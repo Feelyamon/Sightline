@@ -80,6 +80,7 @@ $('tabs').addEventListener('click', (e) => {
     refreshDbStats();
     refreshWindowFlags();
   }
+  if (tab.dataset.tab === 'account') refreshAccount();
   if (tab.dataset.tab === 'help') renderHelp();
   if (tab.dataset.tab === 'about') renderAbout();
 });
@@ -960,6 +961,161 @@ async function refreshMine() {
 }
 
 $('minePeriod').addEventListener('change', refreshMine);
+
+// --- Аккаунт ------------------------------------------------------------
+
+const AUTH_SCREENS = ['authGuest', 'authSignIn', 'authRegister', 'authSignedIn'];
+
+function showAuthScreen(id) {
+  for (const screen of AUTH_SCREENS) $(screen).hidden = screen !== id;
+  for (const box of ['siError', 'regError']) $(box).hidden = true;
+}
+
+async function refreshAccount() {
+  const state = await window.wt.account.state();
+  if (state.signedIn) {
+    $('accLogin').textContent = state.login;
+    $('accRole').textContent = t(state.isAdmin ? 'acc.role.admin' : 'acc.role.user');
+    showAuthScreen('authSignedIn');
+  } else {
+    showAuthScreen('authGuest');
+  }
+  return state;
+}
+
+/**
+ * Показывает ошибку запроса. Отсутствие сети отделено от отказа сервера:
+ * «нет связи» — это не «неверный пароль», и человек должен понимать, что
+ * ему делать, а не гадать.
+ */
+function showAuthError(boxId, error) {
+  const box = $(boxId);
+  box.textContent = error?.offline ? t('acc.offline') : error?.message || String(error);
+  box.hidden = false;
+}
+
+/** Блокирует форму на время запроса: два нажатия подряд — два аккаунта. */
+function setBusy(button, busy) {
+  button.disabled = busy;
+  button.dataset.label = button.dataset.label || button.textContent;
+  button.textContent = busy ? t('acc.working') : button.dataset.label;
+}
+
+$('authShowSignIn').addEventListener('click', () => showAuthScreen('authSignIn'));
+$('authShowRegister').addEventListener('click', () => {
+  if (!$('regNick').value) $('regNick').value = $('nick').value || '';
+  showAuthScreen('authRegister');
+});
+for (const back of document.querySelectorAll('.auth-back')) {
+  back.addEventListener('click', () => showAuthScreen('authGuest'));
+}
+
+$('authSignIn').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const button = $('siSubmit');
+  setBusy(button, true);
+  try {
+    await window.wt.account.signIn({
+      login: $('siLogin').value.trim(),
+      password: $('siPassword').value,
+    });
+    $('siPassword').value = '';
+    await refreshAccount();
+  } catch (err) {
+    showAuthError('siError', err);
+  } finally {
+    setBusy(button, false);
+  }
+});
+
+// Кнопка регистрации оживает только вместе с галочкой согласия: без согласия
+// обрабатывать персональные данные нельзя, а логин с паролем — уже они.
+const updateRegisterButton = () => {
+  $('regSubmit').disabled = !$('regConsent').checked;
+};
+$('regConsent').addEventListener('change', updateRegisterButton);
+
+$('authRegister').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = $('regPassword').value;
+  if (password !== $('regPassword2').value) {
+    showAuthError('regError', { message: t('acc.mismatch') });
+    return;
+  }
+
+  const button = $('regSubmit');
+  setBusy(button, true);
+  try {
+    const result = await window.wt.account.register({
+      login: $('regLogin').value.trim(),
+      password,
+      lang: window.i18n.lang(),
+      acceptTerms: $('regConsent').checked,
+    });
+    $('regPassword').value = '';
+    $('regPassword2').value = '';
+
+    // Ник из формы сразу уезжает в настройки: человек всё равно должен был бы
+    // вписать его вручную, иначе программа не отличит его в бою от остальных.
+    // Спросить один раз при регистрации дешевле, чем оставить его гадать,
+    // почему таблица не подсвечивает его строку.
+    const nick = $('regNick').value.trim();
+    if (nick) {
+      await window.wt.setNick(nick);
+      $('nick').value = nick;
+    }
+
+    await refreshAccount();
+    showRecoveryCode(result.recoveryCode);
+  } catch (err) {
+    showAuthError('regError', err);
+  } finally {
+    setBusy(button, false);
+  }
+});
+
+$('authSignOut').addEventListener('click', async () => {
+  await window.wt.account.signOut();
+  await refreshAccount();
+});
+
+// --- Код восстановления --------------------------------------------------
+
+function showRecoveryCode(code) {
+  $('codeValue').textContent = code;
+  $('codeStatus').textContent = '';
+  $('codeConfirm').checked = false;
+  $('codeClose').disabled = true;
+  $('codeModal').hidden = false;
+}
+
+$('codeConfirm').addEventListener('change', (e) => {
+  $('codeClose').disabled = !e.target.checked;
+});
+
+$('codeCopy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText($('codeValue').textContent);
+  $('codeStatus').textContent = t('code.copied');
+});
+
+$('codeSave').addEventListener('click', async () => {
+  const file = await window.wt.account.saveRecoveryCode($('codeValue').textContent);
+  if (file) $('codeStatus').textContent = t('code.saved', { file });
+});
+
+$('codeClose').addEventListener('click', () => {
+  $('codeModal').hidden = true;
+  // Код стираем из разметки сразу: он больше нигде не хранится, и оставлять
+  // его висеть в закрытом окне незачем.
+  $('codeValue').textContent = '';
+});
+
+for (const [id, page] of [['linkTerms', 'terms'], ['linkPrivacy', 'privacy']]) {
+  $(id).addEventListener('click', (e) => {
+    e.preventDefault();
+    window.wt.openExternal(page);
+  });
+}
 
 // --- Инструкция и «О программе» -----------------------------------------
 

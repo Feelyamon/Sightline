@@ -518,3 +518,51 @@ label.row[hidden] { display: none; }
 .tile.inline { padding: 6px 12px; }
 .tile.inline .value { font-size: 20px; }
 .modal input { margin-top: 6px; }
+
+/* --- Аккаунт --- */
+.auth { max-width: 460px; }
+.auth h2 { font-size: 20px; margin: 4px 0 10px; font-weight: 600; }
+.auth ul { padding-left: 20px; margin: 6px 0 14px; }
+.auth li { margin-bottom: 6px; }
+.auth .field { margin-bottom: 14px; }
+.auth .hint { font-size: 12px; margin-top: 4px; }
+.auth-error {
+  margin: 10px 0;
+  padding: 9px 12px;
+  border: 1px solid #46282c;
+  border-left: 3px solid var(--danger);
+  border-radius: 6px;
+  color: #ffb3b3;
+  font-size: 14px;
+}
+.auth-error[hidden] { display: none; }
+/* Галочка согласия и текст рядом: без выравнивания по верху длинный текст
+   уползает от квадратика. */
+label.row.consent { align-items: flex-start; gap: 10px; margin: 14px 0; }
+label.row.consent input { margin-top: 3px; }
+.note-block {
+  margin: 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #e0b354;
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 14px;
+}
+.note-block p { margin: 6px 0 0; }
+.account-login { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
+
+/* Код восстановления: крупно и моноширинно — его переписывают глазами. */
+.recovery-code {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 24px;
+  letter-spacing: .12em;
+  text-align: center;
+  user-select: all;
+}

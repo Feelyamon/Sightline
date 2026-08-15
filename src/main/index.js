@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, dialog } = require('electron');
 
 const { WtClient } = require('./wt-client');
 const { BattleState } = require('./battle-state');
@@ -420,6 +420,30 @@ handle('app:resetBattle', () => {
 handle('account:state', () => account.state());
 handle('account:register', (_e, form) => account.register(form || {}));
 handle('account:signIn', (_e, form) => account.signIn(form || {}));
+handle('account:saveRecoveryCode', async (_e, code) => {
+  // Диалог сохранения, а не тихая запись в заранее выбранную папку: человек
+  // должен знать, где лежит единственный ключ от его аккаунта.
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: 'sightline-recovery-code.txt',
+    filters: [{ name: 'Text', extensions: ['txt'] }],
+  });
+  if (canceled || !filePath) return null;
+  const dict = locale.dictionary(settings.get('uiLang'));
+  const title = dict['code.title'] || 'recovery code';
+  const lead = dict['code.lead'] || '';
+  require('node:fs').writeFileSync(filePath, `Sightline — ${title}\n\n${code}\n\n${lead}\n`, 'utf8');
+  return filePath;
+});
+
+handle('app:openExternal', (_e, page) => {
+  // Только свои страницы и только из белого списка: передавать в браузер
+  // произвольный адрес из окна — способ открыть что угодно чужими руками.
+  const pages = { terms: '/terms', privacy: '/privacy', rights: '/rights' };
+  const route = pages[page];
+  if (!route) throw new Error('неизвестная страница');
+  return shell.openExternal('https://sightline.feelyamon.ru' + route);
+});
+
 handle('account:signOut', () => account.signOut());
 
 handle('db:counters', () => db.counters());

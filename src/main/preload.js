@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('wt', {
   setUiScale: (value) => invoke('app:setUiScale', value),
   setLang: (lang) => invoke('app:setLang', lang),
   about: () => invoke('app:about'),
+  openExternal: (page) => invoke('app:openExternal', page),
   windowFlags: () => invoke('app:windowFlags'),
   setWindowFlag: (name, value) => invoke('app:setWindowFlag', name, value),
   resetBattle: () => invoke('app:resetBattle'),
@@ -20,6 +21,7 @@ contextBridge.exposeInMainWorld('wt', {
     register: (form) => invoke('account:register', form),
     signIn: (form) => invoke('account:signIn', form),
     signOut: () => invoke('account:signOut'),
+    saveRecoveryCode: (code) => invoke('account:saveRecoveryCode', code),
   },
 
   db: {

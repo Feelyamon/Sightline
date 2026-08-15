@@ -15,6 +15,7 @@
       <button class="tab" data-tab="players" data-i18n="tab.players">Игроки</button>
       <button class="tab" data-tab="mine" data-i18n="tab.mine">Моя техника</button>
       <button class="tab" data-tab="settings" data-i18n="tab.settings">Настройки</button>
+      <button class="tab" data-tab="account" data-i18n="tab.account"></button>
       <button class="tab" data-tab="help" data-i18n="tab.help"></button>
       <button class="tab" data-tab="about" data-i18n="tab.about"></button>
     </nav>
@@ -277,6 +278,96 @@
         <pre class="muted log" id="unparsed"></pre>
       </div>
     </section>
+    <!-- Аккаунт -->
+    <section class="panel" id="panel-account">
+      <div class="auth" id="authGuest">
+        <h2 data-i18n="acc.guest.title"></h2>
+        <p class="muted" data-i18n="acc.guest.text"></p>
+        <div class="section-title" data-i18n="acc.guest.why"></div>
+        <ul class="muted">
+          <li data-i18n="acc.guest.why1"></li>
+          <li data-i18n="acc.guest.why2"></li>
+          <li data-i18n="acc.guest.why3"></li>
+        </ul>
+        <div class="buttons">
+          <button id="authShowSignIn" data-i18n="acc.signIn"></button>
+          <button id="authShowRegister" data-i18n="acc.register"></button>
+        </div>
+      </div>
+
+      <form class="auth" id="authSignIn" hidden>
+        <h2 data-i18n="acc.signIn"></h2>
+        <label class="row field">
+          <span class="muted" data-i18n="acc.login"></span>
+          <input type="text" id="siLogin" autocomplete="username" />
+        </label>
+        <label class="row field">
+          <span class="muted" data-i18n="acc.password"></span>
+          <input type="password" id="siPassword" autocomplete="current-password" />
+        </label>
+        <div class="auth-error" id="siError" hidden></div>
+        <div class="buttons">
+          <button type="submit" id="siSubmit" data-i18n="acc.signIn"></button>
+          <button type="button" class="auth-back" data-i18n="acc.back"></button>
+        </div>
+      </form>
+
+      <form class="auth" id="authRegister" hidden>
+        <h2 data-i18n="acc.register"></h2>
+        <label class="row field">
+          <span class="muted" data-i18n="acc.login"></span>
+          <input type="text" id="regLogin" autocomplete="username" />
+          <span class="hint muted" data-i18n="acc.loginHint"></span>
+        </label>
+        <label class="row field">
+          <span class="muted" data-i18n="acc.password"></span>
+          <input type="password" id="regPassword" autocomplete="new-password" />
+          <span class="hint muted" data-i18n="acc.passwordHint"></span>
+        </label>
+        <label class="row field">
+          <span class="muted" data-i18n="acc.password2"></span>
+          <input type="password" id="regPassword2" autocomplete="new-password" />
+        </label>
+
+        <label class="row field">
+          <span class="muted" data-i18n="acc.gameNick"></span>
+          <input type="text" id="regNick" autocomplete="off" />
+          <span class="hint muted" data-i18n="acc.gameNickHint"></span>
+        </label>
+
+        <div class="note-block">
+          <b data-i18n="acc.warnTitle"></b>
+          <p class="muted" data-i18n="acc.warnText"></p>
+        </div>
+
+        <label class="row consent">
+          <input type="checkbox" id="regConsent" />
+          <span>
+            <span data-i18n="acc.consent"></span>
+            <a href="#" id="linkTerms" data-i18n="acc.consentTerms"></a>
+            <span data-i18n="acc.consentAnd"></span>
+            <a href="#" id="linkPrivacy" data-i18n="acc.consentPrivacy"></a>
+          </span>
+        </label>
+
+        <div class="auth-error" id="regError" hidden></div>
+        <div class="buttons">
+          <button type="submit" id="regSubmit" disabled data-i18n="acc.register"></button>
+          <button type="button" class="auth-back" data-i18n="acc.back"></button>
+        </div>
+      </form>
+
+      <div class="auth" id="authSignedIn" hidden>
+        <h2 data-i18n="acc.signedInAs"></h2>
+        <p class="account-login" id="accLogin"></p>
+        <p class="muted" id="accRole"></p>
+        <div class="buttons">
+          <button id="authSignOut" data-i18n="acc.signOut"></button>
+        </div>
+        <p class="muted small" data-i18n="acc.signOutHint"></p>
+      </div>
+    </section>
+
     <!-- Инструкция: длинный текст, поэтому разделы генерируются из словаря -->
     <section class="panel prose" id="panel-help">
       <p class="lead" data-i18n="help.intro"></p>
@@ -292,6 +383,28 @@
       <p class="muted small" data-i18n="about.disclaimer"></p>
     </section>
   </main>
+
+  <!-- Код восстановления: показывается один раз и закрывается только после
+       подтверждения. Код, показанный мельком, равносилен его отсутствию. -->
+  <div class="modal-backdrop" id="codeModal" hidden>
+    <div class="modal">
+      <h2 data-i18n="code.title"></h2>
+      <p class="muted" data-i18n="code.lead"></p>
+      <div class="recovery-code" id="codeValue"></div>
+      <div class="buttons">
+        <button id="codeCopy" data-i18n="code.copy"></button>
+        <button id="codeSave" data-i18n="code.save"></button>
+      </div>
+      <p class="muted small" id="codeStatus"></p>
+      <label class="row consent">
+        <input type="checkbox" id="codeConfirm" />
+        <span data-i18n="code.confirm"></span>
+      </label>
+      <div class="buttons">
+        <button id="codeClose" disabled data-i18n="code.close"></button>
+      </div>
+    </div>
+  </div>
 
   <!-- Карточка игрока: история встреч и ручная заметка -->
   <div class="modal-backdrop" id="cardModal" hidden>
