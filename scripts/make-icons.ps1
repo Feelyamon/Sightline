@@ -55,6 +55,7 @@ try {
     $bmp.Dispose()
     Write-Host ("{0}  {1}x{1}" -f $t.Path, $t.Size)
   }
+
 } finally {
   $src.Dispose()
 }

@@ -325,6 +325,13 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.whenReady().then(() => {
+  // Windows связывает окно с приложением по этому идентификатору. Без него
+  // панель задач считает программу «каким-то Electron» и рисует его логотип
+  // вместо нашего — независимо от того, какая иконка задана окну. Значение
+  // обязано совпадать с appId из package.json, иначе установленная программа
+  // и запущенная из исходников окажутся для системы разными приложениями.
+  if (process.platform === 'win32') app.setAppUserModelId('ru.feelyamon.sightline');
+
   settings = new Settings(app.getPath('userData'));
   db = new Db(app.getPath('userData'));
   account = new Account(app.getPath('userData'));

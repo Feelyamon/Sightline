@@ -4,8 +4,10 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const zlib = require('node:zlib');
 
 const rules = require('../src/main/window-rules');
+const { appIcon } = require('../src/main/icon');
 
 // --- Показ и скрытие окна -------------------------------------------------
 
@@ -66,4 +68,26 @@ test('иконка приложения — PNG не меньше 256 пиксе
   const height = png.readUInt32BE(20);
   assert.equal(width, height, 'иконка должна быть квадратной');
   assert.ok(width >= 256, `сторона ${width} — установщику нужно не меньше 256`);
+});
+
+test('знак для трея читается в шестнадцати пикселях', () => {
+  // Лого нарисовано тонкими линиями и в этом размере превращается в светлое
+  // пятно — проверено глазами на увеличенном снимке. Поэтому знак для трея
+  // рисуется кодом сплошной заливкой. Тест проверяет не красоту, а то, ради
+  // чего он и рисуется: что в кадре есть заметное пятно и есть прозрачный
+  // фон — то есть что-то различимое, а не заливка целиком и не пустота.
+  const size = 16;
+  const png = appIcon(size);
+  const start = png.indexOf(Buffer.from('IDAT', 'ascii'));
+  const length = png.readUInt32BE(start - 4);
+  const raw = zlib.inflateSync(png.subarray(start + 4, start + 4 + length));
+
+  let visible = 0;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (raw[y * (size * 4 + 1) + 1 + x * 4 + 3] > 128) visible += 1;
+    }
+  }
+  assert.ok(visible > size, `непрозрачных пикселей маловато: ${visible}`);
+  assert.ok(visible < size * size * 0.8, 'фон должен остаться прозрачным');
 });
