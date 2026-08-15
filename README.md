@@ -1,25 +1,27 @@
 # Sightline
 
-Companion-приложение для War Thunder. Читает кил-фид из локального веб-сервера самой игры
-(`http://127.0.0.1:8111`), показывает, кто на какой технике воюет, и копит статистику боёв и
-игроков в локальной базе.
+🇬🇧 English · [🇷🇺 Русский](README.ru.md) · [🇨🇳 中文](README.zh.md)
 
-> Проект не аффилирован с Gaijin Entertainment и не связан с ней. War Thunder — товарный знак
-> Gaijin Entertainment; название здесь используется только для указания совместимости.
-> Приложение работает исключительно с локальным API, который игра предоставляет сама, и ничего
-> в игровом клиенте не модифицирует.
+A companion app for War Thunder. It reads the kill feed from the game's own local web server
+(`http://127.0.0.1:8111`), shows who is fighting in what vehicle right now, and builds up a local
+history of battles and players.
 
-## Про честность
+> Not affiliated with or endorsed by Gaijin Entertainment. War Thunder is a trademark of Gaijin
+> Entertainment; the name is used here only to state compatibility. The app talks exclusively to the
+> local API the game exposes itself and modifies nothing in the game client.
 
-`127.0.0.1:8111` — официальный локальный API, который War Thunder поднимает сам (на нём работают
-стримерские оверлеи, WTRTI и подобные тулзы). Эндпоинт `/hudmsg` отдаёт ровно тот кил-фид, который
-уже нарисован у тебя на экране. Позиций незасвеченных врагов, состояния их машин и прочих скрытых
-данных там нет — приложение просто запоминает за тебя то, что ты и так читаешь глазами.
+## Is this allowed?
 
-**Важное ограничение:** полного скорборда игра наружу не отдаёт. Игрок попадает в таблицу только
-после того, как он кого-то убил, кого-то повредил или был убит.
+`127.0.0.1:8111` is an official local API that War Thunder starts on its own — the same one used by
+streaming overlays, WTRTI and similar tools. The `/hudmsg` endpoint returns exactly the kill feed
+that is already drawn on your screen. It contains no hidden data: no positions of unspotted enemies,
+no state of their vehicles. The app simply remembers what you are already reading with your own eyes.
 
-## Запуск
+**The limitation that shapes everything:** the game does not expose a full scoreboard. A player only
+appears in the table after they kill someone, damage someone, or get killed. In practice that covers
+most of the lobby a few minutes into a battle, but never all of it instantly.
+
+## Running
 
 ```bash
 npm install
@@ -29,79 +31,113 @@ npm install
 npm start
 ```
 
-Мок-режим (без игры, проигрывает `fixtures/hudmsg-sample.json`):
+Mock mode replays a recorded battle from `fixtures/hudmsg-live.json`, so you can see the interface
+without launching the game:
 
 ```bash
 npm run mock
 ```
 
-Тесты:
+Tests:
 
 ```bash
 npm test
 ```
 
-## Одно окно, четыре вкладки
+## One window, six tabs
 
-- **Бой** — живая таблица, слева свои, справа противники. Перед названием техники иконка класса
-  (`▮` наземка, `◬` ЗСУ, `✈` самолёт, `⊹` вертолёт).
-- **Счётчики** — четыре плитки: с запуска приложения, сегодня, неделя, месяц. У каждой свой сброс;
-  очистка всей истории обнуляет все четыре. Ниже — список последних боёв с удалением по одному.
-- **Игроки** — топ союзников и топ противников за период, с порогом «минимум встреч».
-- **Настройки** — ник, окно поверх других, состояние базы и опасные операции.
+- **Battle** — the live table: allies on the left, enemies on the right. Each vehicle carries a class
+  icon (`▮` ground, `◬` SPAA, `✈` plane, `⊹` helicopter). Your own row is highlighted.
+- **Counters** — four tiles: since launch, today, this week, this month. Each resets independently.
+- **Battles** — battle history; click a battle to expand its full roster with awards and vehicles.
+- **Players** — top allies and top enemies for a period, with a "minimum encounters" threshold.
+- **My vehicles** — win rate plus per-vehicle stats, next to what the enemy team brings most often.
+  Every column is sortable.
+- **Settings** — your nickname, always-on-top, database size and the destructive operations.
 
-Счётчики не хранят числа: в базе лежит момент последнего сброса, а число боёв считается запросом.
-Поэтому сброс счётчика ничего не удаляет, а удаление истории обнуляет счётчики само.
+Counters do not store numbers. The database keeps the moment of the last reset, and the count is a
+query — so resetting a counter deletes nothing, and clearing history zeroes all counters by itself.
 
-## База данных
+## How it reads a battle
 
-SQLite через встроенный в Node модуль `node:sqlite` — **нативных зависимостей нет**, ничего не
-компилируется и не пересобирается под ABI Electron. Файл: `%APPDATA%/Sightline/battles.db`.
+**Battle boundaries.** Message ids in `/hudmsg` run through the whole game session and do not restart
+per battle, and the log is a sliding window covering several battles at once. The only reliable
+boundary is the `time` field — seconds since battle start, which drops when a new battle begins.
+Note that the respawn screen also reports `valid: false`, exactly like the hangar, so a short break
+is never treated as a new battle.
 
-Перед любой разрушительной операцией автоматически создаётся копия файла рядом с базой, а само
-действие требует ввода слова подтверждения — случайный мисклик ничего не сломает.
+**Teams.** The API carries no team flag. Sides are derived from a graph: every kill or damage event
+means "these two are on opposite sides", and the colouring spreads from there. Two anchors tie that
+graph to *your* side — you appearing in the feed, and team chat from `/gamechat`, which only your own
+team can see. Players not yet connected to your side are shown grouped: within a group it is known
+who opposes whom, just not which half is yours.
 
-## Как пользоваться
+**What is filtered out.** Recon drones, missiles and other game entities (`[ии] Recon Micro`,
+`weapons/us_agm_88a/short`, `130mm_9m120_1`) are not players: destroying one is neither a death nor
+a frag.
 
-1. В главном окне введи **свой ник в игре** — без него приложение не сможет отличить своих от врагов
-   (в API признака команды нет, команды выводятся из того, кто кого убивает).
-   Клан-тег писать не нужно: `Username` найдётся и в строке `[CLAN] Username`.
-2. Кнопка «Открыть скорборд» — отдельное окно с таблицей. Галка «поверх всех окон» работает, если
-   игра запущена в режиме **оконный без рамки**; поверх эксклюзивного fullscreen Windows её не покажет.
-3. Бой сбрасывается автоматически при старте новой миссии. Между боями ничего не сохраняется.
+## Database
 
-## Что показывает скорборд
+SQLite through Node's built-in `node:sqlite` module — **no native dependencies**, nothing to compile
+or rebuild against the Electron ABI. File: `%APPDATA%/Sightline/battles.db`.
 
-| Колонка | Смысл |
+Nothing is ever deleted automatically. Measured on the real schema (32 players per battle with their
+sorties, duels and awards):
+
+| Battles | Size |
 |---|---|
-| K / D | фраги и потери за бой |
-| Статус | `в бою` · `уничтожен` · `вышел` · `не выехал` |
-| Сейчас | техника под игроком прямо сейчас. Если он мёртв — зачёркнутая машина, на которой его сожгли, и пометка «ещё не выехал» |
-| Выкатывал | все вылеты по порядку: чип на каждый выезд, `×N` — фраги на этой машине, зачёркнутый чип — машину потеряли. Респавн на той же технике — отдельный чип |
-| Видели | сколько назад игрок последний раз светился в фиде |
+| 1 000 | 13 MB |
+| 10 000 | 126 MB |
+| 50 000 | 632 MB |
 
-Вышедшие из боя уезжают вниз списка и притухают. В заголовке секции — сколько всего игроков
-известно и сколько из них сейчас живы.
+Every destructive operation makes a backup copy next to the database first and requires typing a
+confirmation word, so a stray click costs nothing.
 
-**Разведдроны игнорируются**: сбитие «Recon Micro» и подобных не считается смертью игрока и не
-попадает в историю техники — свою машину он при этом не теряет. Список — `DRONE_PATTERNS`
-в `src/main/verbs.js`.
+## Getting started
 
-## Структура
+1. Enter **your in-game nickname** in Settings. Without it the app cannot tell allies from enemies.
+   The clan tag is not needed: `Username` matches `[CLAN] Username`.
+2. "Always on top" works when the game runs in **borderless windowed** mode; Windows will not show it
+   over exclusive fullscreen.
+3. The table clears when a new battle starts, not when you die or return to the hangar.
 
-| Файл | Назначение |
+## What the battle table shows
+
+| Column | Meaning |
 |---|---|
-| `src/main/wt-client.js` | поллинг `/hudmsg` и `/map_info.json`, курсоры, детект боя |
-| `src/main/killfeed-parser.js` | строка кил-фида → участники и тип события |
-| `src/main/verbs.js` | списки глаголов (ru/en) — единственное место для доработки под новые формулировки |
-| `src/main/battle-state.js` | K/D, вылеты, статусы, раскраска команд (union-find с чётностью) |
-| `src/main/vehicle-class.js` | класс техники для иконок: шаблоны имён + подсказка из глагола |
-| `src/main/db.js` | SQLite: бои, игроки, счётчики, сбросы, бэкапы |
-| `src/renderer/` | одно окно: вкладки, сплит своих и врагов |
+| K / D / A | frags, losses and assists. Assists are derived, not reported: you damaged a target, someone else finished it |
+| ★ | awards earned this battle — hover for the list. Only awards the game writes into the kill feed |
+| Status | `in battle` · `destroyed · choosing` · `left` · `not deployed` |
+| Vehicles | one chip per sortie in order. `×N` — frags on that vehicle, a struck-through chip means it was destroyed, a solid border marks the current one, a dashed one means the sortie ended without a confirmed death |
 
-Планы по этапам — [docs/PLAN.md](docs/PLAN.md).
+The player who killed you last is outlined in gold — the target for the *Eye for an Eye* award. The
+outline disappears once the award is out of reach.
 
-## Доработка парсера
+## What is not possible
 
-Если в главном окне появился блок «Нераспознанные строки кил-фида» — скопируй строку и добавь её
-глагол в `src/main/verbs.js`. Больше нигде править не нужно.
+- **Battle rewards and XP.** The post-battle results screen is not exposed by the local API at all.
+  Only OCR of the screen could get it — a separate project.
+- **Map name and battle rating.** Not in the API either.
+- **The full player list.** See the limitation above.
+
+## Layout
+
+| File | Purpose |
+|---|---|
+| `src/main/wt-client.js` | polling `/hudmsg`, `/map_info.json`, `/gamechat`; battle boundaries |
+| `src/main/killfeed-parser.js` | a feed line → participants, event type, awards |
+| `src/main/verbs.js` | verb and award phrasings (ru/en) — the one place to extend |
+| `src/main/battle-state.js` | K/D/A, sorties, statuses, team graph (union-find with parity) |
+| `src/main/vehicle-class.js` | vehicle class for icons; filters out game entities |
+| `src/main/db.js` | SQLite: battles, players, counters, awards, backups |
+| `src/renderer/` | the single window: tabs, ally/enemy split |
+
+Roadmap: [docs/PLAN.md](docs/PLAN.md).
+
+## Extending the parser
+
+If the "unrecognised kill feed lines" block appears in Settings, copy the line and add its phrasing
+to `src/main/verbs.js`. Nothing else needs editing.
+
+One trap worth knowing: in JavaScript `\b` is based on ASCII word characters, so it never matches
+next to Cyrillic. Patterns for Russian phrasings must not use it.
