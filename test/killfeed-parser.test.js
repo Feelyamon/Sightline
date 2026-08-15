@@ -113,6 +113,12 @@ test('живое: награды разбираются с названием и
   assert.equal(saver.award, 'Спасатель танков');
   assert.equal(saver.count, 2);
 
+  // Живой случай: у части наград после числа стоит восклицательный знак,
+  // и уровни одной награды разъезжались на отдельные записи.
+  const shadow = parseMessage('Ник (Т-80БВМ) получил "Удар из тени: x5!"');
+  assert.equal(shadow.award, 'Удар из тени');
+  assert.equal(shadow.count, 5);
+
   // Награда без кавычек — своя формулировка.
   const first = parseMessage('[CLNC] Ник (Leopard 2A4M) ударил первым!');
   assert.equal(first.type, 'award');

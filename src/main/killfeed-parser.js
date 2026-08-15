@@ -84,9 +84,11 @@ function parseAward(text) {
     if (!m) continue;
     const actor = parseParticipant(text.slice(0, m.index));
     if (!actor) continue;
-    // Повторяемые награды приходят с хвостом «: x3».
+    // Повторяемые награды приходят с хвостом «: x3» — иногда с восклицательным
+    // знаком («Удар из тени: x5!»). Без него уровни одной награды разъезжались
+    // на отдельные записи.
     const raw = m[1].trim();
-    const withCount = /^(.*?):\s*x\s*(\d+)$/i.exec(raw);
+    const withCount = /^(.*?):\s*x\s*(\d+)\s*!?$/i.exec(raw);
     return {
       type: 'award',
       actor,

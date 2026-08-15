@@ -103,6 +103,11 @@ th {
   letter-spacing: .04em;
 }
 td.num, th.num { text-align: right; width: 30px; white-space: nowrap; }
+
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sorted { color: var(--accent); }
+.sort-arrow { font-size: 10px; }
 /* Ник показываем целиком и одной строкой: перенос рвал его посреди слова.
    Если не влезает — половина экрана прокручивается по горизонтали (.side). */
 td.nick { white-space: nowrap; }

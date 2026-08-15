@@ -493,32 +493,96 @@ $('minBattles').addEventListener('change', refreshPlayers);
 
 // --- Вкладка «Моя техника» ----------------------------------------------
 
+/** Винрейт по машине: только бои, где исход удалось распознать. */
+function winrateOf(r) {
+  const decided = (r.wins || 0) + (r.losses_battles || 0);
+  return decided ? r.wins / decided : null;
+}
+
+// Колонки таблиц «Моей техники». value — по чему сортируем, cell — что рисуем.
+const MY_COLUMNS = [
+  { key: 'vehicle', title: 'Техника', value: (r) => (r.label || r.vehicle).toLowerCase() },
+  { key: 'sorties', title: 'Вылетов', num: true, value: (r) => r.sorties },
+  { key: 'kills', title: 'Фрагов', num: true, value: (r) => r.kills || 0 },
+  { key: 'losses', title: 'Потерь', num: true, value: (r) => r.losses || 0 },
+  {
+    key: 'winrate',
+    title: 'Винрейт',
+    num: true,
+    // Машины без известного исхода держим внизу при любом направлении.
+    value: (r) => (winrateOf(r) === null ? -1 : winrateOf(r)),
+  },
+];
+
+const ENEMY_COLUMNS = [
+  { key: 'vehicle', title: 'Техника', value: (r) => (r.label || r.vehicle).toLowerCase() },
+  { key: 'sorties', title: 'Вылетов', num: true, value: (r) => r.sorties },
+  { key: 'kills', title: 'Фрагов', num: true, value: (r) => r.kills || 0 },
+  { key: 'players', title: 'Игроков', num: true, value: (r) => r.players },
+];
+
+// Состояние сортировки у каждой таблицы своё.
+const sortState = {
+  mine: { key: 'sorties', dir: 'desc' },
+  enemy: { key: 'sorties', dir: 'desc' },
+};
+
 function vehicleTable(rows, { mine }) {
   if (!rows.length) {
     return el('div', 'empty', mine ? 'Данных пока нет' : 'Противники ещё не набрались');
   }
 
-  const table = el('table');
-  table.innerHTML = mine
-    ? '<thead><tr><th>Техника</th><th class="num">Вылетов</th><th class="num">Фрагов</th>' +
-      '<th class="num">Потерь</th><th>Винрейт</th></tr></thead>'
-    : '<thead><tr><th>Техника</th><th class="num">Вылетов</th><th class="num">Фрагов</th>' +
-      '<th class="num">Игроков</th></tr></thead>';
-  const tbody = el('tbody');
+  const columns = mine ? MY_COLUMNS : ENEMY_COLUMNS;
+  const state = sortState[mine ? 'mine' : 'enemy'];
+  const column = columns.find((c) => c.key === state.key) || columns[1];
 
-  for (const r of rows) {
+  const sorted = [...rows].sort((a, b) => {
+    const av = column.value(a);
+    const bv = column.value(b);
+    const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+    return state.dir === 'asc' ? cmp : -cmp;
+  });
+
+  const table = el('table');
+  const thead = el('thead');
+  const headRow = el('tr');
+  for (const c of columns) {
+    const th = el('th', `sortable${c.num ? ' num' : ''}`);
+    th.append(c.title);
+    if (c.key === state.key) {
+      th.append(el('span', 'sort-arrow', state.dir === 'asc' ? ' ↑' : ' ↓'));
+      th.classList.add('sorted');
+    }
+    th.title = 'Нажми, чтобы отсортировать';
+    th.addEventListener('click', () => {
+      // Повторный клик по той же колонке переворачивает порядок.
+      if (state.key === c.key) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+      else {
+        state.key = c.key;
+        // Числа интереснее сверху вниз, названия — по алфавиту.
+        state.dir = c.num ? 'desc' : 'asc';
+      }
+      refreshMine();
+    });
+    headRow.append(th);
+  }
+  thead.append(headRow);
+  table.append(thead);
+
+  const tbody = el('tbody');
+  for (const r of sorted) {
     const tr = el('tr');
     const veh = el('td');
     veh.append(vehicleNode(r.label || r.vehicle, r.class));
     veh.title = r.vehicle;
 
     if (mine) {
-      const decided = (r.wins || 0) + (r.losses_battles || 0);
-      const wr = decided ? `${Math.round((r.wins / decided) * 100)}%` : '—';
-      const cell = el('td', decided ? '' : 'muted', wr);
-      cell.title = decided
-        ? `побед ${r.wins} из ${decided} боёв с известным исходом`
-        : 'исход этих боёв не определён';
+      const ratio = winrateOf(r);
+      const cell = el('td', `num${ratio === null ? ' muted' : ''}`, ratio === null ? '—' : `${Math.round(ratio * 100)}%`);
+      cell.title =
+        ratio === null
+          ? 'исход этих боёв не определён'
+          : `побед ${r.wins} из ${(r.wins || 0) + (r.losses_battles || 0)} боёв с известным исходом`;
       tr.append(
         veh,
         el('td', 'num', String(r.sorties)),
