@@ -49,6 +49,16 @@
     <symbol id="i-about" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.4v.2" />
     </symbol>
+    <!-- Щит: раздел администратора. -->
+    <symbol id="i-admin" viewBox="0 0 24 24">
+      <path d="M12 3l7 3v5.5c0 4.2-2.8 7.6-7 9.5-4.2-1.9-7-5.3-7-9.5V6z" />
+      <path d="M9 12l2.2 2.2L15.5 10" />
+    </symbol>
+    <!-- Жучок: сообщить о проблеме. -->
+    <symbol id="i-report" viewBox="0 0 24 24">
+      <rect x="7.5" y="8" width="9" height="11" rx="4.5" />
+      <path d="M9.5 8a2.5 2.5 0 0 1 5 0M3.5 11h4M16.5 11h4M3.5 17h4M16.5 17h4M9.6 6.2 8.2 4.6M14.4 6.2l1.4-1.6" />
+    </symbol>
   </svg>
 
   <header class="topbar">
@@ -111,6 +121,16 @@
       <button class="tab" data-tab="about" data-i18n-title="tab.about">
         <svg class="tab-icon"><use href="#i-about" /></svg>
         <span class="tab-label" data-i18n="tab.about"></span>
+      </button>
+      <!-- Виден только администратору. Прятать кнопку — не защита (она на
+           сервере, по типу аргумента), но показывать её всем незачем. -->
+      <button class="tab" data-tab="admin" id="tabAdmin" hidden data-i18n-title="tab.admin">
+        <svg class="tab-icon"><use href="#i-admin" /></svg>
+        <span class="tab-label" data-i18n="tab.admin"></span>
+      </button>
+      <button class="tab-report" id="reportBtn" data-i18n-title="report.open">
+        <svg class="tab-icon"><use href="#i-report" /></svg>
+        <span class="tab-label" data-i18n="report.short"></span>
       </button>
     </nav>
 
@@ -471,6 +491,33 @@
       </div>
     </section>
 
+    <!-- Администрирование. Доступ проверяет сервер; здесь только интерфейс. -->
+    <section class="panel" id="panel-admin">
+      <div class="controls">
+        <label class="row grow">
+          <span class="muted" data-i18n="admin.find"></span>
+          <input type="search" id="adminQuery" data-i18n-placeholder="admin.findPlaceholder"
+                 autocomplete="off" />
+        </label>
+        <button id="adminSearch" data-i18n="admin.search"></button>
+      </div>
+      <div class="auth-error" id="adminError" hidden></div>
+      <div id="adminUsers"></div>
+
+      <div class="section-title" data-i18n="admin.reports"></div>
+      <div class="controls">
+        <label class="row">
+          <span class="muted" data-i18n="admin.reportsScope"></span>
+          <span class="sel"><select id="adminReportScope">
+            <option value="open" data-i18n="admin.reportsOpen"></option>
+            <option value="all" data-i18n="admin.reportsAll"></option>
+          </select></span>
+        </label>
+        <button id="adminReportsRefresh" data-i18n="admin.refresh"></button>
+      </div>
+      <div id="adminReports"></div>
+    </section>
+
     <!-- Инструкция: длинный текст, поэтому разделы генерируются из словаря -->
     <section class="panel prose" id="panel-help">
       <p class="lead" data-i18n="help.intro"></p>
@@ -490,6 +537,32 @@
 
   <!-- Код восстановления: показывается один раз и закрывается только после
        подтверждения. Код, показанный мельком, равносилен его отсутствию. -->
+  <!-- Сообщение о проблеме -->
+  <div class="modal-backdrop" id="reportModal" hidden>
+    <div class="modal">
+      <h2 data-i18n="report.title"></h2>
+      <p class="muted" data-i18n="report.lead"></p>
+      <label class="row field">
+        <span class="muted" data-i18n="report.kind"></span>
+        <span class="sel"><select id="reportKind">
+          <option value="bug" data-i18n="report.kind.bug"></option>
+          <option value="idea" data-i18n="report.kind.idea"></option>
+          <option value="other" data-i18n="report.kind.other"></option>
+        </select></span>
+      </label>
+      <label class="row field">
+        <span class="muted" data-i18n="report.text"></span>
+        <textarea id="reportText" rows="7" data-i18n-placeholder="report.placeholder"></textarea>
+      </label>
+      <p class="muted small" id="reportMeta"></p>
+      <div class="auth-error" id="reportError" hidden></div>
+      <div class="buttons">
+        <button id="reportSend" data-i18n="report.send"></button>
+        <button id="reportCancel" data-i18n="report.cancel"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- Удаление боя. Спрашиваем всегда: строка удаляется без следа, а кнопка
        стоит в таблице рядом с обычными действиями и нажимается мимоходом. -->
   <div class="modal-backdrop" id="deleteBattleModal" hidden>

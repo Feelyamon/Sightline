@@ -27,6 +27,11 @@ const dicts = Object.fromEntries(
   localeModule.LANGS.map((code) => [code, localeModule.dictionary(code)])
 );
 
+// Стенд собирается склейкой строк, и синтаксическая ошибка в заглушке
+// проявилась бы уже в браузере — пустым окном без единого объяснения.
+// Проверяем здесь: сломанный стенд лучше не собрать, чем собрать.
+require(path.join(__dirname, 'stub-check.js'));
+
 const stub = read(__dirname, 'stub.js')
   .replace('/*__DICTS__*/ {}', JSON.stringify(dicts))
   .replace('/*__LANGS__*/ []', JSON.stringify(localeModule.available()));

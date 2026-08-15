@@ -486,6 +486,86 @@ handle('account:removeAvatar', async () => {
   return result;
 });
 
+// --- Сообщение о проблеме ------------------------------------------------
+
+handle('support:send', (_e, form = {}) =>
+  // Версии проставляем здесь, а не спрашиваем у человека: он их не знает и не
+  // обязан, а без них половина сообщений неразбираема.
+  account.request('/bugs', {
+    method: 'POST',
+    body: {
+      message: String(form.message || ''),
+      kind: form.kind || 'bug',
+      app_version: app.getVersion(),
+      os_version: `${process.platform} ${require('node:os').release()}`,
+    },
+    // Вход необязателен: у кого не работает именно вход, тот иначе не сможет
+    // пожаловаться ровно на это.
+    auth: account.isSignedIn,
+  })
+);
+
+handle('support:context', () => ({
+  appVersion: app.getVersion(),
+  osVersion: `${process.platform} ${require('node:os').release()}`,
+  signedIn: account.isSignedIn,
+  login: account.state().login,
+}));
+
+// --- Администрирование ----------------------------------------------------
+//
+// Права проверяет сервер типом аргумента обработчика. Здесь только передача:
+// прятать кнопку в интерфейсе защитой не является и таковой не считается.
+
+handle('admin:findUsers', (_e, query) =>
+  account.request(`/admin/users?q=${encodeURIComponent(String(query || ''))}`, { auth: true })
+);
+handle('admin:newRecoveryCode', (_e, accountId) =>
+  account.request('/admin/recovery-code', {
+    method: 'POST',
+    body: { account_id: accountId },
+    auth: true,
+  })
+);
+handle('admin:setPassword', (_e, accountId, newPassword) =>
+  account.request('/admin/password', {
+    method: 'POST',
+    body: { account_id: accountId, new_password: String(newPassword || '') },
+    auth: true,
+  })
+);
+handle('admin:block', (_e, accountId, blocked, reason) =>
+  account.request('/admin/block', {
+    method: 'POST',
+    body: { account_id: accountId, blocked: !!blocked, reason: reason || null },
+    auth: true,
+  })
+);
+handle('admin:setRole', (_e, accountId, role) =>
+  account.request('/admin/role', {
+    method: 'POST',
+    body: { account_id: accountId, role: String(role || 'user') },
+    auth: true,
+  })
+);
+handle('admin:clearAvatar', (_e, accountId) =>
+  account.request('/admin/avatar/clear', {
+    method: 'POST',
+    body: { account_id: accountId },
+    auth: true,
+  })
+);
+handle('admin:reports', (_e, scope) =>
+  account.request(`/admin/bugs?scope=${scope === 'all' ? 'all' : 'open'}`, { auth: true })
+);
+handle('admin:resolveReport', (_e, id, resolved, note) =>
+  account.request('/admin/bugs/resolve', {
+    method: 'POST',
+    body: { id, resolved: resolved !== false, note: note || null },
+    auth: true,
+  })
+);
+
 handle('friends:state', () => friends.state());
 handle('friends:refresh', () => friends.refresh());
 handle('friends:search', (_e, query) => friends.search(String(query || '')));
@@ -520,7 +600,13 @@ handle('app:resetBattle', () => {
 });
 
 handle('account:state', () => account.state());
-handle('account:checkVersion', () => account.checkVersion());
+handle('account:checkVersion', async () => {
+  const version = await account.checkVersion();
+  // Заодно подтягиваем роль: она лежит в сохранённой сессии и сама не
+  // меняется, а права могли выдать уже после входа.
+  if (!version || version.ok !== false) await account.refreshMe();
+  return version;
+});
 handle('account:register', async (event, form) => {
   // Прогресс отдаём в то же окно, откуда пришёл запрос: считать приходится
   // секунды, и без полосы человек решит, что программа зависла.

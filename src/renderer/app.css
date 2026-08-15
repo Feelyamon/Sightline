@@ -782,3 +782,88 @@ label.row.consent input { margin-top: 3px; }
 }
 .trust.confirmed { color: var(--ally); }
 .trust.disputed { color: #e0b354; }
+
+/* --- Кнопка «Сообщить о проблеме» в навигации --- */
+/* Отделена чертой от разделов: это действие, а не место, куда переходят. */
+.tab-report {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 6px;
+  padding: 6px 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 7px 7px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: color 130ms ease, background 130ms ease;
+}
+.tab-report:hover { color: var(--text); background: #202836; }
+
+textarea {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font: inherit;
+  width: 100%;
+  resize: vertical;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+textarea:hover { border-color: #3a4557; }
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 254, .2);
+}
+
+/* --- Админка --- */
+.admin-user {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: var(--panel);
+}
+/* Закрытое сообщение приглушено, но остаётся читаемым: его перечитывают,
+   когда та же проблема приходит второй раз. */
+.admin-user.resolved { opacity: .6; }
+.admin-user-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.admin-login { font-weight: 600; }
+.admin-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+/* Результат действия — строка, которую можно выделить мышью: код
+   восстановления показывается один раз, и «скопировать из всплывашки» тут
+   не годится. */
+.admin-result {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.admin-ask { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.admin-ask input { flex: 1; min-width: 160px; }
+
+/* Текст сообщения как есть, с переносами: люди присылают шаги списком, и
+   склеивать их в абзац — терять смысл. */
+.admin-report-text {
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  -webkit-user-select: text;
+  user-select: text;
+}

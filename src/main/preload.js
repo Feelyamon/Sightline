@@ -28,6 +28,22 @@ contextBridge.exposeInMainWorld('wt', {
     saveRecoveryCode: (code) => invoke('account:saveRecoveryCode', code),
   },
 
+  support: {
+    send: (form) => invoke('support:send', form),
+    context: () => invoke('support:context'),
+  },
+
+  admin: {
+    findUsers: (query) => invoke('admin:findUsers', query),
+    newRecoveryCode: (id) => invoke('admin:newRecoveryCode', id),
+    setPassword: (id, password) => invoke('admin:setPassword', id, password),
+    block: (id, blocked, reason) => invoke('admin:block', id, blocked, reason),
+    setRole: (id, role) => invoke('admin:setRole', id, role),
+    clearAvatar: (id) => invoke('admin:clearAvatar', id),
+    reports: (scope) => invoke('admin:reports', scope),
+    resolveReport: (id, resolved, note) => invoke('admin:resolveReport', id, resolved, note),
+  },
+
   friends: {
     state: () => invoke('friends:state'),
     refresh: () => invoke('friends:refresh'),

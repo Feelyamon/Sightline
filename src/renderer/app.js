@@ -83,6 +83,10 @@ $('tabs').addEventListener('click', (e) => {
   if (tab.dataset.tab === 'account') refreshAccount();
   if (tab.dataset.tab === 'help') renderHelp();
   if (tab.dataset.tab === 'about') renderAbout();
+  if (tab.dataset.tab === 'admin') {
+    refreshAdminUsers();
+    refreshAdminReports();
+  }
 });
 
 // --- Утилиты ------------------------------------------------------------
@@ -1070,6 +1074,236 @@ function showAuthScreen(id) {
   for (const box of ['siError', 'regError']) $(box).hidden = true;
 }
 
+// --- Сообщение о проблеме ------------------------------------------------
+
+$('reportBtn').addEventListener('click', async () => {
+  $('reportError').hidden = true;
+  $('reportText').value = '';
+  $('reportModal').hidden = false;
+  // Версии показываем прямо в окне: человек должен видеть, что уходит вместе
+  // с текстом, а не догадываться.
+  const ctx = await window.wt.support.context();
+  $('reportMeta').textContent = t('report.meta', {
+    version: ctx.appVersion,
+    os: ctx.osVersion,
+    who: ctx.login || t('report.noAccount'),
+  });
+  $('reportText').focus();
+});
+
+$('reportCancel').addEventListener('click', () => {
+  $('reportModal').hidden = true;
+});
+
+$('reportSend').addEventListener('click', async (e) => {
+  const button = e.currentTarget;
+  const message = $('reportText').value.trim();
+  if (message.length < 10) {
+    $('reportError').textContent = t('report.tooShort');
+    $('reportError').hidden = false;
+    return;
+  }
+  setBusy(button, true);
+  try {
+    await window.wt.support.send({ message, kind: $('reportKind').value });
+    $('reportModal').hidden = true;
+    // Подтверждение — в строке состояния: отдельная «спасибо»-модалка поверх
+    // только что закрытой это ещё одно окно, которое надо закрывать.
+    showError(t('report.sent'));
+  } catch (err) {
+    $('reportError').textContent = err?.offline ? t('acc.offline') : err?.message || String(err);
+    $('reportError').hidden = false;
+  } finally {
+    setBusy(button, false);
+  }
+});
+
+// --- Администрирование ---------------------------------------------------
+
+function showAdminError(error) {
+  const box = $('adminError');
+  box.textContent = error?.offline ? t('acc.offline') : error?.message || String(error);
+  box.hidden = false;
+}
+
+/** Кнопка, которая сама блокируется на время запроса и ловит ошибку. */
+function adminButton(label, run, cls) {
+  const button = el('button', `small ${cls || ''}`, label);
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    $('adminError').hidden = true;
+    try {
+      await run();
+    } catch (e) {
+      showAdminError(e);
+    } finally {
+      button.disabled = false;
+    }
+  });
+  return button;
+}
+
+/**
+ * Спрашивает строку. prompt() в Electron не работает, а окно ради одной
+ * строки — это три элемента разметки на каждое действие. Поэтому одно поле,
+ * которое появляется прямо в строке пользователя.
+ */
+function askLine(row, { label, placeholder, password = false }, onDone) {
+  const form = el('form', 'admin-ask');
+  const input = el('input');
+  input.type = password ? 'password' : 'text';
+  input.placeholder = placeholder || '';
+  form.append(el('span', 'muted', label), input, el('button', 'small', t('admin.apply')));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const value = input.value.trim();
+    if (!value) return;
+    form.remove();
+    try {
+      await onDone(value);
+    } catch (err) {
+      showAdminError(err);
+    }
+  });
+  row.append(form);
+  input.focus();
+}
+
+function adminUserRow(u) {
+  const row = el('div', 'admin-user');
+  const head = el('div', 'admin-user-head');
+  head.append(
+    el('span', 'admin-login', u.login),
+    el('span', 'muted', `#${u.id} · ${t(`acc.role.${u.role === 'admin' ? 'admin' : 'user'}`)}`)
+  );
+  if (u.blocked) head.append(el('span', 'trust disputed', t('admin.blocked')));
+  row.append(head);
+
+  const actions = el('div', 'admin-actions');
+
+  actions.append(
+    adminButton(t('admin.newCode'), async () => {
+      const { recovery_code: code } = await window.wt.admin.newRecoveryCode(u.id);
+      // Код показывается один раз и нигде не хранится — в том числе у нас.
+      // Поэтому не всплывающее сообщение, а строка, которую можно выделить.
+      row.append(el('div', 'admin-result', t('admin.newCodeResult', { code })));
+    })
+  );
+
+  actions.append(
+    adminButton(t('admin.setPassword'), () =>
+      askLine(
+        row,
+        { label: t('admin.newPassword'), placeholder: t('acc.passwordHint'), password: true },
+        async (value) => {
+          const { recovery_code: code } = await window.wt.admin.setPassword(u.id, value);
+          row.append(el('div', 'admin-result', t('admin.setPasswordResult', { code })));
+        }
+      )
+    )
+  );
+
+  actions.append(
+    adminButton(t('admin.clearAvatar'), async () => {
+      await window.wt.admin.clearAvatar(u.id);
+      row.append(el('div', 'admin-result', t('admin.clearAvatarDone')));
+    })
+  );
+
+  actions.append(
+    u.blocked
+      ? adminButton(t('admin.unblock'), async () => {
+          await window.wt.admin.block(u.id, false);
+          refreshAdminUsers();
+        })
+      : adminButton(
+          t('admin.block'),
+          () =>
+            // Причина обязательна: молчаливый бан порождает переписку «за что»,
+            // на которую через полгода нечем ответить.
+            askLine(row, { label: t('admin.blockReason'), placeholder: t('admin.blockReasonHint') }, async (reason) => {
+              await window.wt.admin.block(u.id, true, reason);
+              refreshAdminUsers();
+            }),
+          'danger'
+        )
+  );
+
+  actions.append(
+    adminButton(u.role === 'admin' ? t('admin.demote') : t('admin.promote'), async () => {
+      await window.wt.admin.setRole(u.id, u.role === 'admin' ? 'user' : 'admin');
+      refreshAdminUsers();
+    })
+  );
+
+  row.append(actions);
+  return row;
+}
+
+async function refreshAdminUsers() {
+  const query = $('adminQuery').value.trim();
+  $('adminError').hidden = true;
+  try {
+    const users = await window.wt.admin.findUsers(query);
+    $('adminUsers').replaceChildren(
+      ...(users.length ? users.map(adminUserRow) : [el('div', 'empty', t('admin.noUsers'))])
+    );
+  } catch (e) {
+    showAdminError(e);
+  }
+}
+
+function adminReportRow(r) {
+  const row = el('div', `admin-user${r.resolved ? ' resolved' : ''}`);
+  const head = el('div', 'admin-user-head');
+  head.append(
+    el('span', 'admin-login', t(`report.kind.${r.kind}`)),
+    el('span', 'muted', `#${r.id} · ${r.login || t('report.noAccount')} · ${dateText(Date.parse(r.created_at))}`)
+  );
+  if (r.app_version) head.append(el('span', 'muted', `${r.app_version} · ${r.os_version || '—'}`));
+  row.append(head);
+
+  // Текст сообщения как есть, с переносами: люди присылают шаги
+  // воспроизведения списком, и склеивать их в абзац — терять смысл.
+  row.append(el('pre', 'admin-report-text', r.message));
+  if (r.admin_note) row.append(el('div', 'admin-result', r.admin_note));
+
+  const actions = el('div', 'admin-actions');
+  actions.append(
+    r.resolved
+      ? adminButton(t('admin.reopen'), async () => {
+          await window.wt.admin.resolveReport(r.id, false);
+          refreshAdminReports();
+        })
+      : adminButton(t('admin.resolve'), () =>
+          askLine(row, { label: t('admin.note'), placeholder: t('admin.noteHint') }, async (note) => {
+            await window.wt.admin.resolveReport(r.id, true, note);
+            refreshAdminReports();
+          })
+        )
+  );
+  row.append(actions);
+  return row;
+}
+
+async function refreshAdminReports() {
+  try {
+    const reports = await window.wt.admin.reports($('adminReportScope').value);
+    $('adminReports').replaceChildren(
+      ...(reports.length ? reports.map(adminReportRow) : [el('div', 'empty', t('admin.noReports'))])
+    );
+  } catch (e) {
+    showAdminError(e);
+  }
+}
+
+$('adminSearch').addEventListener('click', refreshAdminUsers);
+$('adminQuery').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') refreshAdminUsers();
+});
+$('adminReportScope').addEventListener('change', refreshAdminReports);
+$('adminReportsRefresh').addEventListener('click', refreshAdminReports);
+
 // --- Друзья и отряд ------------------------------------------------------
 
 // Последнее, что известно про друзей. Приходит из main и обновляется само —
@@ -1398,6 +1632,9 @@ async function refreshAccount() {
   const state = await window.wt.account.state();
   applyVersion(state.version);
   accountLogin = state.login;
+  // Раздел администратора показывается по роли из сессии. Роль приезжает с
+  // сервера при входе; если права выдали позже, надо перезайти.
+  $('tabAdmin').hidden = !state.isAdmin;
   renderSquad();
   renderMyAvatar();
   if (state.signedIn) {
