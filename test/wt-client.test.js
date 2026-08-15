@@ -83,8 +83,35 @@ test('скользящее окно не вызывает ложных сбро�
   assert.equal(resets - baseline, 0, 'сдвиг окна — не новый бой');
 });
 
-test('выход в ангар не сбрасывает таблицу — сброс только на старте нового боя', async (t) => {
+test('экран респавна не сбрасывает таблицу', async (t) => {
   const log = [
+    { id: 500, time: 100, msg: 'Me (Т-80) уничтожил Foe (M1A2)' },
+    { id: 501, time: 130, msg: 'Foe2 (Leopard) уничтожил Me (Т-80)' },
+  ];
+  // После смерти игра ненадолго отдаёт valid=false — это выбор техники,
+  // а не конец боя.
+  let inBattle = true;
+  const server = await fakeGame(() => log, () => inBattle);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const client = new WtClient({ host: '127.0.0.1', port });
+  let resets = 0;
+  client.on('reset', () => resets++);
+
+  await client.tick();
+  const baseline = resets;
+
+  inBattle = false;
+  await client.tick();
+  inBattle = true;
+  await client.tick();
+
+  assert.equal(resets - baseline, 0, 'респавн — не новый бой');
+});
+
+test('выход в ангар не сбрасывает таблицу — сброс на первом событии нового боя', async (t) => {
+  let log = [
     { id: 400, time: 100, msg: 'A (Т-80) уничтожил B (M1A2)' },
     { id: 401, time: 120, msg: 'A (Т-80) уничтожил C (M1A2)' },
   ];
@@ -102,17 +129,22 @@ test('выход в ангар не сбрасывает таблицу — сб
   await client.tick();
   const baseline = resets;
 
-  // Ушли в ангар: состояние прошлого боя должно остаться на экране.
+  // Ушли в ангар: прошлый бой должен остаться на экране.
   inBattle = false;
   await client.tick();
   await client.tick();
   assert.equal(resets - baseline, 0, 'в ангаре таблица не сбрасывается');
   assert.equal(statuses.at(-1), 'idle');
 
-  // Начался следующий бой — вот теперь сброс.
+  // Вернулись в бой, но событий ещё нет — сбрасывать пока нечего и незачем.
   inBattle = true;
   await client.tick();
-  assert.equal(resets - baseline, 1, 'сброс происходит на старте нового боя');
+  assert.equal(resets - baseline, 0, 'без событий нового боя таблица цела');
+
+  // Пошли события новой катки: время начинается заново — вот теперь сброс.
+  log = log.concat([{ id: 402, time: 12, msg: 'D (Leopard) уничтожил E (Т-72)' }]);
+  await client.tick();
+  assert.equal(resets - baseline, 1, 'сброс на первом событии нового боя');
 });
 
 test('запуск посреди сессии не втягивает предыдущий бой', async (t) => {

@@ -261,6 +261,11 @@ class Db {
    * росла в разы.
    */
   updateBattle(id, snapshot, opts = {}) {
+    // Запись могли удалить из-под нас (очистка истории, удаление боя вручную) —
+    // тогда просто пишем бой заново.
+    const exists = this.db.prepare('SELECT 1 FROM battles WHERE id = ?').get(id);
+    if (!exists) return this.saveBattle(snapshot, opts);
+
     this.db.exec('BEGIN');
     try {
       // Дочерние строки проще пересобрать, чем сверять по одной.

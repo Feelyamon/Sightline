@@ -11,6 +11,13 @@ const POLL_MS = 1000;
 const TIMEOUT_MS = 1500;
 // Сколько неудачных тиков подряд терпим, прежде чем сказать «игра не запущена».
 const OFFLINE_AFTER = 3;
+// Насколько долгим должен быть перерыв «не в бою», чтобы считать его выходом в
+// ангар, а не экраном респавна. Даже если перерыв окажется короче, новый бой
+// всё равно опознается по падению времени в кил-фиде.
+const IDLE_NEW_BATTLE_MS = 90_000;
+// Допуск на неточность времени в журнале: настоящая смена боя даёт откат в
+// сотни секунд, поэтому мелкие колебания новым боем не считаем.
+const TIME_DROP_TOLERANCE = 15;
 
 // Node 19+ по умолчанию держит keep-alive соединения. Встроенный веб-сервер
 // War Thunder переиспользуемый сокет закрывает, и следующий запрос падает с
@@ -80,6 +87,7 @@ class WtClient extends EventEmitter {
     this.started = false;
     this.lastTime = -1;
     this.lastChatId = 0;
+    this.idleSince = null;
   }
 
   start() {
@@ -148,13 +156,19 @@ class WtClient extends EventEmitter {
       return;
     }
 
-    if (valid && (!this.inBattle || signature !== this.mapSignature)) {
+    // valid=false бывает не только в ангаре, но и на экране выбора техники
+    // после смерти. Поэтому сам по себе переход «не в бою → в бою» новым боем
+    // НЕ считается — иначе таблица обнулялась после каждого респавна.
+    // Сбрасываем только после долгого перерыва; короткий — это респавн.
+    if (valid) {
+      const gap = this.idleSince ? Date.now() - this.idleSince : 0;
+      if (gap >= IDLE_NEW_BATTLE_MS) this.beginNewBattle();
+      this.idleSince = null;
       this.inBattle = true;
       this.mapSignature = signature;
-      this.beginNewBattle();
-    } else if (!valid && this.inBattle) {
+    } else if (this.inBattle) {
       this.inBattle = false;
-      this.mapSignature = null;
+      this.idleSince = this.idleSince || Date.now();
     }
     // Исход боя лежит в mission.json: пока идёт бой там "running", а по
     // окончании появляется результат. Точные значения зависят от режима,
@@ -210,7 +224,7 @@ class WtClient extends EventEmitter {
       // Время пошло назад — начался следующий бой. Сначала сброс, потом эта
       // запись уходит уже в новое состояние.
       if (typeof d.time === 'number') {
-        if (d.time < this.lastTime) this.beginNewBattle();
+        if (d.time < this.lastTime - TIME_DROP_TOLERANCE) this.beginNewBattle();
         this.lastTime = Math.max(this.lastTime, d.time);
       }
       this.emit('damage', d);
