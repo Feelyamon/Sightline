@@ -73,6 +73,7 @@ class WtClient extends EventEmitter {
     this.inBattle = false;
     this.mockQueue = null;
     this.failures = 0;
+    this.mapSignature = null;
   }
 
   start() {
@@ -114,22 +115,35 @@ class WtClient extends EventEmitter {
   async tick() {
     if (this.mock) return this.tickMock();
 
-    // map_info говорит, идёт ли бой; заодно ловим смену боя.
+    // map_info говорит, идёт ли бой, и по нему же опознаётся смена боя.
     let valid = false;
+    let signature = null;
     try {
       const info = await getJson('/map_info.json');
       valid = info?.valid !== false;
+      // Отпечаток боя: счётчик генерации карты плюс её геометрия. Только на
+      // курсоры hudmsg полагаться нельзя — в новом бою нумерация начинается
+      // заново, сервер на старый lastDmg отдаёт пустоту, и приложение
+      // продолжало показывать прошлый бой.
+      signature = JSON.stringify([
+        info?.map_generation ?? null,
+        info?.grid_zero ?? null,
+        info?.map_max ?? null,
+        info?.grid_steps ?? null,
+      ]);
       this.failures = 0;
     } catch (e) {
       this.noteFailure('War Thunder не запущен или локальный API недоступен');
       return;
     }
 
-    if (valid && !this.inBattle) {
+    if (valid && (!this.inBattle || signature !== this.mapSignature)) {
       this.inBattle = true;
+      this.mapSignature = signature;
       this.beginNewBattle();
     } else if (!valid && this.inBattle) {
       this.inBattle = false;
+      this.mapSignature = null;
     }
     this.setStatus(valid ? 'battle' : 'idle', valid ? '' : 'В ангаре — ждём начала боя');
     if (!valid) return;

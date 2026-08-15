@@ -127,11 +127,34 @@ const labelFor = (vehicle) => LABELS[classify(vehicle)];
 /** Для дев-лога: что не опознано шаблонами. */
 const getUnknownVehicles = () => [...unknownVehicles];
 
+// Не игроки, а игровые сущности: игра пишет их в кил-фид так же, как людей.
+// Живые примеры: «уничтожил [ии] Recon Micro» (дрон под управлением ИИ),
+// «уничтожил weapons/us_agm_88a/short» (сбитая ракета). Техники в скобках у
+// них нет, поэтому по названию машины они не отсеиваются.
+const ENTITY_NICK_PATTERNS = [
+  /^weapons\//i,
+  /^\[(?:ии|ai)\]/i,
+];
+
+/**
+ * Отличает игровую сущность от живого игрока по нику.
+ * Дрон опознаётся и по имени после клан-тега: «[ии] Recon Micro».
+ */
+function isEntityNick(nick) {
+  const name = String(nick || '').trim();
+  if (!name) return false;
+  if (ENTITY_NICK_PATTERNS.some((re) => re.test(name))) return true;
+  // Ник вида «<тег> Recon Micro» — это сам дрон, а не его владелец.
+  const withoutTag = name.replace(/^\[[^\]]*\]\s*/, '').trim();
+  return matchPatterns(withoutTag) === 'drone';
+}
+
 module.exports = {
   classify,
   iconFor,
   labelFor,
   learn,
+  isEntityNick,
   getUnknownVehicles,
   ICONS,
   LABELS,

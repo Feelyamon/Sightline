@@ -1,9 +1,18 @@
 'use strict';
 
 const { parseMessage } = require('./killfeed-parser');
-const { classify, learn } = require('./vehicle-class');
+const { classify, learn, isEntityNick } = require('./vehicle-class');
 
 const isDrone = (vehicle) => !!vehicle && classify(vehicle) === 'drone';
+
+/**
+ * Событие про игровую сущность, а не про игрока: сбитый дрон под ИИ, ракета.
+ * Такие строки игнорируем целиком — в том числе не даём за них фраг. Игра шлёт
+ * на один дрон две строки («фатальное повреждение владельцу» и «уничтожил
+ * [ии] Recon Micro»), и без этого стрелку начислялось лишнее убийство.
+ */
+const isEntityTarget = (participant) =>
+  !!participant && (isEntityNick(participant.nick) || isDrone(participant.vehicle));
 
 /**
  * Union-Find с чётностью: рёбра означают «эти двое в РАЗНЫХ командах».
@@ -180,12 +189,8 @@ class BattleState {
     switch (parsed.type) {
       case 'kill': {
         const killer = this.seen(parsed.actor, at);
-        // Сбитый разведдрон — не потеря машины: жертву не трогаем вообще,
-        // фраг убийце засчитываем.
-        if (isDrone(parsed.victim?.vehicle)) {
-          if (killer) this.addKill(killer);
-          break;
-        }
+        // Дрон или ракета — не потеря машины и не фраг по игроку.
+        if (isEntityTarget(parsed.victim)) break;
         const victim = this.seen(parsed.victim, at);
         if (!killer || !victim || killer.nick === victim.nick) {
           if (victim) this.addDeath(victim);
@@ -199,7 +204,7 @@ class BattleState {
       case 'damage': {
         // Счёт не меняем: важна только засветившаяся техника.
         this.seen(parsed.actor, at);
-        if (isDrone(parsed.victim?.vehicle)) break;
+        if (isEntityTarget(parsed.victim)) break;
         this.seen(parsed.victim, at);
         if (parsed.actor?.nick && parsed.victim?.nick && parsed.actor.nick !== parsed.victim.nick) {
           this.teams.union(parsed.actor.nick, parsed.victim.nick, 1);
@@ -207,7 +212,7 @@ class BattleState {
         break;
       }
       case 'selfDeath': {
-        if (isDrone(parsed.victim?.vehicle)) break;
+        if (isEntityTarget(parsed.victim)) break;
         const victim = this.seen(parsed.victim, at);
         if (victim) this.addDeath(victim);
         break;
@@ -215,7 +220,7 @@ class BattleState {
       case 'left': {
         // Техники в строке нет, поэтому игрока «живым» не помечаем.
         const nick = parsed.victim?.nick;
-        if (!nick) break;
+        if (!nick || isEntityNick(nick)) break;
         const p = this.player(this.matchExisting(nick) || nick);
         p.lastSeen = at;
         p.status = 'left';

@@ -69,13 +69,46 @@ test('выход из боя фиксируется и уводит игрока
   assert.equal(snap.players[snap.players.length - 1].nick, 'Foe');
 });
 
-test('сбитый разведдрон не считается смертью и не пишется в технику', () => {
+test('сбитый разведдрон не считается ни смертью, ни фрагом', () => {
   const s = new BattleState('Me');
   const snap = feed(s, [
     'Foe (Панцирь-С1) нанёс фатальное повреждение Ally (Recon Micro)',
   ]);
-  assert.equal(find(snap, 'Foe').kills, 1);
+  // Машину владелец не терял, а стрелку фраг не идёт: на тот же дрон придёт
+  // вторая строка «уничтожил [ии] Recon Micro», и счёт бы задвоился.
+  assert.equal(find(snap, 'Foe').kills, 0);
+  assert.equal(find(snap, 'Foe').currentVehicle, 'Панцирь-С1', 'техника стрелка видна');
   assert.equal(find(snap, 'Ally'), undefined);
+});
+
+test('дрон не даёт двойного фрага: обе строки про него игнорируются', () => {
+  const s = new BattleState('Me');
+  // Игра шлёт на один сбитый дрон две строки подряд.
+  const snap = feed(s, [
+    '玩家十四号 (Панцирь-С1) нанёс фатальное повреждение PlayerFifteen69 (Recon Micro)',
+    '玩家十四号 (Панцирь-С1) уничтожил [ии] Recon Micro',
+  ]);
+  assert.equal(find(snap, '玩家十四号').kills, 0, 'фраг за дрон не начисляется');
+  assert.equal(find(snap, '[ии] Recon Micro'), undefined, 'сущность ИИ не игрок');
+  assert.equal(find(snap, 'PlayerFifteen69'), undefined, 'владелец дрона машину не терял');
+});
+
+test('сбитая ракета не попадает в таблицу игроков', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, ['玩家十四号 (Панцирь-С1) уничтожил weapons/us_agm_88a/short']);
+  assert.equal(find(snap, 'weapons/us_agm_88a/short'), undefined);
+  assert.equal(find(snap, '玩家十四号').kills, 0);
+});
+
+test('живое: «нанёс критическое повреждение» — урон, а не фраг', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    '=6dog9= Ник (CS/SA5) нанёс критическое повреждение Враг (Type 90)',
+  ]);
+  assert.deepEqual(snap.unparsed, []);
+  assert.equal(find(snap, '=6dog9= Ник').kills, 0);
+  assert.equal(find(snap, 'Враг').deaths, 0);
+  assert.equal(find(snap, 'Враг').currentVehicle, 'Type 90');
 });
 
 test('игрок без техники помечается как «не выехал»', () => {
@@ -182,9 +215,9 @@ test('запись живого боя: смена техники, гибель,
   assert.equal(left.status, 'left');
   assert.deepEqual(left.vehicles, []);
 
-  // Владелец сбитого дрона в таблицу не попал, фраг у стрелка есть.
+  // Владелец сбитого дрона в таблицу не попал, фраг за дрон не начислен.
   assert.equal(find(snap, 'PlayerFifteen69'), undefined);
-  assert.equal(find(snap, '玩家十四号').kills, 1);
+  assert.equal(find(snap, '玩家十四号').kills, 0);
 });
 
 test('мок-фикстура проигрывается без unknown-строк', () => {
