@@ -509,7 +509,8 @@ function vehicleTable(rows, { mine }) {
   for (const r of rows) {
     const tr = el('tr');
     const veh = el('td');
-    veh.append(vehicleNode(r.vehicle, null));
+    veh.append(vehicleNode(r.label || r.vehicle, r.class));
+    veh.title = r.vehicle;
 
     if (mine) {
       const decided = (r.wins || 0) + (r.losses_battles || 0);

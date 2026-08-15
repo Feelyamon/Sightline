@@ -8,6 +8,11 @@ const { BattleState } = require('./battle-state');
 const { Settings } = require('./settings');
 const { Db, windowStart } = require('./db');
 const { classifyResult } = require('./battle-result');
+const { classify, displayName } = require('./vehicle-class');
+
+/** Дополняет строки статистики классом техники — renderer сам его не знает. */
+const withVehicleClass = (rows) =>
+  rows.map((r) => ({ ...r, class: classify(r.vehicle), label: displayName(r.vehicle) }));
 
 const MOCK = process.argv.includes('--mock');
 
@@ -199,10 +204,12 @@ ipcMain.handle('db:topPlayers', (_e, opts = {}) => {
 ipcMain.handle('db:playerCard', (_e, nick) => db.playerCard(nick));
 ipcMain.handle('db:dossier', (_e, nicks) => db.dossier(nicks, settings.get('selfNick')));
 ipcMain.handle('db:myVehicles', (_e, opts = {}) =>
-  db.myVehicles(settings.get('selfNick'), { since: opts.period ? windowStart(opts.period) : 0 })
+  withVehicleClass(
+    db.myVehicles(settings.get('selfNick'), { since: opts.period ? windowStart(opts.period) : 0 })
+  )
 );
 ipcMain.handle('db:enemyVehicles', (_e, opts = {}) =>
-  db.enemyVehicles({ since: opts.period ? windowStart(opts.period) : 0 })
+  withVehicleClass(db.enemyVehicles({ since: opts.period ? windowStart(opts.period) : 0 }))
 );
 ipcMain.handle('db:winrate', (_e, opts = {}) =>
   db.winrate({ since: opts.period ? windowStart(opts.period) : 0 })
