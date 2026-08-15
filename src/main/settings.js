@@ -6,6 +6,21 @@ const path = require('node:path');
 const DEFAULTS = {
   selfNick: '',
   alwaysOnTop: false,
+  // Масштаб интерфейса целиком, включая графики. 1 — как есть, 1.5 — в
+  // полтора раза крупнее. Отдельная настройка нужна не для красоты: мелкий
+  // шрифт делает приложение бесполезным для части людей.
+  uiScale: 1,
+  // Пустая строка — язык ещё не выбирали. Тогда берётся английский:
+  // договорённость такая, что до первого выбора интерфейс английский.
+  uiLang: '',
+
+  // Поведение окна и трея.
+  closeToTray: true,
+  launchWithSystem: false,
+  showOnGameStart: true,
+  hideOnGameExit: false,
+  // Разовое предупреждение «программа осталась в трее» показывается один раз.
+  trayNoticeShown: false,
   mainBounds: { width: 520, height: 480 },
   scoreboardBounds: { width: 720, height: 560 },
 };

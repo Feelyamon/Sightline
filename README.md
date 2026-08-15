@@ -44,16 +44,24 @@ Tests:
 npm test
 ```
 
-## One window, six tabs
+## One window, eight tabs
 
 - **Battle** — the live table: allies on the left, enemies on the right. Each vehicle carries a class
   icon (`▮` ground, `◬` SPAA, `✈` plane, `⊹` helicopter). Your own row is highlighted.
-- **Counters** — four tiles: since launch, today, this week, this month. Each resets independently.
-- **Battles** — battle history; click a battle to expand its full roster with awards and vehicles.
+- **Statistics** — four counter tiles (since launch, today, this week, this month; each resets
+  independently), followed by charts: battles by hour of day, win/loss streaks, KDA and win rate
+  by day as a seven-day rolling average, and a half-year activity calendar.
+- **Battles** — battle history with search by nick or vehicle and filters by period, outcome
+  and your own vehicle. The summary above the list is computed over the filtered selection,
+  not the whole database. Click a battle to expand its full roster with awards and vehicles.
 - **Players** — top allies and top enemies for a period, with a "minimum encounters" threshold.
 - **My vehicles** — win rate plus per-vehicle stats, next to what the enemy team brings most often.
   Every column is sortable.
-- **Settings** — your nickname, always-on-top, database size and the destructive operations.
+- **How to use** — a plain-language guide in larger type. The «?» button in the header opens the
+  section about the tab you are currently on.
+- **About** — version, licence, where the data file lives.
+- **Settings** — tray and startup, your nickname, interface language (English, Russian, Chinese), interface size,
+  always-on-top, database size and the destructive operations.
 
 Counters do not store numbers. The database keeps the moment of the last reset, and the count is a
 query — so resetting a counter deletes nothing, and clearing history zeroes all counters by itself.
@@ -113,6 +121,32 @@ confirmation word, so a stray click costs nothing.
 The player who killed you last is outlined in gold — the target for the *Eye for an Eye* award. The
 outline disappears once the award is out of reach.
 
+## How you know the stats are real
+
+The stats are gathered by an app running on the player's own machine — which means they can be
+faked. We do not pretend otherwise and do not hide behind obfuscation: any key the client signs
+requests with sits on the machine of the very person we would be defending against.
+
+Instead, battles verify each other. Several people running this app can end up in the same battle,
+and all of them see the same kill feed. When their records of the same event agree, the battle gets
+a **green check**. When someone's data contradicts the rest, the discrepancy stays in the database
+for good.
+
+The key detail is **who** confirmed it. An ally can be brought along: take a second account into
+your squad and confirm anything to yourself. Opponents, however, are not chosen — you cannot put
+your own alt on the enemy team. That makes confirmation from the enemy side worth far more, and the
+green check is granted for exactly that.
+
+A missing check is not an accusation. While there are few users, a player will be the only one in
+most of their battles, and there is simply nobody to corroborate them. Such battles stay neutral.
+The yellow triangle on an account appears not for a lack of witnesses but only for **confirmed
+discrepancies** with other people's records — and not for a single one, but for a consistent
+pattern: a client may have started mid-battle or lost some lines, and that is a gap, not a lie.
+
+The more people use the app, the denser the web of witnesses and the less point there is in faking
+anything. It cuts both ways: verified data will be scarce at first, and we honestly show how many
+battles in a profile are confirmed.
+
 ## What is not possible
 
 - **Battle rewards and XP.** The post-battle results screen is not exposed by the local API at all.
@@ -130,9 +164,17 @@ outline disappears once the award is out of reach.
 | `src/main/battle-state.js` | K/D/A, sorties, statuses, team graph (union-find with parity) |
 | `src/main/vehicle-class.js` | vehicle class for icons; filters out game entities |
 | `src/main/db.js` | SQLite: battles, players, counters, awards, backups |
+| `src/main/migrations.js` | schema version in `PRAGMA user_version`; steps run in order, once each |
 | `src/renderer/` | the single window: tabs, ally/enemy split |
+| `src/renderer/charts.js` | inline-SVG charts, no third-party libraries |
+| `src/i18n/` | interface strings in three languages; key parity is covered by a test |
+| `src/renderer/i18n.js` | t(key), plural forms, substitution into the markup |
 
-Roadmap: [docs/PLAN.md](docs/PLAN.md).
+Roadmap: [ROADMAP.txt](ROADMAP.txt). The original plan that got the app this far:
+[docs/PLAN.md](docs/PLAN.md).
+
+`npm run harness` builds the whole interface into a single HTML file backed by stub data —
+handy for working on the layout in a browser without launching Electron.
 
 ## Extending the parser
 

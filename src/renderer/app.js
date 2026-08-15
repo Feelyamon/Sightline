@@ -8,23 +8,38 @@ const el = (tag, cls, text) => {
   return n;
 };
 
-const STATUS_TEXT = { battle: 'В бою', idle: 'В ангаре', offline: 'Игра не запущена' };
+// Все видимые строки идут через словарь (см. i18n.js). Короткое имя — потому
+// что вызов встречается на каждой второй строке разметки таблиц.
+const t = (key, params) => window.i18n.t(key, params);
+
+/**
+ * Шапка таблицы из ключей словаря.
+ * @param {string[]} keys
+ * @param {{num?: number[], nick?: number[]}} [classes] - индексы колонок,
+ *   которым нужен свой класс: числовые прижимаются вправо, ник не переносится.
+ */
+function headRow(keys, { num = [], nick = [] } = {}) {
+  const cells = keys.map((key, i) => {
+    const cls = num.includes(i) ? ' class="num"' : nick.includes(i) ? ' class="nick"' : '';
+    // Строки словаря вставляются как текст: перевод — данные, не разметка.
+    const text = t(key).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+    return `<th${cls}>${text}</th>`;
+  });
+  return `<thead><tr>${cells.join('')}</tr></thead>`;
+}
+
+const STATUS_KEY = { battle: 'status.battle', idle: 'status.idle', offline: 'status.offline' };
 // «Уничтожен» само по себе читается как «выбыл из боя навсегда», поэтому
 // добавлено «выбирает»: игрок жив, он в ангаре выбирает следующую машину.
 const PLAYER_STATUS = {
-  alive: ['в бою', 'alive'],
-  dead: ['уничтожен · выбирает', 'dead'],
-  left: ['вышел', 'left'],
-  unknown: ['не выехал', 'idle'],
+  alive: ['player.alive', 'alive'],
+  dead: ['player.dead', 'dead'],
+  left: ['player.left', 'left'],
+  unknown: ['player.idle', 'idle'],
 };
 // Иконки классов приходят из main вместе со снапшотом (см. vehicle-class.js).
 const CLASS_ICON = { tank: '▮', spaa: '◬', plane: '✈', heli: '⊹', drone: '⌖' };
-const COUNTER_LABEL = {
-  session: 'С запуска',
-  today: 'Сегодня',
-  week: 'Неделя',
-  month: 'Месяц',
-};
+const COUNTER_KEYS = ['session', 'today', 'week', 'month'];
 
 let lastState = null;
 let nickDirty = false;
@@ -58,10 +73,15 @@ $('tabs').addEventListener('click', (e) => {
     p.classList.toggle('active', p.id === `panel-${tab.dataset.tab}`);
   }
   if (tab.dataset.tab === 'counters') refreshCounters();
-  if (tab.dataset.tab === 'battles') refreshBattles();
+  if (tab.dataset.tab === 'battles') refreshVehicleFilter().then(() => refreshBattles());
   if (tab.dataset.tab === 'mine') refreshMine();
   if (tab.dataset.tab === 'players') refreshPlayers();
-  if (tab.dataset.tab === 'settings') refreshDbStats();
+  if (tab.dataset.tab === 'settings') {
+    refreshDbStats();
+    refreshWindowFlags();
+  }
+  if (tab.dataset.tab === 'help') renderHelp();
+  if (tab.dataset.tab === 'about') renderAbout();
 });
 
 // --- Утилиты ------------------------------------------------------------
@@ -86,12 +106,22 @@ function clockText(seconds) {
 function dateText(ms) {
   if (!ms) return '—';
   const d = new Date(ms);
-  return d.toLocaleString('ru-RU', {
+  return d.toLocaleString(window.i18n.locale(), {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/**
+ * Награда одной строкой: «Снайпер», «Снайпер (2 ст.)», «Удар из тени ×5».
+ * Степень отделена от названия в базе, поэтому собираем её обратно здесь.
+ */
+function awardText(a) {
+  const tier = a.tier > 0 ? t('award.tier', { n: a.tier }) : '';
+  const count = a.count > 1 ? ` ×${a.count}` : '';
+  return `${a.name}${tier}${count}`;
 }
 
 /** Название техники с иконкой класса. */
@@ -115,7 +145,7 @@ function vehiclesCell(p) {
   const sorties = p.sorties.filter((s) => s.vehicle);
   if (!sorties.length) {
     td.className = 'muted';
-    td.textContent = p.status === 'left' ? 'вышел, не выехав' : 'не выехал';
+    td.textContent = t(p.status === 'left' ? 'player.leftNoSortie' : 'player.idle');
     return td;
   }
 
@@ -133,15 +163,17 @@ function vehiclesCell(p) {
     );
     chip.append(vehicleNode(s.label || s.vehicle, s.class, { dead: s.destroyed }));
     if (s.kills > 0) chip.append(el('b', null, `×${s.kills}`));
-    const state = s.destroyed
-      ? 'уничтожен на этой машине'
-      : isCurrent
-        ? 'сейчас на этой машине'
-        : isEnded
-          ? 'пересел на другую машину — гибели в кил-фиде не было'
-          : 'машина цела';
+    const state = t(
+      s.destroyed
+        ? 'tip.sortDestroyed'
+        : isCurrent
+          ? 'tip.sortCurrent'
+          : isEnded
+            ? 'tip.sortEnded'
+            : 'tip.sortAlive'
+    );
     // В подсказке — полное имя из игры со служебными символами и смысл ×N.
-    chip.title = `${s.vehicle}\n${state}\nфрагов на этой машине: ${s.kills}`;
+    chip.title = `${s.vehicle}\n${state}\n${t('tip.sortFrags', { n: s.kills })}`;
     wrap.append(chip);
   });
   td.append(wrap);
@@ -149,13 +181,10 @@ function vehiclesCell(p) {
 }
 
 function playersTable(players) {
-  if (!players.length) return el('div', 'empty', 'Пока никого');
+  if (!players.length) return el('div', 'empty', t('battle.empty'));
 
   const table = el('table');
-  table.innerHTML =
-    '<thead><tr><th class="nick">Ник</th><th class="num">K</th><th class="num">D</th>' +
-    '<th class="num">A</th><th class="num">★</th><th>Статус</th>' +
-    '<th>Техника (последняя — текущая)</th></tr></thead>';
+  table.innerHTML = headRow(['col.nick', 'col.kills', 'col.deaths', 'col.assists', 'col.awards', 'col.status', 'col.vehiclesCurrent'], { num: [1, 2, 3, 4], nick: [0] });
   const tbody = el('tbody');
 
   for (const p of players) {
@@ -166,7 +195,7 @@ function playersTable(players) {
     // Обидчик, за которого ещё можно взять «Око за око».
     if (p.isRevengeTarget) {
       tr.classList.add('revenge');
-      tr.title = 'Убил тебя последним — за него даётся «Око за око»';
+      tr.title = t('player.revenge');
     }
 
     const nick = el('td', `nick${p.isSelf ? ' self' : ''}`);
@@ -181,29 +210,27 @@ function playersTable(players) {
       const mark = el('span', 'dossier', `${d.battles}`);
       const fav = d.favourite[0];
       mark.title =
-        `встреч: ${d.battles}` +
-        (fav ? `\nчаще всего: ${fav.vehicle} (${fav.sorties} вылетов)` : '') +
-        `\nон убивал меня ${d.killedMe}, я его ${d.killedByMe}` +
-        (d.note ? `\n\nзаметка: ${d.note}` : '');
+        t('tip.dossier', { n: d.battles }) +
+        (fav ? `\n${t('tip.dossierFav', { vehicle: fav.vehicle, n: fav.sorties })}` : '') +
+        `\n${t('tip.dossierDuel', { killedMe: d.killedMe, killedByMe: d.killedByMe })}` +
+        (d.note ? `\n\n${t('tip.dossierNote', { note: d.note })}` : '');
       if (d.note) mark.classList.add('has-note');
       nick.append(mark);
     }
 
-    const [label, cls] = PLAYER_STATUS[p.status] || PLAYER_STATUS.unknown;
+    const [labelKey, cls] = PLAYER_STATUS[p.status] || PLAYER_STATUS.unknown;
     const st = el('td');
-    st.append(el('span', `badge ${cls}`, label));
+    st.append(el('span', `badge ${cls}`, t(labelKey)));
 
     const assists = el('td', 'num', String(p.assists || 0));
-    assists.title = 'ассисты: повредил цель, но добил её другой (считается приложением)';
+    assists.title = t('tip.assists');
 
     // Награды за бой — те, что игра пишет в кил-фид.
     const awardsCell = el('td', 'num');
     if (p.awards && p.awards.length) {
       const total = p.awards.reduce((s, a) => s + (a.count || 1), 0);
       const badge = el('span', 'awards', `★${total}`);
-      badge.title = p.awards
-        .map((a) => (a.count > 1 ? `${a.name} ×${a.count}` : a.name))
-        .join('\n');
+      badge.title = p.awards.map(awardText).join('\n');
       awardsCell.append(badge);
     }
 
@@ -249,13 +276,19 @@ function unknownGroups(players) {
     const sideB = list.filter((p) => p.side === 1);
     if (!sideA.length || !sideB.length) {
       // Все на одной стороне — просто список, делить нечего.
-      wrap.append(el('div', 'section-title', `Группа ${i + 1} — одна сторона`), playersTable(list));
+      wrap.append(el('div', 'section-title', t('battle.group', { n: i + 1 })), playersTable(list));
       return;
     }
     const split = el('div', 'split');
-    for (const [label, rows] of [[`Группа ${i + 1}: сторона A`, sideA], [`Группа ${i + 1}: сторона B`, sideB]]) {
+    for (const [label, rows] of [
+      [t('battle.groupSideA', { n: i + 1 }), sideA],
+      [t('battle.groupSideB', { n: i + 1 }), sideB],
+    ]) {
       const side = el('div', 'side');
-      side.append(el('div', 'side-title', `${label} — ${rows.length}`), playersTable(rows));
+      side.append(
+        el('div', 'side-title', t('battle.sideTitle', { label, n: rows.length })),
+        playersTable(rows)
+      );
       split.append(side);
     }
     wrap.append(split);
@@ -263,7 +296,7 @@ function unknownGroups(players) {
 
   if (loners.length) {
     wrap.append(
-      el('div', 'section-title', `Ни с кем не пересекались — ${loners.length}`),
+      el('div', 'section-title', t('battle.loners', { n: loners.length })),
       playersTable(loners)
     );
   }
@@ -277,24 +310,38 @@ function renderBattle(state) {
   ensureDossier(state.players.map((p) => p.nick));
 
   $('dot').className = `dot ${state.status || 'offline'}`;
-  $('statusText').textContent =
-    (STATUS_TEXT[state.status] || 'Неизвестно') + (state.detail ? ` · ${state.detail}` : '');
-  $('counter').textContent = `${clockText(state.clock)} · известно ${state.knownPlayers}`;
+  // Снапшот боя приходит четыре раза в секунду и затирал бы сообщение об
+  // ошибке быстрее, чем человек успевал его прочитать.
+  if (!$('statusText').classList.contains('error')) {
+    $('statusText').textContent =
+      t(STATUS_KEY[state.status] || 'status.unknown') + (state.detail ? ` · ${state.detail}` : '');
+  }
+  $('counter').textContent =
+    `${clockText(state.clock)} · ${t('status.known', { n: state.knownPlayers })}`;
 
   const byTeam = (team) => state.players.filter((p) => p.team === team);
   const allies = byTeam('ally');
   const enemies = byTeam('enemy');
   const unknown = byTeam('unknown');
 
-  $('allyTitle').textContent = `Свои — ${allies.length}, живых ${allies.filter((p) => p.status === 'alive').length}`;
-  $('enemyTitle').textContent = `Противники — ${enemies.length}, живых ${enemies.filter((p) => p.status === 'alive').length}`;
+  const alive = (rows) => rows.filter((p) => p.status === 'alive').length;
+  $('allyTitle').textContent = t('battle.side', {
+    title: t('battle.allies'),
+    total: allies.length,
+    alive: alive(allies),
+  });
+  $('enemyTitle').textContent = t('battle.side', {
+    title: t('battle.enemies'),
+    total: enemies.length,
+    alive: alive(enemies),
+  });
 
   $('allyBody').replaceChildren(playersTable(allies));
   $('enemyBody').replaceChildren(playersTable(enemies));
 
   $('unknownBox').hidden = unknown.length === 0;
   if (unknown.length) {
-    $('unknownTitle').textContent = `Команда не определена — ${unknown.length}`;
+    $('unknownTitle').textContent = t('battle.unknownTeamCount', { n: unknown.length });
     $('unknownBody').replaceChildren(unknownGroups(unknown));
   }
 
@@ -312,15 +359,15 @@ async function refreshCounters() {
   const tiles = $('tiles');
   tiles.replaceChildren();
 
-  for (const [name, label] of Object.entries(COUNTER_LABEL)) {
+  for (const name of COUNTER_KEYS) {
     const c = counters[name] || { battles: 0, from: 0 };
     const tile = el('div', 'tile');
     tile.append(
-      el('div', 'label', label),
+      el('div', 'label', t(`counter.${name}`)),
       el('div', 'value', String(c.battles)),
-      el('div', 'since', `с ${dateText(c.from)}`)
+      el('div', 'since', t('counter.since', { date: dateText(c.from) }))
     );
-    const btn = el('button', 'small', 'Сбросить');
+    const btn = el('button', 'small', t('counter.reset'));
     btn.addEventListener('click', async () => {
       await window.wt.db.resetCounter(name);
       refreshCounters();
@@ -329,7 +376,87 @@ async function refreshCounters() {
     tiles.append(tile);
   }
 
+  refreshCharts();
 }
+
+/** Час в виде «21:00–21:59» — подписи в заметках под графиками. */
+const hourRange = (h) => t('chart.hourRange', { h: String(h).padStart(2, '0') });
+
+/**
+ * Русское склонение по числу: «1 победа», «2 победы», «5 побед».
+ * @param {number} n
+ * @param {[string, string, string]} forms - для 1, для 2, для 5
+ */
+function streakNote(s) {
+  if (s.current.type === 'none') return t('stats.streak.none');
+  const n = s.current.length;
+  const word = window.i18n.plural(n, s.current.type === 'win' ? 'plural.wins' : 'plural.losses');
+  const parts = [t('stats.streak.current', { n, word })];
+  if (s.bestWin) parts.push(t('stats.streak.best', { n: s.bestWin }));
+  if (s.worstLoss) parts.push(t('stats.streak.worst', { n: s.worstLoss }));
+  return parts.join(' · ');
+}
+
+/**
+ * Ширина контейнера в настоящих пикселях. График строится сразу в ней, а не в
+ * условных единицах с последующим сжатием: при сжатии вместе с картинкой
+ * ужимался и шрифт подписей — на половинной карточке 9px превращались в 5px.
+ */
+const chartWidth = (id) => Math.max(320, $(id).clientWidth || 720);
+
+async function refreshCharts() {
+  const period = $('statsPeriod').value || null;
+  const [hours, days, streaks] = await Promise.all([
+    window.wt.db.activityByHour({ period }),
+    window.wt.db.dailyStats({ period }),
+    window.wt.db.streaks({ recent: 50 }),
+  ]);
+
+  $('chartHours').replaceChildren(
+    window.charts.hoursChart(hours, { width: chartWidth('chartHours') })
+  );
+  const best = window.charts.bestHours(hours);
+  $('hoursNote').textContent = best
+    ? t('stats.hours.best', {
+        best: hourRange(best.best.hour),
+        bestWr: Math.round(best.best.wr * 100),
+        bestN: best.best.played,
+        bestWord: window.i18n.plural(best.best.played, 'plural.battles'),
+        worst: hourRange(best.worst.hour),
+        worstWr: Math.round(best.worst.wr * 100),
+        worstN: best.worst.played,
+      })
+    : t('stats.hours.notEnough');
+
+  $('chartStreak').replaceChildren(
+    window.charts.streakStrip(streaks.recent, { width: chartWidth('chartStreak') })
+  );
+  $('streakNote').textContent = streakNote(streaks);
+
+  // Линии по двум точкам смысла не имеют — честнее сказать, что рано.
+  $('chartTrend').replaceChildren(
+    days.length >= 2
+      ? window.charts.trendChart(days, { width: chartWidth('chartTrend') })
+      : el('div', 'empty', t('stats.trend.notEnough'))
+  );
+
+  // Календарь всегда за полгода: он про режим игры, а не про выбранный период.
+  const allDays = period ? await window.wt.db.dailyStats({}) : days;
+  $('chartGrass').replaceChildren(
+    window.charts.grassChart(allDays, { weeks: 26, width: chartWidth('chartGrass') })
+  );
+}
+
+$('statsPeriod').addEventListener('change', refreshCharts);
+
+// Ширина графиков зашита в момент отрисовки, поэтому после изменения размера
+// окна их надо построить заново — иначе подписи разъедутся с картинкой.
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  if (!$('panel-counters').classList.contains('active')) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(refreshCharts, 200);
+});
 
 // --- Вкладка «Бои» ------------------------------------------------------
 
@@ -338,17 +465,21 @@ function battleRoster(details) {
   const wrap = el('div', 'roster');
   const split = el('div', 'split');
 
-  for (const [team, title] of [['ally', 'Свои'], ['enemy', 'Противники'], ['unknown', 'Без команды']]) {
+  for (const [team, titleKey] of [
+    ['ally', 'battles.teamAlly'],
+    ['enemy', 'battles.teamEnemy'],
+    ['unknown', 'battles.teamUnknown'],
+  ]) {
     const rows = details.players.filter((p) => p.team === team);
     if (!rows.length) continue;
 
     const side = el('div', 'side');
-    side.append(el('div', `side-title ${team}`, `${title} — ${rows.length}`));
+    side.append(
+      el('div', `side-title ${team}`, t('battle.sideTitle', { label: t(titleKey), n: rows.length }))
+    );
 
     const table = el('table');
-    table.innerHTML =
-      '<thead><tr><th class="nick">Ник</th><th>КДА</th><th>Награды</th>' +
-      '<th>Техника</th></tr></thead>';
+    table.innerHTML = headRow(['col.nick', 'col.kda', 'col.awardsFull', 'col.vehicles'], { nick: [0] });
     const tbody = el('tbody');
     for (const p of rows) {
       const tr = el('tr');
@@ -360,9 +491,7 @@ function battleRoster(details) {
       kda.append(kdaBadge(p.kills, p.deaths, p.assists));
 
       const awards = el('td', 'muted');
-      awards.textContent = (p.awards || [])
-        .map((a) => (a.count > 1 ? `${a.name} ×${a.count}` : a.name))
-        .join(', ') || '—';
+      awards.textContent = (p.awards || []).map(awardText).join(', ') || '—';
 
       tr.append(nick, kda, awards, el('td', 'muted', p.vehicles.join(' · ') || '—'));
       tbody.append(tr);
@@ -376,87 +505,250 @@ function battleRoster(details) {
   return wrap;
 }
 
-async function refreshBattles() {
-  const limit = Number($('battlesLimit').value) || 10;
-  const [battles, stats] = await Promise.all([
-    window.wt.db.recentBattles(limit),
-    window.wt.db.stats(),
-  ]);
-  const body = $('battlesBody');
+// Сколько боёв подгружается за раз. Рисовать всю историю разом нельзя: на
+// нескольких тысячах записей окно встаёт колом на отрисовке таблицы.
+const BATTLES_PAGE = 50;
 
-  // Хранится всё: ограничение здесь — только сколько строк рисовать.
-  const mb = (stats.sizeBytes / 1024 / 1024).toFixed(1);
-  $('battlesTotal').textContent = `всего в базе: ${stats.battles}, ${mb} МБ`;
+const battlesFilter = { query: '', period: '', from: 0, to: 0, result: '', myVehicle: '' };
+// Сколько строк сейчас на экране — от этого считается и «показать ещё», и
+// перерисовка после записи нового боя: она не должна схлопывать выдачу к
+// первой странице, если человек уже пролистал вглубь.
+let battlesLoaded = 0;
+// Номер последнего запроса. Обновлений может идти несколько сразу (переключение
+// вкладки, ввод в поиске, запись боя), и ответы возвращаются не в том порядке,
+// в каком уходили — устаревший ответ не должен затирать свежую выдачу.
+let battlesRequest = 0;
 
-  if (!battles.length) {
-    body.replaceChildren(el('div', 'empty', 'Боёв пока нет. Первый запишется, когда закончится.'));
-    return;
-  }
+const RESULT_CLASS = { win: 'result-win', loss: 'result-loss' };
 
-  const table = el('table');
-  table.innerHTML =
-    '<thead><tr><th>Когда</th><th class="num">Длит.</th><th>Исход</th><th>КДА</th>' +
-    '<th>Моя техника</th><th class="num">Игроков</th><th></th></tr></thead>';
-  const tbody = el('tbody');
+/** Одна строка боя плюс скрытая строка с составом под ней. */
+function battleRow(b) {
+  const tr = el('tr', 'clickable');
 
-  for (const b of battles) {
-    const tr = el('tr', 'clickable');
+  const actions = el('td');
+  const del = el('button', 'small danger', t('battles.delete'));
+  del.addEventListener('click', async (e) => {
+    e.stopPropagation(); // не раскрывать строку по клику на удаление
+    await window.wt.db.deleteBattle(b.id);
+    refreshBattles();
+    refreshCounters();
+  });
+  actions.append(del);
 
-    const actions = el('td');
-    const del = el('button', 'small danger', 'Удалить');
-    del.addEventListener('click', async (e) => {
-      e.stopPropagation(); // не раскрывать строку по клику на удаление
-      await window.wt.db.deleteBattle(b.id);
-      refreshBattles();
-      refreshCounters();
-    });
-    actions.append(del);
-
-    const kda = el('td');
+  // У отменённого боя цифр не показываем вовсе. Нули читались бы как результат
+  // («сыграл вничью по нулям»), а зачёркнутый КДА всё равно принимают за
+  // настоящий. Прочерк честнее: данных нет.
+  const kda = el('td');
+  if (b.cancelled) {
+    kda.className = 'muted';
+    kda.textContent = '—';
+  } else {
     kda.append(kdaBadge(b.my_kills, b.my_deaths, b.my_assists));
-
-    const RESULT = {
-      win: ['победа', 'result-win'],
-      loss: ['поражение', 'result-loss'],
-    };
-    const [resultLabel, resultClass] = RESULT[b.result] || ['—', 'muted'];
-
-    tr.append(
-      el('td', null, dateText(b.started_at)),
-      el('td', 'num', clockText(b.duration)),
-      el('td', resultClass, resultLabel),
-      kda,
-      el('td', null, b.my_vehicles.join(', ') || '—'),
-      el('td', 'num', String(b.players_seen)),
-      actions
-    );
-
-    // Строка с составом — открывается и закрывается по клику на бой.
-    const detailRow = el('tr', 'detail-row');
-    const detailCell = el('td');
-    detailCell.colSpan = 7;
-    detailRow.append(detailCell);
-    detailRow.hidden = true;
-
-    let loaded = false;
-    tr.addEventListener('click', async () => {
-      detailRow.hidden = !detailRow.hidden;
-      if (detailRow.hidden || loaded) return;
-      const details = await window.wt.db.battleDetails(b.id);
-      detailCell.replaceChildren(
-        details ? battleRoster(details) : el('div', 'empty', 'Состав не найден')
-      );
-      loaded = true;
-    });
-
-    tbody.append(tr, detailRow);
   }
 
-  table.append(tbody);
-  body.replaceChildren(table);
+  const resultClass = b.cancelled ? 'cancelled' : RESULT_CLASS[b.result] || 'muted';
+  const resultLabel = b.cancelled
+    ? t('battles.cancelled')
+    : RESULT_CLASS[b.result]
+      ? t(`result.${b.result}`)
+      : t('result.none');
+
+  if (b.cancelled) {
+    tr.classList.add('row-cancelled');
+    tr.title = t('battles.cancelledHint');
+  }
+
+  tr.append(
+    el('td', null, dateText(b.started_at)),
+    el('td', 'num', clockText(b.duration)),
+    el('td', resultClass, resultLabel),
+    kda,
+    el('td', null, b.my_vehicles.join(', ') || '—'),
+    el('td', 'num', String(b.players_seen)),
+    actions
+  );
+
+  const detailRow = el('tr', 'detail-row');
+  const detailCell = el('td');
+  detailCell.colSpan = 7;
+  detailRow.append(detailCell);
+  detailRow.hidden = true;
+
+  let loaded = false;
+  tr.addEventListener('click', async () => {
+    detailRow.hidden = !detailRow.hidden;
+    if (detailRow.hidden || loaded) return;
+    const details = await window.wt.db.battleDetails(b.id);
+    detailCell.replaceChildren(
+      details ? battleRoster(details) : el('div', 'empty', t('battles.rosterNotFound'))
+    );
+    loaded = true;
+  });
+
+  return [tr, detailRow];
 }
 
-$('battlesLimit').addEventListener('change', refreshBattles);
+/** Дата из поля ввода в миллисекунды. edge='end' — конец суток, а не начало. */
+function dateInputMs(value, edge = 'start') {
+  if (!value) return 0;
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return 0;
+  if (edge === 'end') d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
+/** Активен ли хоть один фильтр — от этого зависит текст пустой выдачи. */
+function filtersActive() {
+  const f = battlesFilter;
+  return !!(f.query || f.period || f.from || f.to || f.result || f.myVehicle);
+}
+
+function readFilters() {
+  battlesFilter.query = $('battleQuery').value.trim();
+  battlesFilter.result = $('battleResult').value;
+  battlesFilter.myVehicle = $('battleVehicle').value;
+
+  const period = $('battlePeriod').value;
+  const custom = period === 'custom';
+  $('battleRange').hidden = !custom;
+  battlesFilter.period = custom ? '' : period;
+  let from = custom ? dateInputMs($('battleFrom').value) : 0;
+  let to = custom ? dateInputMs($('battleTo').value, 'end') : 0;
+
+  // Даты поставили задом наперёд — меняем местами, а не показываем пустой
+  // список. Человек почти наверняка перепутал поля, и молчаливое «ничего не
+  // найдено» он воспримет как поломку программы, а не как свою ошибку.
+  if (from && to && from > to) {
+    [from, to] = [to, from];
+    const a = $('battleFrom').value;
+    $('battleFrom').value = $('battleTo').value;
+    $('battleTo').value = a;
+  }
+
+  battlesFilter.from = from;
+  battlesFilter.to = to;
+}
+
+function summaryText(s) {
+  if (!s.battles && !s.cancelled) return '';
+  const parts = [t('battles.found', { n: s.battles })];
+  if (s.percent !== null) parts.push(t('battles.winPercent', { n: s.percent }));
+  if (s.battles) parts.push(t('battles.kda', { n: s.kda.toFixed(2) }));
+  if (s.unknown) parts.push(t('battles.noResult', { n: s.unknown }));
+  // Отменённые считаем отдельно и говорим об этом вслух: иначе человек увидит
+  // в списке двадцать боёв, а в сводке восемнадцать и решит, что она врёт.
+  if (s.cancelled) parts.push(t('summary.cancelled', { n: s.cancelled }));
+  return parts.join(' · ');
+}
+
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.append] - дописать следующую страницу вместо
+ *   перерисовки: иначе «показать ещё» дёргало бы список к началу.
+ */
+async function refreshBattles({ append = false } = {}) {
+  if (!append) readFilters();
+
+  const limit = append ? BATTLES_PAGE : Math.max(BATTLES_PAGE, battlesLoaded);
+  const offset = append ? battlesLoaded : 0;
+  const ticket = ++battlesRequest;
+
+  const [found, stats] = await Promise.all([
+    window.wt.db.searchBattles({ ...battlesFilter, limit, offset }),
+    window.wt.db.stats(),
+  ]);
+  if (ticket !== battlesRequest) return; // нас обогнал более свежий запрос
+
+  const mb = (stats.sizeBytes / 1024 / 1024).toFixed(1);
+  $('battlesTotal').textContent = t('battles.total', { battles: stats.battles, mb });
+  $('battlesSummary').textContent = summaryText(found.summary);
+
+  const body = $('battlesBody');
+  const tbody = append ? body.querySelector('tbody') : null;
+
+  if (append && tbody) {
+    for (const b of found.rows) tbody.append(...battleRow(b));
+    battlesLoaded += found.rows.length;
+  } else {
+    if (!found.rows.length) {
+      body.replaceChildren(
+        el(
+          'div',
+          'empty',
+          t(filtersActive() ? 'battles.emptyFiltered' : 'battles.empty')
+        )
+      );
+      battlesLoaded = 0;
+      $('battlesMore').hidden = true;
+      return;
+    }
+
+    const table = el('table');
+    table.innerHTML = headRow(
+      ['col.when', 'col.duration', 'col.result', 'col.kda', 'col.myVehicles', 'col.playersSeen', 'empty.cell'],
+      { num: [1, 5] }
+    );
+    const fresh = el('tbody');
+    for (const b of found.rows) fresh.append(...battleRow(b));
+    table.append(fresh);
+    body.replaceChildren(table);
+    battlesLoaded = found.rows.length;
+  }
+
+  const left = found.total - battlesLoaded;
+  $('battlesMore').hidden = left <= 0;
+  $('battlesMore').textContent = t('battles.more', { n: Math.min(left, BATTLES_PAGE), left });
+}
+
+/** Список моей техники для фильтра. Выбранное значение переживает обновление. */
+async function refreshVehicleFilter() {
+  const rows = await window.wt.db.myVehicles({});
+  const select = $('battleVehicle');
+  const previous = select.value;
+
+  // value обязателен: у <option> без него значением становится сам текст, и
+  // «любая» уехала бы в фильтр как название машины.
+  const any = el('option', null, t('battles.anyVehicle'));
+  any.value = '';
+  select.replaceChildren(any);
+  for (const r of rows) {
+    const option = el('option', null, r.label || r.vehicle);
+    option.value = r.vehicle;
+    select.append(option);
+  }
+  // Машина могла исчезнуть вместе с удалённым боем — тогда фильтр снимаем.
+  select.value = [...select.options].some((o) => o.value === previous) ? previous : '';
+}
+
+// Ввод в поиске не дёргает базу на каждую букву.
+let queryTimer = null;
+$('battleQuery').addEventListener('input', () => {
+  clearTimeout(queryTimer);
+  queryTimer = setTimeout(() => {
+    battlesLoaded = 0; // новый запрос — снова с первой страницы
+    refreshBattles();
+  }, 200);
+});
+
+for (const id of ['battlePeriod', 'battleResult', 'battleVehicle', 'battleFrom', 'battleTo']) {
+  $(id).addEventListener('change', () => {
+    battlesLoaded = 0;
+    refreshBattles();
+  });
+}
+
+$('battleReset').addEventListener('click', () => {
+  $('battleQuery').value = '';
+  $('battlePeriod').value = '';
+  $('battleFrom').value = '';
+  $('battleTo').value = '';
+  $('battleResult').value = '';
+  $('battleVehicle').value = '';
+  battlesLoaded = 0;
+  refreshBattles();
+});
+
+$('battlesMore').addEventListener('click', () => refreshBattles({ append: true }));
 
 // --- Вкладка «Игроки» ---------------------------------------------------
 
@@ -476,19 +768,20 @@ function kdaBadge(kills, deaths, assists) {
     el('b', 'kda-a', String(a)),
     el('span', 'kda-ratio', ratio)
   );
-  badge.title = `убийств ${k}, смертей ${d}, ассистов ${a}\n(K+A)/D = ${ratio}${
-    d === 0 ? ' — смертей не было' : ''
-  }`;
+  badge.title =
+    `${t('tip.kda', { k, d, a })}\n${t('tip.kdaRatio', { ratio })}` +
+    (d === 0 ? t('tip.kdaNoDeaths') : '');
   return badge;
 }
 
 function topTable(rows) {
-  if (!rows.length) return el('div', 'empty', 'Никто не набрал нужного числа встреч');
+  if (!rows.length) return el('div', 'empty', t('players.emptyTop'));
 
   const table = el('table');
-  table.innerHTML =
-    '<thead><tr><th class="nick">Ник</th><th class="num">Боёв</th><th>КДА</th>' +
-    '<th>Последний раз</th></tr></thead>';
+  table.innerHTML = headRow(['col.nick', 'col.battles', 'col.kda', 'col.lastSeen'], {
+    nick: [0],
+    num: [1],
+  });
   const tbody = el('tbody');
   for (const r of rows) {
     const tr = el('tr');
@@ -507,7 +800,12 @@ function topTable(rows) {
 
 async function refreshPlayers() {
   const period = $('period').value || null;
-  const minBattles = Math.max(1, Number($('minBattles').value) || 1);
+  // Ограничения в разметке (min/max) — подсказка браузеру, а не защита: их
+  // обходит и ввод с клавиатуры, и вставка из буфера. Дробное «5.5» тоже
+  // приходит сюда как есть. Поэтому чиним значение здесь, а не надеемся.
+  const raw = Math.floor(Number($('minBattles').value));
+  const minBattles = Number.isFinite(raw) ? Math.min(100, Math.max(1, raw)) : 1;
+  if (String(minBattles) !== $('minBattles').value) $('minBattles').value = minBattles;
   const [allies, enemies] = await Promise.all([
     window.wt.db.topPlayers({ side: 'ally', period, minBattles }),
     window.wt.db.topPlayers({ side: 'enemy', period, minBattles }),
@@ -529,13 +827,13 @@ function winrateOf(r) {
 
 // Колонки таблиц «Моей техники». value — по чему сортируем, cell — что рисуем.
 const MY_COLUMNS = [
-  { key: 'vehicle', title: 'Техника', value: (r) => (r.label || r.vehicle).toLowerCase() },
-  { key: 'sorties', title: 'Вылетов', num: true, value: (r) => r.sorties },
-  { key: 'kills', title: 'Фрагов', num: true, value: (r) => r.kills || 0 },
-  { key: 'losses', title: 'Потерь', num: true, value: (r) => r.losses || 0 },
+  { key: 'vehicle', title: 'col.vehicle', value: (r) => (r.label || r.vehicle).toLowerCase() },
+  { key: 'sorties', title: 'col.sorties', num: true, value: (r) => r.sorties },
+  { key: 'kills', title: 'col.frags', num: true, value: (r) => r.kills || 0 },
+  { key: 'losses', title: 'col.losses', num: true, value: (r) => r.losses || 0 },
   {
     key: 'winrate',
-    title: 'Винрейт',
+    title: 'col.winrate',
     num: true,
     // Машины без известного исхода держим внизу при любом направлении.
     value: (r) => (winrateOf(r) === null ? -1 : winrateOf(r)),
@@ -543,10 +841,10 @@ const MY_COLUMNS = [
 ];
 
 const ENEMY_COLUMNS = [
-  { key: 'vehicle', title: 'Техника', value: (r) => (r.label || r.vehicle).toLowerCase() },
-  { key: 'sorties', title: 'Вылетов', num: true, value: (r) => r.sorties },
-  { key: 'kills', title: 'Фрагов', num: true, value: (r) => r.kills || 0 },
-  { key: 'players', title: 'Игроков', num: true, value: (r) => r.players },
+  { key: 'vehicle', title: 'col.vehicle', value: (r) => (r.label || r.vehicle).toLowerCase() },
+  { key: 'sorties', title: 'col.sorties', num: true, value: (r) => r.sorties },
+  { key: 'kills', title: 'col.frags', num: true, value: (r) => r.kills || 0 },
+  { key: 'players', title: 'col.playersCount', num: true, value: (r) => r.players },
 ];
 
 // Состояние сортировки у каждой таблицы своё.
@@ -557,7 +855,7 @@ const sortState = {
 
 function vehicleTable(rows, { mine }) {
   if (!rows.length) {
-    return el('div', 'empty', mine ? 'Данных пока нет' : 'Противники ещё не набрались');
+    return el('div', 'empty', t(mine ? 'mine.emptyMine' : 'mine.emptyEnemy'));
   }
 
   const columns = mine ? MY_COLUMNS : ENEMY_COLUMNS;
@@ -576,12 +874,12 @@ function vehicleTable(rows, { mine }) {
   const headRow = el('tr');
   for (const c of columns) {
     const th = el('th', `sortable${c.num ? ' num' : ''}`);
-    th.append(c.title);
+    th.append(t(c.title));
     if (c.key === state.key) {
       th.append(el('span', 'sort-arrow', state.dir === 'asc' ? ' ↑' : ' ↓'));
       th.classList.add('sorted');
     }
-    th.title = 'Нажми, чтобы отсортировать';
+    th.title = t('tip.sortable');
     th.addEventListener('click', () => {
       // Повторный клик по той же колонке переворачивает порядок.
       if (state.key === c.key) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
@@ -609,8 +907,11 @@ function vehicleTable(rows, { mine }) {
       const cell = el('td', `num${ratio === null ? ' muted' : ''}`, ratio === null ? '—' : `${Math.round(ratio * 100)}%`);
       cell.title =
         ratio === null
-          ? 'исход этих боёв не определён'
-          : `побед ${r.wins} из ${(r.wins || 0) + (r.losses_battles || 0)} боёв с известным исходом`;
+          ? t('tip.winrateUnknown')
+          : t('tip.winrateOf', {
+              wins: r.wins,
+              total: (r.wins || 0) + (r.losses_battles || 0),
+            });
       tr.append(
         veh,
         el('td', 'num', String(r.sorties)),
@@ -642,14 +943,15 @@ async function refreshMine() {
 
   const tile = $('winrateTile');
   tile.replaceChildren(
-    el('div', 'label', 'Винрейт'),
+    el('div', 'label', t('mine.winrate')),
     el('div', 'value', wr.percent === null ? '—' : `${wr.percent}%`),
     el(
       'div',
       'since',
       wr.percent === null
-        ? `боёв ${wr.total}, исход ни одного не определён`
-        : `${wr.wins} побед / ${wr.losses} поражений${wr.unknown ? `, ${wr.unknown} без исхода` : ''}`
+        ? t('mine.winrateNone', { n: wr.total })
+        : t('mine.winrateSome', { wins: wr.wins, losses: wr.losses }) +
+          (wr.unknown ? t('mine.winrateUnknownTail', { n: wr.unknown }) : '')
     )
   );
 
@@ -659,6 +961,80 @@ async function refreshMine() {
 
 $('minePeriod').addEventListener('change', refreshMine);
 
+// --- Инструкция и «О программе» -----------------------------------------
+
+// Разделы инструкции по порядку. Каждый — пара ключей .title и .text в
+// словаре; абзацы внутри текста разделены переводом строки.
+const HELP_SECTIONS = [
+  'start',
+  'status',
+  'who',
+  'table',
+  'icons',
+  'stats',
+  'history',
+  'size',
+  'window',
+  'tray',
+  'data',
+  'problems',
+];
+
+// Какой раздел открывать по кнопке «?» с той или иной вкладки.
+const HELP_FOR_TAB = {
+  battle: 'table',
+  counters: 'stats',
+  battles: 'history',
+  players: 'history',
+  mine: 'stats',
+  settings: 'tray',
+};
+
+function renderHelp() {
+  const body = $('helpBody');
+  body.replaceChildren();
+  for (const id of HELP_SECTIONS) {
+    const section = el('section', 'help-section');
+    section.id = `help-${id}`;
+    section.append(el('h2', null, t(`help.${id}.title`)));
+    // Каждая строка словаря — отдельный абзац: сплошной текст в инструкции
+    // читать тяжело, а ради этого её и пишем.
+    for (const line of t(`help.${id}.text`).split('\n')) {
+      if (line.trim()) section.append(el('p', null, line));
+    }
+    body.append(section);
+  }
+}
+
+function openHelp(sectionId) {
+  document.querySelector('.tab[data-tab="help"]').click();
+  const target = sectionId && $(`help-${sectionId}`);
+  if (target) target.scrollIntoView({ block: 'start' });
+  else document.querySelector('main').scrollTop = 0;
+}
+
+$('helpBtn').addEventListener('click', () => {
+  const current = document.querySelector('.tab.active')?.dataset.tab;
+  openHelp(HELP_FOR_TAB[current]);
+});
+
+async function renderAbout() {
+  const about = await window.wt.about();
+  const facts = $('aboutFacts');
+  facts.replaceChildren();
+
+  const rows = [
+    ['about.version', about.version],
+    ['about.license', about.license],
+    ['about.runtime', `Electron ${about.electron} · Node ${about.node}`],
+    ['about.dataFile', about.dbFile],
+  ];
+  for (const [key, value] of rows) {
+    if (!value) continue;
+    facts.append(el('dt', null, t(key)), el('dd', null, String(value)));
+  }
+}
+
 // --- Карточка игрока ----------------------------------------------------
 
 let cardNick = null;
@@ -666,7 +1042,7 @@ let cardNick = null;
 async function openCard(nick) {
   cardNick = nick;
   $('cardNick').textContent = nick;
-  $('cardSummary').textContent = 'Загружаю…';
+  $('cardSummary').textContent = t('card.loading');
   $('cardBody').replaceChildren();
   $('cardModal').hidden = false;
 
@@ -678,19 +1054,18 @@ async function openCard(nick) {
   $('cardNote').value = d?.note || '';
 
   if (!card) {
-    $('cardSummary').textContent = 'Этого игрока ещё нет в базе — он попадёт туда, когда бой закончится.';
+    $('cardSummary').textContent = t('card.notFound');
     return;
   }
 
   const asAlly = card.encounters.filter((e) => e.team === 'ally').length;
   const asEnemy = card.encounters.filter((e) => e.team === 'enemy').length;
   $('cardSummary').textContent =
-    `Встреч: ${card.encounters.length} (в моей команде ${asAlly}, против ${asEnemy})` +
-    (d ? ` · он убивал меня ${d.killedMe}, я его ${d.killedByMe}` : '');
+    t('card.summary', { total: card.encounters.length, ally: asAlly, enemy: asEnemy }) +
+    (d ? t('card.summaryDuel', { killedMe: d.killedMe, killedByMe: d.killedByMe }) : '');
 
   const table = el('table');
-  table.innerHTML =
-    '<thead><tr><th>Когда</th><th>Команда</th><th>КДА</th><th>Техника</th></tr></thead>';
+  table.innerHTML = headRow(['col.when', 'col.team', 'col.kda', 'col.vehicles']);
   const tbody = el('tbody');
   for (const e of card.encounters.slice(0, 50)) {
     const tr = el('tr');
@@ -698,7 +1073,11 @@ async function openCard(nick) {
     kda.append(kdaBadge(e.kills, e.deaths, e.assists));
     tr.append(
       el('td', null, dateText(e.started_at)),
-      el('td', `nick ${e.team}`, e.team === 'ally' ? 'свой' : e.team === 'enemy' ? 'против' : '—'),
+      el(
+        'td',
+        `nick ${e.team}`,
+        e.team === 'ally' ? t('card.teamAlly') : e.team === 'enemy' ? t('card.teamEnemy') : '—'
+      ),
       kda,
       el('td', 'muted', e.vehicles.join(' · ') || '—')
     );
@@ -724,7 +1103,7 @@ $('cardSave').addEventListener('click', async () => {
 async function refreshDbStats() {
   const s = await window.wt.db.stats();
   const mb = (s.sizeBytes / 1024 / 1024).toFixed(2);
-  $('dbStats').textContent = `Боёв: ${s.battles} · игроков: ${s.players} · размер: ${mb} МБ`;
+  $('dbStats').textContent = t('settings.dbStats', { battles: s.battles, players: s.players, mb });
   $('dbStats').title = s.file;
 }
 
@@ -739,6 +1118,31 @@ $('nick').addEventListener('blur', () => {
   nickDirty = false;
 });
 $('onTop').addEventListener('change', (e) => window.wt.setAlwaysOnTop(e.target.checked));
+
+// Галочки поведения окна и трея — все однотипные, поэтому вешаем один
+// обработчик и не плодим четыре одинаковых.
+const WINDOW_FLAGS = ['closeToTray', 'launchWithSystem', 'showOnGameStart', 'hideOnGameExit'];
+for (const name of WINDOW_FLAGS) {
+  $(name).addEventListener('change', (e) => window.wt.setWindowFlag(name, e.target.checked));
+}
+
+async function refreshWindowFlags() {
+  const flags = await window.wt.windowFlags();
+  for (const name of WINDOW_FLAGS) $(name).checked = !!flags[name];
+}
+
+// Пункт «Настройки» в меню трея открывает именно эту вкладку.
+window.wt.onOpenTab((tab) => {
+  const button = document.querySelector(`.tab[data-tab="${tab}"]`);
+  if (button) button.click();
+});
+
+$('uiScale').addEventListener('change', async (e) => {
+  await window.wt.setUiScale(e.target.value);
+  // Масштаб меняет ширину карточек в CSS-пикселях, а размеры графика зашиты
+  // в момент отрисовки — без пересборки подписи разъедутся с картинкой.
+  if ($('panel-counters').classList.contains('active')) refreshCharts();
+});
 $('reveal').addEventListener('click', () => window.wt.db.reveal());
 $('resetBattleBtn').addEventListener('click', () => window.wt.resetBattle());
 
@@ -746,7 +1150,7 @@ $('resetBattleBtn').addEventListener('click', () => window.wt.resetBattle());
 
 let confirmAction = null;
 
-function askConfirm({ title, text, word = 'УДАЛИТЬ', action }) {
+function askConfirm({ title, text, word = t('confirm.word'), action }) {
   $('modalTitle').textContent = title;
   $('modalText').textContent = text;
   $('modalWord').textContent = word;
@@ -776,8 +1180,8 @@ document.addEventListener('keydown', (e) => {
 
 $('clearHistory').addEventListener('click', () =>
   askConfirm({
-    title: 'Очистить историю боёв',
-    text: 'Удалит все записанные бои и обнулит все четыре счётчика. База игроков останется. Копия базы сохранится рядом с файлом.',
+    title: t('confirm.clearHistory.title'),
+    text: t('confirm.clearHistory.text'),
     action: async () => {
       await window.wt.db.clearHistory({ keepPlayers: true });
       refreshDbStats();
@@ -788,8 +1192,8 @@ $('clearHistory').addEventListener('click', () =>
 
 $('clearPlayers').addEventListener('click', () =>
   askConfirm({
-    title: 'Очистить базу игроков',
-    text: 'Удалит всех накопленных игроков и их встречи — топы союзников и противников обнулятся. Копия базы сохранится рядом с файлом.',
+    title: t('confirm.clearPlayers.title'),
+    text: t('confirm.clearPlayers.text'),
     action: async () => {
       await window.wt.db.clearPlayers();
       refreshDbStats();
@@ -803,16 +1207,79 @@ $('clearPlayers').addEventListener('click', () =>
 window.wt.onUpdate(renderBattle);
 window.wt.onDbChanged(() => {
   refreshCounters();
-  refreshBattles();
+  refreshVehicleFilter().then(() => refreshBattles());
   refreshDbStats();
 });
-window.wt.onError((message) => {
-  $('statusText').textContent = message;
+// Запросы к main рассыпаны по всему файлу, и оборачивать каждый в try/catch
+// значило бы засыпать код одинаковыми блоками. Ловим отказы одной точкой:
+// упавший запрос теперь виден в строке состояния, а не превращает вкладку в
+// молча замершую.
+window.addEventListener('unhandledrejection', (e) => {
+  e.preventDefault();
+  const message = e.reason?.message || String(e.reason);
+  // Electron приписывает к сообщению служебный префикс канала — он нужен в
+  // логе, но не человеку.
+  showError(message.replace(/^Error invoking remote method '[^']+':\s*/, ''));
+});
+
+function showError(message) {
+  const box = $('statusText');
+  box.textContent = message;
+  box.classList.add('error');
+  clearTimeout(showError.timer);
+  // Через полминуты строка вернётся к обычному состоянию: постоянно висящая
+  // старая ошибка мешает видеть, что происходит сейчас.
+  showError.timer = setTimeout(() => box.classList.remove('error'), 30000);
+}
+
+window.wt.onError(showError);
+
+/**
+ * Раскладывает язык по интерфейсу: словарь в i18n, статические подписи в
+ * разметку, список языков в настройки. Каждый язык назван на самом себе —
+ * человек, открывший программу на незнакомом языке, всё равно найдёт свой.
+ */
+function applyLocale(locale) {
+  window.i18n.setLocale(locale);
+  window.i18n.apply();
+
+  const select = $('uiLang');
+  if (locale.languages) {
+    select.replaceChildren();
+    for (const l of locale.languages) {
+      const option = el('option', null, l.name);
+      option.value = l.code;
+      select.append(option);
+    }
+  }
+  select.value = locale.lang;
+}
+
+/** Перерисовывает то, что построено из строк, а не из разметки. */
+function rerenderAll() {
+  if (lastState) renderBattle(lastState);
+  refreshCounters();
+  refreshDbStats();
+  const active = document.querySelector('.panel.active')?.id;
+  if (active === 'panel-battles') refreshVehicleFilter().then(() => refreshBattles());
+  if (active === 'panel-players') refreshPlayers();
+  if (active === 'panel-mine') refreshMine();
+  if (active === 'panel-help') renderHelp();
+  if (active === 'panel-about') renderAbout();
+}
+
+$('uiLang').addEventListener('change', async (e) => {
+  applyLocale(await window.wt.setLang(e.target.value));
+  rerenderAll();
 });
 
 window.wt.getState().then((state) => {
+  // Язык раскладываем до первой отрисовки, иначе на долю секунды мелькнут
+  // ключи словаря вместо текста.
+  applyLocale(state);
   $('onTop').checked = !!state.alwaysOnTop;
+  if (state.uiScale) $('uiScale').value = String(state.uiScale);
   renderBattle(state);
+  refreshCounters();
+  refreshDbStats();
 });
-refreshCounters();
-refreshDbStats();

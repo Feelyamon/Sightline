@@ -9,6 +9,13 @@
   --ally: #63c98a;
   --accent: #6ea8fe;
   --danger: #e05a5a;
+
+  /* Говорим движку, что тема тёмная: от этого зависят выпадающий список
+     select, календарь у поля даты, галочки и полосы прокрутки — всё, что
+     рисует не наш CSS, а сама система. Без этой строки они приходят
+     белыми и выбиваются из окна. */
+  color-scheme: dark;
+  accent-color: var(--accent);
 }
 
 * { box-sizing: border-box; }
@@ -28,6 +35,9 @@ body {
 .topbar {
   display: flex;
   align-items: center;
+  /* При крупном масштабе интерфейса вкладки и статус перестают помещаться в
+     строку — переносим их, а не обрезаем. */
+  flex-wrap: wrap;
   gap: 12px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
@@ -35,7 +45,10 @@ body {
   flex: none;
 }
 
-.tabs { display: flex; gap: 4px; }
+/* Вкладок восемь, и в узком окне они не помещаются в строку. Переносим их
+   внутри своего блока, а не выдавливаем статус на вторую строку: статус —
+   первое, куда смотрит человек, проверяя, видит ли программа игру. */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .tab {
   background: transparent;
   border: 1px solid transparent;
@@ -56,7 +69,10 @@ body {
   border-color: #2f4a6d;
 }
 
-.status { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.status { display: flex; align-items: center; gap: 8px; }
+/* Ошибку в строке состояния видно сразу: без выделения она теряется среди
+   обычных сообщений вроде «В ангаре». */
+#statusText.error { color: var(--enemy); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
 .dot.battle { background: var(--ally); }
 .dot.idle { background: #e0b354; }
@@ -129,6 +145,11 @@ tr.revenge td {
   box-shadow: inset 0 0 0 1px rgba(224, 179, 84, .55);
 }
 tr.revenge td.nick { color: #f0c96b; font-weight: 600; }
+
+/* Отменённый бой: приглушён, но не спрятан — он в списке есть, просто в
+   цифры не входит. */
+tr.row-cancelled td { opacity: .55; }
+td.cancelled { color: #e0b354; white-space: nowrap; }
 
 .result-win { color: var(--ally); }
 .result-loss { color: var(--enemy); }
@@ -233,6 +254,128 @@ details[hidden] { display: none; }
 .tile .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .tile .since { color: var(--muted); font-size: 10px; margin: 4px 0 8px; }
 
+/* --- Инструкция и «О программе» --- */
+/* Сплошной текст читают, а не проглядывают: шире строки, крупнее шрифт и
+   ограниченная ширина колонки — длинные строки утомляют глаз. */
+.prose {
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.prose h1 { font-size: 22px; margin: 0 0 6px; }
+.prose h2 {
+  font-size: 16px;
+  margin: 26px 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+  color: var(--accent);
+}
+.prose p { margin: 0 0 10px; }
+.prose .lead { color: var(--muted); margin-bottom: 4px; }
+.prose .small { font-size: 13px; }
+.help-section:first-child h2 { margin-top: 14px; }
+
+.prose dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 18px 0;
+  font-size: 14px;
+}
+.prose dt { color: var(--muted); }
+.prose dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Круглая «?» рядом со статусом: одна на всё окно, открывает раздел
+   инструкции про ту вкладку, где стоит человек. */
+.help-btn {
+  margin-left: auto;
+  align-self: flex-start;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1;
+  flex: none;
+}
+.help-btn:hover { color: var(--accent); }
+
+
+/* --- Карточки с графиками --- */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+  min-width: 0;
+}
+/* На всю ширину — тем графикам, где по горизонтали лежит время. */
+.card.wide { grid-column: 1 / -1; }
+/* В узком окне — и при крупном масштабе, который сужает его в CSS-пикселях —
+   две колонки превращают графики в нечитаемые полоски. */
+@media (max-width: 900px) {
+  .cards { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+}
+.card-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+/* Пояснения под заголовком чуть мельче основного текста, но не настолько,
+   чтобы их приходилось разглядывать. Кому и этого мало — «Размер интерфейса»
+   в настройках увеличивает всё окно целиком. */
+.card-hint { font-size: 12px; margin-bottom: 10px; }
+.card-note { font-size: 12px; margin-top: 10px; }
+.legend-kda { color: var(--accent); }
+.legend-wr { color: var(--ally); }
+
+/* Ширина viewBox равна реальной ширине карточки (её подставляет app.js), так
+   что масштаб 1:1 и подписи не мельчают. max-width страхует от переполнения,
+   если окно сузили между перерисовками. */
+.chart { display: block; max-width: 100%; height: auto; overflow: visible; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font-size: 12px; }
+.chart .axis.mid { text-anchor: middle; }
+.chart .axis.end { text-anchor: end; }
+.chart .axis.kda { fill: var(--accent); }
+.chart .axis.wr { fill: var(--ally); }
+
+.chart .bar.win { fill: var(--ally); }
+.chart .bar.loss { fill: var(--enemy); }
+.chart .bar.unknown { fill: var(--muted); opacity: .5; }
+/* Прозрачная накладка ловит наведение на всю высоту столбика. */
+.chart .hit { fill: transparent; }
+.chart .hit:hover { fill: rgba(110, 168, 254, .1); }
+
+.chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .line.kda { stroke: var(--accent); }
+.chart .line.wr { stroke: var(--ally); }
+.chart .dot { fill: var(--accent); opacity: .35; }
+
+/* Ступени «травки»: от фона до полной заливки акцентом. */
+.chart .cell { fill: var(--panel-2); stroke: var(--line); stroke-width: 1; }
+.chart .cell.level-1 { fill: #1e3a5f; stroke: none; }
+.chart .cell.level-2 { fill: #2f5c96; stroke: none; }
+.chart .cell.level-3 { fill: #4a83cc; stroke: none; }
+.chart .cell.level-4 { fill: var(--accent); stroke: none; }
+.chart .cell.future { opacity: .3; }
+.chart .cell:hover { stroke: var(--text); stroke-width: 1; }
+
+.chart .pip.win { fill: var(--ally); }
+.chart .pip.loss { fill: var(--enemy); }
+.chart .pip.unknown { fill: var(--line); }
+.chart-streak, .chart-grass { max-width: 100%; }
+
 /* --- Формы --- */
 button {
   background: var(--panel);
@@ -249,20 +392,87 @@ button.danger { color: var(--danger); border-color: #46282c; }
 button.danger:hover:not(:disabled) { border-color: var(--danger); }
 button.small { padding: 2px 8px; font-size: 11px; }
 
-input[type="text"], input[type="number"], select {
+input[type="text"], input[type="number"], input[type="search"], input[type="date"], select {
   background: var(--panel-2);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 5px 8px;
+  padding: 6px 9px;
   font: inherit;
 }
 input[type="text"] { width: 100%; }
 input[type="number"] { width: 70px; }
+input:hover, select:hover { border-color: #3a4557; }
+input:focus, select:focus, button:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(110, 168, 254, .2);
+}
+input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) brightness(1.6); }
+/* Иконка календаря приходит тёмной на тёмном — осветляем до цвета текста. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(.7);
+  cursor: pointer;
+}
+input[type="checkbox"] { width: 15px; height: 15px; }
+
+/* Своя стрелка у выпадающих списков: у самого select псевдоэлементов не
+   бывает, поэтому он завёрнут в span.sel, и треугольник рисует обёртка.
+   Треугольник сложен из границ — картинкой было бы нельзя: наша CSP
+   запрещает data:-адреса. */
+.sel { position: relative; display: inline-flex; }
+.sel select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 26px;
+  width: 100%;
+  cursor: pointer;
+}
+.sel::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  margin-top: -2px;
+  border: 4px solid transparent;
+  border-top-color: var(--muted);
+  pointer-events: none;
+}
+.sel:hover::after { border-top-color: var(--text); }
+
+/* Полосы прокрутки: системные светлые сильно выбиваются из тёмного окна. */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--panel-2); }
+::-webkit-scrollbar-thumb {
+  background: #333c4c;
+  border: 3px solid var(--panel-2);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: #465268; }
+::-webkit-scrollbar-corner { background: var(--panel-2); }
 
 label.row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
 label.field { flex-direction: column; align-items: stretch; max-width: 420px; }
 .controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+
+/* --- Панель фильтров во вкладке «Бои» --- */
+.filters {
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.filters label.row { margin: 0; }
+/* Поиск занимает всё свободное место: он здесь главный, остальное — уточнения. */
+.filters label.row.grow { flex: 1 1 220px; }
+.filters input[type="search"] { width: 100%; min-width: 140px; }
+.filters .sel { max-width: 190px; }
+label.row[hidden] { display: none; }
+
+#battlesSummary { color: var(--accent); }
+.more { justify-content: center; margin-top: 10px; }
 .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 .log { white-space: pre-wrap; font-size: 11px; max-height: 160px; overflow: auto; }
 

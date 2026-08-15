@@ -9,13 +9,16 @@
 <body>
   <header class="topbar">
     <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="battle">Бой</button>
-      <button class="tab" data-tab="counters">Счётчики</button>
-      <button class="tab" data-tab="battles">Бои</button>
-      <button class="tab" data-tab="players">Игроки</button>
-      <button class="tab" data-tab="mine">Моя техника</button>
-      <button class="tab" data-tab="settings">Настройки</button>
+      <button class="tab active" data-tab="battle" data-i18n="tab.battle">Бой</button>
+      <button class="tab" data-tab="counters" data-i18n="tab.stats">Статистика</button>
+      <button class="tab" data-tab="battles" data-i18n="tab.battles">Бои</button>
+      <button class="tab" data-tab="players" data-i18n="tab.players">Игроки</button>
+      <button class="tab" data-tab="mine" data-i18n="tab.mine">Моя техника</button>
+      <button class="tab" data-tab="settings" data-i18n="tab.settings">Настройки</button>
+      <button class="tab" data-tab="help" data-i18n="tab.help"></button>
+      <button class="tab" data-tab="about" data-i18n="tab.about"></button>
     </nav>
+    <button class="help-btn" id="helpBtn" data-i18n-title="help.open">?</button>
     <div class="status" id="status">
       <span class="dot" id="dot"></span>
       <span id="statusText">…</span>
@@ -28,74 +31,150 @@
     <section class="panel active" id="panel-battle">
       <div class="split">
         <div class="side">
-          <div class="side-title ally" id="allyTitle">Свои</div>
+          <div class="side-title ally" id="allyTitle"></div>
           <div id="allyBody"></div>
         </div>
         <div class="side">
-          <div class="side-title enemy" id="enemyTitle">Противники</div>
+          <div class="side-title enemy" id="enemyTitle"></div>
           <div id="enemyBody"></div>
         </div>
       </div>
       <!-- Свёрнут по умолчанию: в начале боя сюда попадает половина лобби,
            пока цепочка «кто кого убил» не дотянулась до моей команды. -->
       <details id="unknownBox" hidden>
-        <summary class="section-title" id="unknownTitle">Команда не определена</summary>
+        <summary class="section-title" id="unknownTitle" data-i18n="battle.unknownTeam">Команда не определена</summary>
         <div id="unknownBody"></div>
       </details>
       <p class="muted footnote">
-        Видны только игроки, засветившиеся в кил-фиде — полного списка игра наружу не отдаёт.
+        <span data-i18n="battle.footnote"></span>
       </p>
     </section>
 
-    <!-- Счётчики -->
+    <!-- Статистика: счётчики сверху, графики под ними -->
     <section class="panel" id="panel-counters">
       <div class="tiles" id="tiles"></div>
+
+      <div class="controls" id="statsControls">
+        <label class="row">
+          <span class="muted" data-i18n="stats.period">Период графиков</span>
+          <span class="sel"><select id="statsPeriod">
+            <option value="month" data-i18n="period.month"></option>
+            <option value="week" data-i18n="period.week"></option>
+            <option value="" data-i18n="period.all"></option>
+          </select></span>
+        </label>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-title" data-i18n="stats.hours.title"></div>
+          <div class="card-hint muted">
+            <span data-i18n="stats.hours.hint"></span>
+          </div>
+          <div id="chartHours"></div>
+          <div class="card-note muted" id="hoursNote"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" data-i18n="stats.streak.title"></div>
+          <div class="card-hint muted" data-i18n="stats.streak.hint"></div>
+          <div id="chartStreak"></div>
+          <div class="card-note muted" id="streakNote"></div>
+        </div>
+
+        <div class="card wide">
+          <div class="card-title" data-i18n="stats.trend.title"></div>
+          <!-- Легенда отдельной строкой, а не словами внутри предложения:
+               порядок слов в разных языках свой, и вставлять в него цветные
+               куски значило бы ломать перевод. -->
+          <div class="card-hint muted" data-i18n="stats.trend.hint"></div>
+          <div class="card-hint legend">
+            <span class="legend-kda">■ <span data-i18n="legend.kda"></span></span>
+            <span class="legend-wr">■ <span data-i18n="legend.winrate"></span></span>
+          </div>
+          <div id="chartTrend"></div>
+        </div>
+
+        <div class="card wide">
+          <div class="card-title" data-i18n="stats.grass.title"></div>
+          <div class="card-hint muted" data-i18n="stats.grass.hint"></div>
+          <div id="chartGrass"></div>
+        </div>
+      </div>
     </section>
 
     <!-- Бои -->
     <section class="panel" id="panel-battles">
-      <div class="controls">
-        <label class="row">
-          <span class="muted">Показывать</span>
-          <select id="battlesLimit">
-            <option value="10">последние 10</option>
-            <option value="25">последние 25</option>
-            <option value="100">последние 100</option>
-            <option value="500">последние 500</option>
-            <option value="2000">последние 2000</option>
-            <option value="10000">последние 10000</option>
-          </select>
+      <div class="controls filters">
+        <label class="row grow">
+          <span class="muted" data-i18n="battles.search"></span>
+          <input type="search" id="battleQuery" data-i18n-placeholder="battles.searchPlaceholder" autocomplete="off" />
         </label>
-        <span class="muted">Нажми на бой, чтобы увидеть состав</span>
+        <label class="row">
+          <span class="muted" data-i18n="period.label"></span>
+          <span class="sel"><select id="battlePeriod">
+            <option value="" data-i18n="period.all"></option>
+            <option value="today" data-i18n="period.today"></option>
+            <option value="week" data-i18n="period.week"></option>
+            <option value="month" data-i18n="period.month"></option>
+            <option value="custom" data-i18n="period.custom"></option>
+          </select></span>
+        </label>
+        <label class="row" id="battleRange" hidden>
+          <input type="date" id="battleFrom" />
+          <span class="muted">—</span>
+          <input type="date" id="battleTo" />
+        </label>
+        <label class="row">
+          <span class="muted" data-i18n="col.result"></span>
+          <span class="sel"><select id="battleResult">
+            <option value="" data-i18n="result.any"></option>
+            <option value="win" data-i18n="result.win"></option>
+            <option value="loss" data-i18n="result.loss"></option>
+            <option value="unknown" data-i18n="result.unknown"></option>
+          </select></span>
+        </label>
+        <label class="row">
+          <span class="muted" data-i18n="battles.myVehicle"></span>
+          <span class="sel"><select id="battleVehicle"><option value="" data-i18n="battles.anyVehicle"></option></select></span>
+        </label>
+        <button id="battleReset" class="small" data-i18n="battles.resetFilters"></button>
+      </div>
+      <div class="controls">
+        <span id="battlesSummary"></span>
+        <span class="muted" data-i18n="battles.clickHint"></span>
         <span class="muted" id="battlesTotal"></span>
       </div>
       <div id="battlesBody"></div>
+      <div class="buttons more">
+        <button id="battlesMore" hidden></button>
+      </div>
     </section>
 
     <!-- Игроки -->
     <section class="panel" id="panel-players">
       <div class="controls">
         <label class="row">
-          <span class="muted">Период</span>
-          <select id="period">
-            <option value="month">за месяц</option>
-            <option value="week">за неделю</option>
-            <option value="today">за сегодня</option>
-            <option value="">за всё время</option>
-          </select>
+          <span class="muted" data-i18n="period.label"></span>
+          <span class="sel"><select id="period">
+            <option value="month" data-i18n="period.month"></option>
+            <option value="week" data-i18n="period.week"></option>
+            <option value="today" data-i18n="period.today"></option>
+            <option value="" data-i18n="period.all"></option>
+          </select></span>
         </label>
         <label class="row">
-          <span class="muted">Минимум встреч</span>
+          <span class="muted" data-i18n="players.minMeetings"></span>
           <input type="number" id="minBattles" value="5" min="1" max="100" />
         </label>
       </div>
       <div class="split">
         <div class="side">
-          <div class="side-title ally">Топ союзники</div>
+          <div class="side-title ally" data-i18n="players.topAllies"></div>
           <div id="topAllies"></div>
         </div>
         <div class="side">
-          <div class="side-title enemy">Топ противники</div>
+          <div class="side-title enemy" data-i18n="players.topEnemies"></div>
           <div id="topEnemies"></div>
         </div>
       </div>
@@ -105,23 +184,23 @@
     <section class="panel" id="panel-mine">
       <div class="controls">
         <label class="row">
-          <span class="muted">Период</span>
-          <select id="minePeriod">
-            <option value="month">за месяц</option>
-            <option value="week">за неделю</option>
-            <option value="today">за сегодня</option>
-            <option value="">за всё время</option>
-          </select>
+          <span class="muted" data-i18n="period.label"></span>
+          <span class="sel"><select id="minePeriod">
+            <option value="month" data-i18n="period.month"></option>
+            <option value="week" data-i18n="period.week"></option>
+            <option value="today" data-i18n="period.today"></option>
+            <option value="" data-i18n="period.all"></option>
+          </select></span>
         </label>
         <div class="tile inline" id="winrateTile"></div>
       </div>
       <div class="split">
         <div class="side">
-          <div class="side-title ally">На чём воюю я</div>
+          <div class="side-title ally" data-i18n="mine.myVehicles"></div>
           <div id="myVehicles"></div>
         </div>
         <div class="side">
-          <div class="side-title enemy">Что выкатывают против</div>
+          <div class="side-title enemy" data-i18n="mine.enemyVehicles"></div>
           <div id="enemyVehicles"></div>
         </div>
       </div>
@@ -130,51 +209,103 @@
     <!-- Настройки -->
     <section class="panel" id="panel-settings">
       <label class="row field">
-        <span class="muted">Твой ник в игре (клан-тег писать не нужно)</span>
-        <input type="text" id="nick" placeholder="Например: Username" autocomplete="off" />
+        <span class="muted" data-i18n="settings.nick"></span>
+        <input type="text" id="nick" data-i18n-placeholder="settings.nickPlaceholder" autocomplete="off" />
       </label>
 
       <label class="row">
         <input type="checkbox" id="onTop" />
-        <span>Окно поверх всех окон</span>
+        <span data-i18n="settings.onTop"></span>
       </label>
 
-      <div class="section-title">База данных</div>
+      <label class="row">
+        <span class="muted" data-i18n="settings.language"></span>
+        <span class="sel"><select id="uiLang"></select></span>
+      </label>
+
+      <label class="row">
+        <span class="muted" data-i18n="settings.uiScale"></span>
+        <span class="sel"><select id="uiScale">
+          <option value="1" data-i18n="scale.1"></option>
+          <option value="1.15" data-i18n="scale.1.15"></option>
+          <option value="1.3" data-i18n="scale.1.3"></option>
+          <option value="1.5" data-i18n="scale.1.5"></option>
+          <option value="1.75" data-i18n="scale.1.75"></option>
+        </select></span>
+        <span class="muted" data-i18n="settings.uiScaleHint"></span>
+      </label>
+
+      <div class="section-title" data-i18n="settings.window"></div>
+      <label class="row">
+        <input type="checkbox" id="closeToTray" />
+        <span data-i18n="settings.closeToTray"></span>
+        <span class="muted" data-i18n="settings.closeToTrayHint"></span>
+      </label>
+      <label class="row">
+        <input type="checkbox" id="launchWithSystem" />
+        <span data-i18n="settings.launchWithSystem"></span>
+        <span class="muted" data-i18n="settings.launchWithSystemHint"></span>
+      </label>
+      <label class="row">
+        <input type="checkbox" id="showOnGameStart" />
+        <span data-i18n="settings.showOnGameStart"></span>
+      </label>
+      <label class="row">
+        <input type="checkbox" id="hideOnGameExit" />
+        <span data-i18n="settings.hideOnGameExit"></span>
+      </label>
+      <p class="muted small" data-i18n="settings.launchNote"></p>
+
+      <div class="section-title" data-i18n="settings.db"></div>
       <div class="muted" id="dbStats">…</div>
       <div class="buttons">
-        <button id="reveal">Показать файл базы</button>
-        <button id="resetBattleBtn">Сбросить текущий бой</button>
+        <button id="reveal" data-i18n="settings.reveal"></button>
+        <button id="resetBattleBtn" data-i18n="settings.resetBattle"></button>
       </div>
 
-      <div class="section-title">Опасные операции</div>
+      <div class="section-title" data-i18n="settings.danger"></div>
       <p class="muted">
-        Перед каждой из них автоматически создаётся резервная копия базы рядом с файлом.
+        <span data-i18n="settings.dangerHint"></span>
       </p>
       <div class="buttons">
-        <button class="danger" id="clearHistory">Очистить историю боёв</button>
-        <button class="danger" id="clearPlayers">Очистить базу игроков</button>
+        <button class="danger" id="clearHistory" data-i18n="settings.clearHistory"></button>
+        <button class="danger" id="clearPlayers" data-i18n="settings.clearPlayers"></button>
       </div>
 
       <div id="unparsedBox" hidden>
-        <div class="section-title">Нераспознанные строки кил-фида</div>
+        <div class="section-title" data-i18n="settings.unparsed"></div>
         <pre class="muted log" id="unparsed"></pre>
       </div>
+    </section>
+    <!-- Инструкция: длинный текст, поэтому разделы генерируются из словаря -->
+    <section class="panel prose" id="panel-help">
+      <p class="lead" data-i18n="help.intro"></p>
+      <div id="helpBody"></div>
+    </section>
+
+    <!-- О программе -->
+    <section class="panel prose" id="panel-about">
+      <h1>Sightline</h1>
+      <p class="lead" data-i18n="about.what"></p>
+      <dl id="aboutFacts"></dl>
+      <p class="muted" data-i18n="about.fair"></p>
+      <p class="muted small" data-i18n="about.disclaimer"></p>
     </section>
   </main>
 
   <!-- Карточка игрока: история встреч и ручная заметка -->
   <div class="modal-backdrop" id="cardModal" hidden>
     <div class="modal wide">
-      <h2 id="cardNick">Игрок</h2>
+      <h2 id="cardNick" data-i18n="card.title"></h2>
       <div class="muted" id="cardSummary"></div>
       <label class="row field">
-        <span class="muted">Заметка — всплывёт при следующей встрече</span>
-        <input type="text" id="cardNote" placeholder="Например: камперит на Ка-50" autocomplete="off" />
+        <span class="muted" data-i18n="card.note"></span>
+        <input type="text" id="cardNote" data-i18n-placeholder="card.notePlaceholder" autocomplete="off" />
       </label>
       <div id="cardBody"></div>
       <div class="buttons">
-        <button id="cardSave">Сохранить заметку</button>
-        <button id="cardClose">Закрыть</button>
+        <button id="cardSave" data-i18n="card.save"></button>
+        <button id="cardClose" data-i18n="card.close"></button>
       </div>
     </div>
   </div>
@@ -182,17 +313,19 @@
   <!-- Подтверждение опасных действий: закрывает случайный мисклик -->
   <div class="modal-backdrop" id="modal" hidden>
     <div class="modal">
-      <h2 id="modalTitle">Подтверждение</h2>
+      <h2 id="modalTitle" data-i18n="confirm.title"></h2>
       <p id="modalText"></p>
-      <p class="muted">Чтобы подтвердить, введите <b id="modalWord">УДАЛИТЬ</b></p>
+      <p class="muted"><span data-i18n="confirm.hint"></span> <b id="modalWord"></b></p>
       <input type="text" id="modalInput" autocomplete="off" />
       <div class="buttons">
-        <button id="modalCancel">Отмена</button>
-        <button class="danger" id="modalOk" disabled>Подтвердить</button>
+        <button id="modalCancel" data-i18n="confirm.cancel"></button>
+        <button class="danger" id="modalOk" disabled data-i18n="confirm.ok"></button>
       </div>
     </div>
   </div>
 
+  <script src="i18n.js"></script>
+  <script src="charts.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -7,7 +7,8 @@
   "scripts": {
     "start": "electron .",
     "mock": "electron . --mock",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "harness": "node scripts/harness/build.js"
   },
   "author": "",
   "license": "MIT",

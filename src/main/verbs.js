@@ -99,6 +99,36 @@ const NAMED_AWARDS = [
   { re: /\bfinal blow\b/i, name: 'Последний удар' },
 ];
 
+// Уровни (степени) наград. Игра пишет их прямо в название: «Снайпер II»,
+// «Тактик 2 степени». Из-за этого одна и та же награда разъезжалась в базе на
+// несколько разных, и статистику по ней было не собрать. Первая группа
+// шаблона — название без уровня, вторая — сам уровень.
+//
+// Порядок важен: шаблоны со словом «степени» идут первыми, иначе шаблон
+// «хвостовая римская цифра» отрежет цифру и оставит висеть слово «степени».
+const AWARD_TIER_PATTERNS = [
+  /^(.+?)\s+(\d+)\s*-?\s*(?:й|ой|я|ей)?\s*степени$/i,
+  /^(.+?)\s+([IVXL]+)\s+степени$/i,
+  /^(.+?)\s+(\d+)\s*(?:st|nd|rd|th)?\s+(?:class|degree|rank)$/i,
+  /^(.+?)\s+([IVXL]+)$/,
+  /^(.+?)\s+(\d+)$/,
+];
+
+const ROMAN = { I: 1, V: 5, X: 10, L: 50 };
+
+/** Римское число в арабское. Возвращает 0, если строка не римская. */
+function fromRoman(s) {
+  const chars = String(s).toUpperCase().split('');
+  if (!chars.length || chars.some((c) => !(c in ROMAN))) return 0;
+  let total = 0;
+  for (let i = 0; i < chars.length; i++) {
+    const value = ROMAN[chars[i]];
+    const next = ROMAN[chars[i + 1]] || 0;
+    total += value < next ? -value : value;
+  }
+  return total;
+}
+
 // Строки, которые вообще не про технику: ачивки, серии убийств, захват точек.
 // Отбрасываем молча, чтобы не засорять unparsed[].
 const NOISE_PATTERNS = [
@@ -137,4 +167,6 @@ module.exports = {
   AIR_VERBS,
   AWARD_PATTERNS,
   NAMED_AWARDS,
+  AWARD_TIER_PATTERNS,
+  fromRoman,
 };

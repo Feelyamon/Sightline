@@ -9,6 +9,8 @@ const {
   AIR_VERBS,
   AWARD_PATTERNS,
   NAMED_AWARDS,
+  AWARD_TIER_PATTERNS,
+  fromRoman,
 } = require('./verbs');
 
 // Длинные глаголы вперёд: «тяжело повредил» должен победить «повредил»,
@@ -74,9 +76,34 @@ function findVerb(msg, verbs) {
 }
 
 /**
+ * Отделяет уровень награды от её названия: «Снайпер II» → «Снайпер», 2.
+ * Без этого одна награда лежала бы в базе несколькими разными, и собрать по
+ * ней статистику было бы нельзя.
+ *
+ * Правило осторожное: если после отсечения уровня от названия почти ничего
+ * не осталось, считаем, что шаблон сработал по ошибке, и оставляем строку
+ * как есть. Награду лучше не разобрать, чем превратить в мусор.
+ *
+ * @param {string} raw
+ * @returns {{name: string, tier: number}}
+ */
+function normalizeAward(raw) {
+  const text = String(raw || '').trim();
+  for (const re of AWARD_TIER_PATTERNS) {
+    const m = re.exec(text);
+    if (!m) continue;
+    const name = m[1].trim();
+    if (name.length < 3) continue;
+    const tier = /^\d+$/.test(m[2]) ? Number(m[2]) : fromRoman(m[2]);
+    if (tier > 0 && tier <= 20) return { name, tier };
+  }
+  return { name: text, tier: 0 };
+}
+
+/**
  * Награда за бой: «Ник (Техника) получил "Снайпер"», «... получил
  * "Спасатель танков: x2"», «... ударил первым!».
- * @returns {{type:'award', actor, award, count}|null}
+ * @returns {{type:'award', actor, award, tier, count}|null}
  */
 function parseAward(text) {
   for (const re of AWARD_PATTERNS) {
@@ -89,10 +116,12 @@ function parseAward(text) {
     // на отдельные записи.
     const raw = m[1].trim();
     const withCount = /^(.*?):\s*x\s*(\d+)\s*!?$/i.exec(raw);
+    const { name, tier } = normalizeAward(withCount ? withCount[1] : raw);
     return {
       type: 'award',
       actor,
-      award: withCount ? withCount[1].trim() : raw,
+      award: name,
+      tier,
       count: withCount ? Number(withCount[2]) : 1,
     };
   }
@@ -101,7 +130,7 @@ function parseAward(text) {
     const m = re.exec(text);
     if (!m) continue;
     const actor = parseParticipant(text.slice(0, m.index));
-    if (actor) return { type: 'award', actor, award: name, count: 1 };
+    if (actor) return { type: 'award', actor, award: name, tier: 0, count: 1 };
   }
   return null;
 }
@@ -160,4 +189,4 @@ function parseMessage(msg) {
   return { type: 'unknown' };
 }
 
-module.exports = { parseMessage, parseParticipant, parseAward };
+module.exports = { parseMessage, parseParticipant, parseAward, normalizeAward };

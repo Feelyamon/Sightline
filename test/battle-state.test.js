@@ -129,7 +129,9 @@ test('живое: бортовое сообщение — шум, «послед
   ]);
   assert.deepEqual(snap.unparsed, []);
   assert.equal(snap.players.length, 1, 'бортовое сообщение игрока не создаёт');
-  assert.deepEqual(find(snap, '[120B] Ник').awards, [{ name: 'Последний удар', count: 1 }]);
+  assert.deepEqual(find(snap, '[120B] Ник').awards, [
+    { name: 'Последний удар', count: 1, tier: 0 },
+  ]);
 });
 
 test('награды собираются по игрокам, повторяемые — с количеством', () => {
@@ -145,11 +147,23 @@ test('награды собираются по игрокам, повторяе�
   assert.deepEqual(
     awards.sort((a, b) => a.name.localeCompare(b.name)),
     [
-      { name: 'Спасатель танков', count: 2 },
-      { name: 'Снайпер', count: 1 },
-      { name: 'Ударил первым', count: 1 },
+      { name: 'Спасатель танков', count: 2, tier: 0 },
+      { name: 'Снайпер', count: 1, tier: 0 },
+      { name: 'Ударил первым', count: 1, tier: 0 },
     ].sort((a, b) => a.name.localeCompare(b.name))
   );
+});
+
+test('степень награды растёт по ходу боя, а не плодит записи', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Ace (БМПТ-72) уничтожил X (M1A2)',
+    'Ace (БМПТ-72) получил "Тактик"',
+    'Ace (БМПТ-72) получил "Тактик II"',
+    'Ace (БМПТ-72) получил "Тактик 3 степени"',
+  ]);
+  assert.deepEqual(snap.unparsed, []);
+  assert.deepEqual(find(snap, 'Ace').awards, [{ name: 'Тактик', count: 1, tier: 3 }]);
 });
 
 test('«Око за око»: цель появляется после моей смерти и снимается', () => {

@@ -8,12 +8,18 @@ contextBridge.exposeInMainWorld('wt', {
   getState: () => invoke('app:getState'),
   setNick: (nick) => invoke('app:setNick', nick),
   setAlwaysOnTop: (value) => invoke('app:setAlwaysOnTop', value),
+  setUiScale: (value) => invoke('app:setUiScale', value),
+  setLang: (lang) => invoke('app:setLang', lang),
+  about: () => invoke('app:about'),
+  windowFlags: () => invoke('app:windowFlags'),
+  setWindowFlag: (name, value) => invoke('app:setWindowFlag', name, value),
   resetBattle: () => invoke('app:resetBattle'),
 
   db: {
     counters: () => invoke('db:counters'),
     stats: () => invoke('db:stats'),
     recentBattles: (limit) => invoke('db:recentBattles', limit),
+    searchBattles: (opts) => invoke('db:searchBattles', opts),
     topPlayers: (opts) => invoke('db:topPlayers', opts),
     playerCard: (nick) => invoke('db:playerCard', nick),
     battleDetails: (id) => invoke('db:battleDetails', id),
@@ -21,6 +27,9 @@ contextBridge.exposeInMainWorld('wt', {
     myVehicles: (opts) => invoke('db:myVehicles', opts),
     enemyVehicles: (opts) => invoke('db:enemyVehicles', opts),
     winrate: (opts) => invoke('db:winrate', opts),
+    activityByHour: (opts) => invoke('db:activityByHour', opts),
+    dailyStats: (opts) => invoke('db:dailyStats', opts),
+    streaks: (opts) => invoke('db:streaks', opts),
     setNote: (nick, note) => invoke('db:setNote', nick, note),
     resetCounter: (name) => invoke('db:resetCounter', name),
     deleteBattle: (id) => invoke('db:deleteBattle', id),
@@ -38,6 +47,11 @@ contextBridge.exposeInMainWorld('wt', {
     const handler = () => cb();
     ipcRenderer.on('db:changed', handler);
     return () => ipcRenderer.off('db:changed', handler);
+  },
+  onOpenTab: (cb) => {
+    const handler = (_e, tab) => cb(tab);
+    ipcRenderer.on('app:openTab', handler);
+    return () => ipcRenderer.off('app:openTab', handler);
   },
   onError: (cb) => {
     const handler = (_e, message) => cb(message);

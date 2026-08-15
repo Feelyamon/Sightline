@@ -239,6 +239,17 @@ class WtClient extends EventEmitter {
       if (prev && typeof prev.id === 'number') this.lastDmg = prev.id;
     }
 
+    // Пропуск в нумерации означает, что часть строк кил-фида до нас не дошла:
+    // журнал игры — скользящее окно, и всё, что из него выпало, потеряно
+    // навсегда. Приложение могло подвиснуть, окно свернуться, игра икнуть.
+    // Считать по таким данным КДА нельзя — бой помечается неполным.
+    const fresh = damage.filter((d) => typeof d?.id === 'number' && d.id > this.lastDmg);
+    if (this.started && this.lastDmg > 0 && fresh.length) {
+      const firstNew = Math.min(...fresh.map((d) => d.id));
+      const lost = firstNew - this.lastDmg - 1;
+      if (lost > 0) this.emit('dataGap', { lost, from: this.lastDmg, to: firstNew });
+    }
+
     for (const d of damage) {
       if (typeof d?.id !== 'number') continue;
       if (d.id <= this.lastDmg) continue; // уже отдавали
