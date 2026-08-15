@@ -7,7 +7,7 @@ let LANG = 'ru';
 // Временный стенд: подменяет мост из preload данными в памяти, чтобы смотреть
 // вкладки без запуска Electron. Удаляется после проверки.
 
-const NICKS = ['Sniper_88', 'ЖуЖуКа', '玩家一号', 'Camper2000', 'player_twelve', 'Слепой_Крот'];
+const NICKS = ['PlayerA', 'ИгрокБ', '玩家一号', 'PlayerC', 'player_twelve', 'ИгрокГ'];
 const MY = ['Т-80БВМ', 'ИС-2', 'Як-9Т', 'Leopard 2A4'];
 const DAY = 86400000;
 

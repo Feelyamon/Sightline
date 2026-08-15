@@ -178,7 +178,7 @@ test('поиск находит бои по технике — своей и ч�
 test('поиск не зависит от регистра, включая кириллицу', () => {
   const db = tmpDb();
   history(db);
-  db.saveBattle(battle(['Me (Т-80) уничтожил ЖуЖуКа (M1A2)']));
+  db.saveBattle(battle(['Me (Т-80) уничтожил ЖуЖуКаТест (M1A2)']));
 
   // Латиница работала бы и на LIKE, кириллица — уже нет.
   assert.equal(db.searchBattles({ query: 'sniper' }).total, 1);
