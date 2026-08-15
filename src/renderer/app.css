@@ -1,0 +1,214 @@
+:root {
+  --bg: #12151a;
+  --panel: #1a1f27;
+  --panel-2: #0e1116;
+  --line: #2a3140;
+  --text: #dfe5ee;
+  --muted: #8b95a6;
+  --enemy: #ff6b6b;
+  --ally: #63c98a;
+  --accent: #6ea8fe;
+  --danger: #e05a5a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 "Segoe UI", system-ui, sans-serif;
+  -webkit-user-select: none;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* --- Шапка --- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  flex: none;
+}
+
+.tabs { display: flex; gap: 4px; }
+.tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); background: var(--panel-2); border-color: var(--line); }
+
+.status { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.battle { background: var(--ally); }
+.dot.idle { background: #e0b354; }
+.dot.offline { background: var(--enemy); }
+
+main { flex: 1; overflow: auto; padding: 12px; }
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* --- Сплит: свои слева, враги справа --- */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.side { min-width: 0; overflow-x: auto; }
+.side-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.side-title.ally { color: var(--ally); }
+.side-title.enemy { color: var(--enemy); }
+
+.muted { color: var(--muted); }
+.footnote { margin-top: 14px; font-size: 11px; }
+.section-title {
+  margin: 16px 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* --- Таблицы --- */
+/* table-layout: auto — иначе колонка ника получает фиксированную долю и режет
+   длинные ники с клан-тегами и иероглифами. */
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+td.num, th.num { text-align: right; width: 30px; white-space: nowrap; }
+/* Ник показываем целиком и одной строкой: перенос рвал его посреди слова.
+   Если не влезает — половина экрана прокручивается по горизонтали (.side). */
+td.nick { white-space: nowrap; }
+td.nick.self { text-decoration: underline; font-weight: 600; }
+tr.row-left { opacity: .45; }
+tr.row-dead td.nick { color: var(--muted); }
+
+.empty { color: var(--muted); padding: 12px 4px; }
+
+details > summary { cursor: pointer; list-style: revert; }
+details[hidden] { display: none; }
+
+/* --- Техника --- */
+.veh { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.veh-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.veh.dead .veh-name { text-decoration: line-through; color: var(--muted); }
+.icon { flex: none; width: 1em; text-align: center; color: var(--muted); }
+.icon.plane, .icon.heli { color: var(--accent); }
+.icon.spaa { color: #e0b354; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel-2);
+  font-size: 11px;
+  max-width: 100%;
+}
+.chip .veh-name { max-width: 170px; }
+.chip b { color: var(--accent); font-weight: 600; }
+.chip.destroyed { color: var(--muted); opacity: .7; }
+/* Текущая машина — последний чип; рамкой отличаем её от истории. */
+.chip.current { border-color: var(--accent); background: #16202e; }
+
+.badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.badge.alive { color: #0d1a12; background: var(--ally); }
+.badge.dead { color: #1a0d0d; background: var(--enemy); }
+.badge.left { color: var(--muted); border: 1px solid var(--line); }
+.badge.idle { color: #1a170d; background: #e0b354; }
+
+/* --- Плитки счётчиков --- */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.tile .value { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.tile .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.tile .since { color: var(--muted); font-size: 10px; margin: 4px 0 8px; }
+
+/* --- Формы --- */
+button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+  font: inherit;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.danger { color: var(--danger); border-color: #46282c; }
+button.danger:hover:not(:disabled) { border-color: var(--danger); }
+button.small { padding: 2px 8px; font-size: 11px; }
+
+input[type="text"], input[type="number"], select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+}
+input[type="text"] { width: 100%; }
+input[type="number"] { width: 70px; }
+
+label.row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+label.field { flex-direction: column; align-items: stretch; max-width: 420px; }
+.controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.buttons { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.log { white-space: pre-wrap; font-size: 11px; max-height: 160px; overflow: auto; }
+
+/* --- Модалка подтверждения --- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #000a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+/* display в правиле выше перебивает атрибут hidden, поэтому гасим явно —
+   иначе модалка висит поверх интерфейса с момента загрузки. */
+.modal-backdrop[hidden] { display: none; }
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  width: min(440px, 90vw);
+}
+.modal h2 { margin: 0 0 8px; font-size: 15px; }
+.modal input { margin-top: 6px; }

@@ -1,0 +1,17 @@
+{
+  "name": "sightline",
+  "productName": "Sightline",
+  "version": "0.1.0",
+  "description": "Companion-приложение для War Thunder: разбор кил-фида, статистика боёв и игроков. Использует официальный локальный API игры (127.0.0.1:8111). Не аффилировано с Gaijin Entertainment.",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "mock": "electron . --mock",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^43.4.0"
+  }
+}

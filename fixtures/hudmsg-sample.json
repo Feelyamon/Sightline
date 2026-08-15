@@ -1,0 +1,12 @@
+[
+  { "id": 1, "msg": "Username (T-34-85) destroyed Fritz_88 (Pz.IV G)", "sender": "", "enemy": false, "mode": "", "time": 40 },
+  { "id": 2, "msg": "Fritz_88 (Tiger H1) destroyed AllyOne (KV-1)", "sender": "", "enemy": true, "mode": "", "time": 75 },
+  { "id": 3, "msg": "[CLAN]Hans (Panther D) severely damaged Username (T-34-85)", "sender": "", "enemy": true, "mode": "", "time": 90 },
+  { "id": 4, "msg": "[CLAN]Hans (Panther D) destroyed Username (T-34-85)", "sender": "", "enemy": true, "mode": "", "time": 95 },
+  { "id": 5, "msg": "AllyOne (SU-100) destroyed [CLAN]Hans (Panther D)", "sender": "", "enemy": false, "mode": "", "time": 130 },
+  { "id": 6, "msg": "Username (Yak-9T) shot down Fritz_88 (Bf 109 F-4)", "sender": "", "enemy": false, "mode": "", "time": 180 },
+  { "id": 7, "msg": "NoobPilot (Spitfire Mk Vb) has crashed.", "sender": "", "enemy": true, "mode": "", "time": 190 },
+  { "id": 8, "msg": "Username has achieved Aviation Rank 3", "sender": "", "enemy": false, "mode": "killstreak", "time": 195 },
+  { "id": 9, "msg": "Кто-то (ИС-2) уничтожил Fritz_88 (Tiger E)", "sender": "", "enemy": false, "mode": "", "time": 220 },
+  { "id": 10, "msg": "Fritz_88 (Tiger E) тяжело повредил Кто-то (ИС-2)", "sender": "", "enemy": true, "mode": "", "time": 240 }
+]

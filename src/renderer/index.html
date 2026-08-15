@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+  <title>Sightline</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="battle">Бой</button>
+      <button class="tab" data-tab="counters">Счётчики</button>
+      <button class="tab" data-tab="players">Игроки</button>
+      <button class="tab" data-tab="settings">Настройки</button>
+    </nav>
+    <div class="status" id="status">
+      <span class="dot" id="dot"></span>
+      <span id="statusText">…</span>
+      <span class="muted" id="counter"></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Бой -->
+    <section class="panel active" id="panel-battle">
+      <div class="split">
+        <div class="side">
+          <div class="side-title ally" id="allyTitle">Свои</div>
+          <div id="allyBody"></div>
+        </div>
+        <div class="side">
+          <div class="side-title enemy" id="enemyTitle">Противники</div>
+          <div id="enemyBody"></div>
+        </div>
+      </div>
+      <!-- Свёрнут по умолчанию: в начале боя сюда попадает половина лобби,
+           пока цепочка «кто кого убил» не дотянулась до моей команды. -->
+      <details id="unknownBox" hidden>
+        <summary class="section-title" id="unknownTitle">Команда не определена</summary>
+        <div id="unknownBody"></div>
+      </details>
+      <p class="muted footnote">
+        Видны только игроки, засветившиеся в кил-фиде — полного списка игра наружу не отдаёт.
+      </p>
+    </section>
+
+    <!-- Счётчики -->
+    <section class="panel" id="panel-counters">
+      <div class="tiles" id="tiles"></div>
+      <div class="section-title">Последние бои</div>
+      <div id="battlesBody"></div>
+    </section>
+
+    <!-- Игроки -->
+    <section class="panel" id="panel-players">
+      <div class="controls">
+        <label class="row">
+          <span class="muted">Период</span>
+          <select id="period">
+            <option value="month">за месяц</option>
+            <option value="week">за неделю</option>
+            <option value="today">за сегодня</option>
+            <option value="">за всё время</option>
+          </select>
+        </label>
+        <label class="row">
+          <span class="muted">Минимум встреч</span>
+          <input type="number" id="minBattles" value="5" min="1" max="100" />
+        </label>
+      </div>
+      <div class="split">
+        <div class="side">
+          <div class="side-title ally">Топ союзники</div>
+          <div id="topAllies"></div>
+        </div>
+        <div class="side">
+          <div class="side-title enemy">Топ противники</div>
+          <div id="topEnemies"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Настройки -->
+    <section class="panel" id="panel-settings">
+      <label class="row field">
+        <span class="muted">Твой ник в игре (клан-тег писать не нужно)</span>
+        <input type="text" id="nick" placeholder="Например: Username" autocomplete="off" />
+      </label>
+
+      <label class="row">
+        <input type="checkbox" id="onTop" />
+        <span>Окно поверх всех окон</span>
+      </label>
+
+      <div class="section-title">База данных</div>
+      <div class="muted" id="dbStats">…</div>
+      <div class="buttons">
+        <button id="reveal">Показать файл базы</button>
+        <button id="resetBattleBtn">Сбросить текущий бой</button>
+      </div>
+
+      <div class="section-title">Опасные операции</div>
+      <p class="muted">
+        Перед каждой из них автоматически создаётся резервная копия базы рядом с файлом.
+      </p>
+      <div class="buttons">
+        <button class="danger" id="clearHistory">Очистить историю боёв</button>
+        <button class="danger" id="clearPlayers">Очистить базу игроков</button>
+      </div>
+
+      <div id="unparsedBox" hidden>
+        <div class="section-title">Нераспознанные строки кил-фида</div>
+        <pre class="muted log" id="unparsed"></pre>
+      </div>
+    </section>
+  </main>
+
+  <!-- Подтверждение опасных действий: закрывает случайный мисклик -->
+  <div class="modal-backdrop" id="modal" hidden>
+    <div class="modal">
+      <h2 id="modalTitle">Подтверждение</h2>
+      <p id="modalText"></p>
+      <p class="muted">Чтобы подтвердить, введите <b id="modalWord">УДАЛИТЬ</b></p>
+      <input type="text" id="modalInput" autocomplete="off" />
+      <div class="buttons">
+        <button id="modalCancel">Отмена</button>
+        <button class="danger" id="modalOk" disabled>Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[
+  { "id": 1, "msg": "*CLNA* PlayerSeventeen потерял связь", "sender": "", "enemy": false, "mode": "", "time": 12 },
+  { "id": 2, "msg": "PlayerSeventeentd! kd?NET_PLAYER_DISCONNECT_FROM_GAME", "sender": "", "enemy": false, "mode": "", "time": 12 },
+  { "id": 3, "msg": "[CLNB] playereighteen потерял связь", "sender": "", "enemy": false, "mode": "", "time": 13 },
+  { "id": 4, "msg": "playereighteentd! kd?NET_PLAYER_DISCONNECT_FROM_GAME", "sender": "", "enemy": false, "mode": "", "time": 13 },
+  { "id": 5, "msg": "[CLNC] 玩家一号 (Leopard 2A4M) уничтожил ^CLND^ 很长的中文名字玩家二号 (◍M1A1 HC)", "sender": "", "enemy": false, "mode": "", "time": 96 },
+  { "id": 6, "msg": "[CLNC] 玩家一号 (Leopard 2A4M) ударил первым!", "sender": "", "enemy": false, "mode": "", "time": 96 },
+  { "id": 7, "msg": "=CLNE= 玩家三号 (БМПТ-72) уничтожил [CLNF] ⋇PlayerFour (Type 90 (B) \"Fuji\")", "sender": "", "enemy": false, "mode": "", "time": 104 },
+  { "id": 8, "msg": "=CLNE= 玩家三号 (БМПТ-72) получил \"Снайпер\"", "sender": "", "enemy": false, "mode": "", "time": 104 },
+  { "id": 9, "msg": "^CLND^ 很长的中文名字玩家二号 потерял связь", "sender": "", "enemy": false, "mode": "", "time": 110 },
+  { "id": 10, "msg": "^CLNG^ PlayerFive (Leopard 2PL) уничтожил ┾CLNH┿ 玩家六号 (ZTZ96B)", "sender": "", "enemy": false, "mode": "", "time": 141 },
+  { "id": 11, "msg": ".CLNI. ⋇playerseven (◍M1A1 HC) поджёг ^CLNG^ PlayerFive (Leopard 2PL)", "sender": "", "enemy": true, "mode": "", "time": 150 },
+  { "id": 12, "msg": "=CLNJ= Player Eight (M1A1 Click-Bait) уничтожил -CLNK- XM玩家九号 (◍Т-80У-Е1)", "sender": "", "enemy": true, "mode": "", "time": 176 },
+  { "id": 13, "msg": "=CLNE= 玩家三号 (БМПТ-72) уничтожил 玩家十号 (MBT-2000)", "sender": "", "enemy": false, "mode": "", "time": 190 },
+  { "id": 14, "msg": "=CLNL= ⋇PLAYER ELEVEN (БМПТ-72) уничтожил .CLNI. ⋇playerseven (◍M1A1 HC)", "sender": "", "enemy": false, "mode": "", "time": 214 },
+  { "id": 15, "msg": "[CLAN] Username (Т-80БВМ) поджёг =CLNM= player_twelve (M1A2 SEP)", "sender": "", "enemy": false, "mode": "", "time": 240 },
+  { "id": 16, "msg": "[CLAN] Username (Т-80БВМ) уничтожил =CLNM= player_twelve (M1A2 SEP)", "sender": "", "enemy": false, "mode": "", "time": 242 },
+  { "id": 17, "msg": "PLAYERTHIRTEEN (Т-90М (Арена-М)) уничтожил V10000 (M1A1 Click-Bait)", "sender": "", "enemy": false, "mode": "", "time": 250 },
+  { "id": 18, "msg": "玩家十四号 (Панцирь-С1) нанёс фатальное повреждение PlayerFifteen69 (Recon Micro)", "sender": "", "enemy": false, "mode": "", "time": 262 },
+  { "id": 19, "msg": "=CLNM= player_twelve (M1A2 SEPv3) уничтожил ┾CLNN┿ 玩家十六号 (Т-80У-Е1)", "sender": "", "enemy": true, "mode": "", "time": 300 },
+  { "id": 20, "msg": "V10000 потерял связь", "sender": "", "enemy": false, "mode": "", "time": 310 }
+]
