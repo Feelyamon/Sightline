@@ -489,6 +489,9 @@ label.row[hidden] { display: none; }
 /* display в правиле выше перебивает атрибут hidden, поэтому гасим явно —
    иначе модалка висит поверх интерфейса с момента загрузки. */
 .modal-backdrop[hidden] { display: none; }
+/* Блокирующее окно поверх всего, включая другие модалки: пока программа
+   устарела, ничего важнее этого сообщения на экране нет. */
+.modal-backdrop.blocking { z-index: 100; background: #000d; }
 .modal {
   background: var(--panel);
   border: 1px solid var(--line);

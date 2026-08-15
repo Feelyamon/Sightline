@@ -280,6 +280,11 @@ function unknownGroups(players) {
   }
   groups.sort((a, b) => b.length - a.length);
 
+  // Объяснение сверху, а не в подсказке под вопросиком: «Группа 2: сторона A»
+  // без него не значит ничего, и человек справедливо не понимает, что ему
+  // показали и почему это длится.
+  wrap.append(el('p', 'muted footnote', t('battle.unknownHint')));
+
   groups.forEach((list, i) => {
     const sideA = list.filter((p) => p.side === 0);
     const sideB = list.filter((p) => p.side === 1);
@@ -288,10 +293,11 @@ function unknownGroups(players) {
       wrap.append(el('div', 'section-title', t('battle.group', { n: i + 1 })), playersTable(list));
       return;
     }
+    wrap.append(el('div', 'section-title', t('battle.pair', { n: i + 1 })));
     const split = el('div', 'split');
     for (const [label, rows] of [
-      [t('battle.groupSideA', { n: i + 1 }), sideA],
-      [t('battle.groupSideB', { n: i + 1 }), sideB],
+      [t('battle.pairSideA'), sideA],
+      [t('battle.pairSideB'), sideB],
     ]) {
       const side = el('div', 'side');
       side.append(
@@ -979,8 +985,43 @@ function showAuthScreen(id) {
   for (const box of ['siError', 'regError']) $(box).hidden = true;
 }
 
+// --- Версия программы ----------------------------------------------------
+
+/**
+ * Показывает или прячет блокирующее окно «программа устарела».
+ *
+ * Проверка идёт при запуске и повторяется после каждого обращения к серверу:
+ * минимум могли поднять, пока окно висело открытым сутками.
+ *
+ * Недоступный сервер устареванием НЕ считается. Разбор кил-фида, история боёв
+ * и графики работают без сети вообще, и выключать их из-за пропавшего
+ * интернета было бы издевательством — в этом случае недоступен только аккаунт.
+ */
+function applyVersion(version) {
+  const outdated = version && version.ok === false;
+  $('outdatedModal').hidden = !outdated;
+  if (!outdated) return;
+  $('outdatedVersions').textContent = t('update.versions', {
+    mine: version.appVersion || '—',
+    min: version.minClient || '—',
+  });
+}
+
+async function checkVersion() {
+  try {
+    applyVersion(await window.wt.account.checkVersion());
+  } catch {
+    // Проверка не прошла — значит сервера сейчас нет. Молчим: местная часть
+    // программы от этого не зависит.
+  }
+}
+
+$('outdatedDownload').addEventListener('click', () => window.wt.account.openDownload());
+$('outdatedRetry').addEventListener('click', checkVersion);
+
 async function refreshAccount() {
   const state = await window.wt.account.state();
+  applyVersion(state.version);
   if (state.signedIn) {
     $('accLogin').textContent = state.login;
     $('accRole').textContent = t(state.isAdmin ? 'acc.role.admin' : 'acc.role.user');
@@ -1446,4 +1487,8 @@ window.wt.getState().then((state) => {
   renderBattle(state);
   refreshCounters();
   refreshDbStats();
+  // Спрашиваем сервер о версии сразу при запуске, а не при первом заходе во
+  // вкладку аккаунта: устаревшая сборка не должна успеть показать человеку
+  // хоть что-то, чему нельзя верить.
+  checkVersion();
 });

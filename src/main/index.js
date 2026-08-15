@@ -30,7 +30,10 @@ let tray = null;
 let quitting = false;
 let client = null;
 let battle = null;
-let status = { status: 'offline', detail: 'Запуск…' };
+// Пока игра не найдена, статус — «Игра не запущена», и добавить к нему нечего.
+// Приписка вроде «Запуск…» обещала бы, что программа сейчас запустит игру, —
+// она этого не делает и делать не будет.
+let status = { status: 'offline', detail: '' };
 let pushScheduled = false;
 
 // Границы текущего боя и защита от двойной записи: бой заканчивается либо
@@ -418,6 +421,7 @@ handle('app:resetBattle', () => {
 });
 
 handle('account:state', () => account.state());
+handle('account:checkVersion', () => account.checkVersion());
 handle('account:register', (_e, form) => account.register(form || {}));
 handle('account:signIn', (_e, form) => account.signIn(form || {}));
 handle('account:saveRecoveryCode', async (_e, code) => {
@@ -442,6 +446,17 @@ handle('app:openExternal', (_e, page) => {
   const route = pages[page];
   if (!route) throw new Error('неизвестная страница');
   return shell.openExternal('https://sightline.feelyamon.ru' + route);
+});
+
+handle('account:openDownload', () => {
+  // Адрес приходит с сервера, поэтому проверяем его тут, а не доверяем на
+  // слово: подменённый ответ не должен уметь открыть человеку что угодно.
+  const raw = account.version?.downloadUrl || 'https://sightline.feelyamon.ru/';
+  const url = new URL(raw);
+  if (url.protocol !== 'https:' || url.hostname !== 'sightline.feelyamon.ru') {
+    throw new Error('адрес обновления не с нашего сайта');
+  }
+  return shell.openExternal(url.href);
 });
 
 handle('account:signOut', () => account.signOut());

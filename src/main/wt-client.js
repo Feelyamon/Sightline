@@ -124,11 +124,14 @@ class WtClient extends EventEmitter {
    * Статус «игра не запущена» ставим только после нескольких неудач подряд,
    * иначе он мигает на ровном месте.
    */
-  noteFailure(detail) {
+  noteFailure(reason) {
     this.failures++;
     if (this.failures >= OFFLINE_AFTER) {
       this.inBattle = false;
-      this.setStatus('offline', detail);
+      // Причина уходит в лог, а не в интерфейс: «Игра не запущена» — уже
+      // полный ответ, а «Таймаут /hudmsg» рядом с ним ничего не добавляет.
+      if (reason) this.emit('debug', reason);
+      this.setStatus('offline', '');
     }
   }
 
@@ -193,7 +196,9 @@ class WtClient extends EventEmitter {
       // Не критично: без исхода бой всё равно запишется.
     }
 
-    this.setStatus(valid ? 'battle' : 'idle', valid ? '' : 'В ангаре — ждём начала боя');
+    // Приписки нет намеренно: «В бою» и «В ангаре» переведены и сами по себе
+    // понятны, а нелокализованный хвост рядом с ними выглядел бы недоделкой.
+    this.setStatus(valid ? 'battle' : 'idle', '');
     if (!valid) return;
 
     // Журнал запрашиваем целиком, а не с курсора. Курсорный запрос в новом бою

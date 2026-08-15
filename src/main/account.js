@@ -13,6 +13,37 @@ const { safeStorage } = require('electron');
 
 const TOKEN_FILE = 'account.dat';
 
+// Версия приложения уходит в каждый запрос. Сервер по ней решает, разговаривать
+// ли с этой сборкой вообще: старая программа не ломается громко, она молча
+// присылает не то и молча теряет данные, — поэтому её останавливают, а не чинят
+// на ходу. Совпадать с package.json обязано; читаем оттуда, чтобы не разъехалось.
+const APP_VERSION = require('../../package.json').version;
+const VERSION_HEADER = 'X-Sightline-Version';
+
+/**
+ * Разбирает «0.3.0» в [0, 3, 0]. Хвост после третьего числа («-beta») на
+ * совместимость не влияет и отбрасывается — ровно как на сервере.
+ * @returns {number[]|null}
+ */
+function parseVersion(raw) {
+  const core = String(raw || '').trim().split(/[-+]/)[0];
+  if (!core) return null;
+  const parts = core.split('.');
+  if (parts.length > 3) return null;
+  const nums = parts.map((p) => (/^\d+$/.test(p) ? Number(p) : NaN));
+  if (nums.some(Number.isNaN)) return null;
+  while (nums.length < 3) nums.push(0);
+  return nums;
+}
+
+/** Обычное сравнение по частям: −1, 0, 1. */
+function compareVersions(a, b) {
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  }
+  return 0;
+}
+
 class Account {
   /**
    * @param {string} userDataDir
@@ -23,6 +54,9 @@ class Account {
     this.file = path.join(userDataDir, TOKEN_FILE);
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.session = null; // { token, login, role, lang, expiresAt }
+    // Что сервер думает о нашей версии. null — ещё не спрашивали.
+    // { ok, appVersion, minClient, latestClient, downloadUrl, updateAvailable }
+    this.version = null;
     this.load();
   }
 
@@ -42,6 +76,7 @@ class Account {
       role: this.session?.role || null,
       isAdmin: this.isAdmin,
       expiresAt: this.session?.expiresAt || null,
+      version: this.version,
     };
   }
 
@@ -89,7 +124,7 @@ class Account {
    * @param {boolean} [opts.auth] - приложить токен
    */
   async request(route, { method = 'GET', body, auth = false } = {}) {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/json', [VERSION_HEADER]: APP_VERSION };
     if (auth) {
       if (!this.isSignedIn) throw new Error('нужен вход в аккаунт');
       headers.Authorization = `Bearer ${this.session.token}`;
@@ -124,6 +159,20 @@ class Account {
     }
 
     if (!response.ok) {
+      // Сервер отказал по версии. Запоминаем это сразу: узнать о том, что
+      // программа устарела, можно на любом запросе, а не только на проверке
+      // версии при старте — например, если минимум подняли, пока окно висело
+      // открытым.
+      if (response.status === 426) {
+        this.version = {
+          ok: false,
+          appVersion: APP_VERSION,
+          minClient: data?.min_client || null,
+          latestClient: data?.latest_client || null,
+          downloadUrl: data?.download_url || null,
+          updateAvailable: true,
+        };
+      }
       // Токен протух или отозван — состояние «вошёл» больше не соответствует
       // действительности, и держать его нельзя: иначе интерфейс будет
       // показывать вход, которого нет.
@@ -135,6 +184,39 @@ class Account {
     }
 
     return data;
+  }
+
+  /**
+   * Спрашивает сервер, годится ли эта сборка.
+   *
+   * Метод открыт и не закрыт проверкой версии — иначе устаревшая программа не
+   * смогла бы даже узнать, что она устарела.
+   *
+   * Сервер недоступен — это НЕ повод считать версию плохой. Локальная часть
+   * программы (разбор кил-фида, история боёв, графики) работает без сети
+   * вообще, и выключать её из-за того, что интернет отвалился, было бы
+   * издевательством. Пока ответа нет, аккаунт просто недоступен.
+   */
+  async checkVersion() {
+    try {
+      const data = await this.request('/version');
+      const min = parseVersion(data?.min_client);
+      const latest = parseVersion(data?.latest_client);
+      const mine = parseVersion(APP_VERSION);
+      this.version = {
+        ok: !min || !mine || compareVersions(mine, min) >= 0,
+        appVersion: APP_VERSION,
+        minClient: data?.min_client || null,
+        latestClient: data?.latest_client || null,
+        downloadUrl: data?.download_url || null,
+        updateAvailable: !!(latest && mine && compareVersions(mine, latest) < 0),
+      };
+    } catch (e) {
+      // 426 уже записан в request(); остальное — «сервера сейчас нет».
+      if (this.version?.ok === false) return this.version;
+      this.version = null;
+    }
+    return this.version;
   }
 
   async register({ login, password, lang, acceptTerms }) {
@@ -189,4 +271,4 @@ class Account {
   }
 }
 
-module.exports = { Account };
+module.exports = { Account, parseVersion, compareVersions, APP_VERSION };

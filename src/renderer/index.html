@@ -386,6 +386,21 @@
 
   <!-- Код восстановления: показывается один раз и закрывается только после
        подтверждения. Код, показанный мельком, равносилен его отсутствию. -->
+  <!-- Устаревшая сборка. Закрыть нельзя намеренно: сервер с такой версией
+       разговаривать отказался, и всё, что программа может показать дальше, —
+       это неправда разной степени свежести. -->
+  <div class="modal-backdrop blocking" id="outdatedModal" hidden>
+    <div class="modal">
+      <h2 data-i18n="update.title"></h2>
+      <p data-i18n="update.text"></p>
+      <p class="muted small" id="outdatedVersions"></p>
+      <div class="buttons">
+        <button id="outdatedDownload" data-i18n="update.download"></button>
+        <button id="outdatedRetry" class="ghost" data-i18n="update.retry"></button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="codeModal" hidden>
     <div class="modal">
       <h2 data-i18n="code.title"></h2>

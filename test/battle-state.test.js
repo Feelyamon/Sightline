@@ -410,3 +410,30 @@ test('мок-фикстура проигрывается без unknown-стро
   assert.equal(find(snap, 'Fritz_88').team, 'enemy');
   assert.equal(find(snap, 'AllyOne').team, 'ally');
 });
+
+test('значок игры перед ником не заводит второго игрока', () => {
+  // Живой случай: строку про убийство игра пишет без значка, а строку про
+  // награду — со значком. Раньше это давало две записи: фраги у одной,
+  // награда у другой, и обе висели в таблице рядом.
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    '^ILAZ^ DeathVision (M1A2 SEP V2) уничтожил Foe (Т-80БВМ)',
+    '⋇^ILAZ^ DeathVision (M1A2 SEP V2) ударил первым!',
+  ]);
+
+  const rows = snap.players.filter((p) => p.nick.includes('DeathVision'));
+  assert.equal(rows.length, 1, 'игрок должен быть один');
+  assert.equal(rows[0].nick, '^ILAZ^ DeathVision', 'остаётся написание из кил-фида');
+  assert.equal(rows[0].kills, 1);
+  assert.equal(rows[0].awards.length, 1);
+});
+
+test('ник из одних значков не сливается с другим таким же', () => {
+  // Свёртка выбрасывает всё, кроме букв и цифр; у таких ников она пустая, и
+  // сравнивать по ней нельзя — иначе они схлопнутся в одного человека.
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    '★★★ (T-34) уничтожил ⋇⋇⋇ (Tiger H1)',
+  ]);
+  assert.equal(snap.players.length, 2);
+});

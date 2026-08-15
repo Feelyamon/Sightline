@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const zlib = require('node:zlib');
 
 const rules = require('../src/main/window-rules');
-const { sightIcon } = require('../src/main/icon');
+const { appIcon } = require('../src/main/icon');
 
 // --- Показ и скрытие окна -------------------------------------------------
 
@@ -51,7 +51,7 @@ test('предупреждение про трей показывается од
 // --- Иконка ---------------------------------------------------------------
 
 test('иконка — валидный PNG нужного размера', () => {
-  const png = sightIcon(32);
+  const png = appIcon(32);
 
   assert.deepEqual(
     [...png.subarray(0, 8)],
@@ -68,7 +68,7 @@ test('иконка — валидный PNG нужного размера', () =
 
 test('в иконке действительно что-то нарисовано', () => {
   const size = 32;
-  const png = sightIcon(size);
+  const png = appIcon(size);
 
   // Достаём IDAT и разжимаем: пустая картинка означала бы, что тест на
   // сигнатуру проходит, а в трее пусто.
@@ -88,6 +88,6 @@ test('в иконке действительно что-то нарисован�
 
 test('иконка строится в любом размере', () => {
   for (const size of [16, 32, 64]) {
-    assert.equal(sightIcon(size).readUInt32BE(16), size);
+    assert.equal(appIcon(size).readUInt32BE(16), size);
   }
 });

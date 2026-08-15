@@ -1,7 +1,7 @@
 'use strict';
 
 const { Tray, Menu, nativeImage } = require('electron');
-const { sightIcon } = require('./icon');
+const { appIcon } = require('./icon');
 
 // Значок в трее и его меню. Единственный способ выйти из приложения
 // по-настоящему, когда включено «сворачивать в трей»: крестик окна в этом
@@ -15,7 +15,7 @@ const { sightIcon } = require('./icon');
  * @param {(key: string) => string} deps.t - перевод
  */
 function createTray({ onShow, onSettings, onQuit, t }) {
-  const icon = nativeImage.createFromBuffer(sightIcon(32));
+  const icon = nativeImage.createFromBuffer(appIcon(32));
   // Windows берёт из значка 16 пикселей; отдаём 32 и просим уменьшить, иначе
   // на экранах с масштабированием иконка выглядит мыльной.
   icon.setTemplateImage(false);
