@@ -206,9 +206,28 @@ test('дрон не даёт двойного фрага: обе строки п
 
 test('сбитая ракета не попадает в таблицу игроков', () => {
   const s = new BattleState('Me');
-  const snap = feed(s, ['玩家十四号 (Панцирь-С1) уничтожил weapons/us_agm_88a/short']);
+  const snap = feed(s, [
+    '玩家十四号 (Панцирь-С1) уничтожил weapons/us_agm_88a/short',
+    // Живой случай: сырой идентификатор боеприпаса вместо ника.
+    'Ally (Тунгуска) уничтожил 130mm_9m120_1',
+    'Ally (Тунгуска) уничтожил 130mm_9m120_1',
+  ]);
   assert.equal(find(snap, 'weapons/us_agm_88a/short'), undefined);
+  assert.equal(find(snap, '130mm_9m120_1'), undefined);
   assert.equal(find(snap, '玩家十四号').kills, 0);
+  assert.equal(find(snap, 'Ally').kills, 0, 'за сбитую ракету фраг не идёт');
+});
+
+test('ник с подчёркиваниями за сущность не принимается', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Me (Т-80) уничтожил cool_guy_1 (M1A2)',
+    'Me (Т-80) уничтожил killman20 (Leopard)',
+    'Me (Т-80) уничтожил 130mm_9m120_1',
+  ]);
+  assert.ok(find(snap, 'cool_guy_1'), 'обычный ник остаётся игроком');
+  assert.ok(find(snap, 'killman20'), 'ник с цифрами остаётся игроком');
+  assert.equal(find(snap, '130mm_9m120_1'), undefined);
 });
 
 test('живое: «нанёс критическое повреждение» — урон, а не фраг', () => {

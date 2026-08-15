@@ -144,7 +144,23 @@ const getUnknownVehicles = () => [...unknownVehicles];
 const ENTITY_NICK_PATTERNS = [
   /^weapons\//i,
   /^\[(?:ии|ai)\]/i,
+  // Калибр в начале: «130mm_9m120_1» — сбитая ракета, а не игрок.
+  /^\d+\s*mm[_-]/i,
+  /^(?:rocket|missile|bomb|torpedo)[_-]/i,
 ];
+
+/**
+ * Похоже ли имя на внутренний идентификатор игры вроде «130mm_9m120_1».
+ * Признак: только строчная латиница с цифрами и подчёркиваниями, и минимум
+ * два фрагмента начинаются с цифры. Обычный ник вроде «cool_guy_1» под это
+ * не подходит — у него такой фрагмент один.
+ */
+function looksLikeInternalId(name) {
+  if (!/^[a-z0-9_]+$/.test(name)) return false;
+  const parts = name.split('_').filter(Boolean);
+  if (parts.length < 2) return false;
+  return parts.filter((p) => /^\d/.test(p)).length >= 2;
+}
 
 /**
  * Отличает игровую сущность от живого игрока по нику.
@@ -154,6 +170,7 @@ function isEntityNick(nick) {
   const name = String(nick || '').trim();
   if (!name) return false;
   if (ENTITY_NICK_PATTERNS.some((re) => re.test(name))) return true;
+  if (looksLikeInternalId(name)) return true;
   // Ник вида «<тег> Recon Micro» — это сам дрон, а не его владелец.
   const withoutTag = name.replace(/^\[[^\]]*\]\s*/, '').trim();
   return matchPatterns(withoutTag) === 'drone';
