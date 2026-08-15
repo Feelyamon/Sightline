@@ -123,6 +123,8 @@ function createWindow({ hidden = false } = {}) {
     minWidth: 900,
     minHeight: 560,
     title: 'Sightline',
+    // Без этого в заголовке окна и на панели задач висит логотип Electron.
+    icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
     backgroundColor: '#12151a',
     // Окно создаётся скрытым и показывается по ready-to-show. Иначе при тихом
     // старте с системой оно успевало моргнуть на экране, а при обычном —
