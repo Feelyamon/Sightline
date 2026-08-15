@@ -287,5 +287,6 @@
   "code.close": "Continue",
   "acc.gameNick": "In-game nickname",
   "acc.gameNickHint": "will be filled into settings for you; no need to type the clan tag",
-  "acc.gameNickOptional": "you can leave it empty and fill it in later in settings"
+  "acc.gameNickOptional": "you can leave it empty and fill it in later in settings",
+  "player.squad": "in your squad"
 }

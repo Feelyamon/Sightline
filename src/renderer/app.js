@@ -200,6 +200,14 @@ function playersTable(players) {
     }
 
     const nick = el('td', `nick${p.isSelf ? ' self' : ''}`);
+    // Отряд — те, с кем игрок зашёл в бой сам. Помечаем зелёным значком:
+    // подсветка всей строки конфликтовала бы с подсветкой своей строки и
+    // с золотой рамкой «Око за око».
+    if (p.inSquad && !p.isSelf) {
+      const mark = el('span', 'squad-mark', '●');
+      mark.title = t('player.squad');
+      nick.append(mark);
+    }
     const nameEl = el('span', 'nick-name', p.nick);
     nameEl.addEventListener('click', () => openCard(p.nick));
     nick.append(nameEl);

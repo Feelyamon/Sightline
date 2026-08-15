@@ -566,3 +566,12 @@ label.row.consent input { margin-top: 3px; }
   text-align: center;
   user-select: all;
 }
+
+/* Значок отряда рядом с ником. Значок, а не подсветка строки: подсветка
+   конфликтовала бы со своей строкой и с золотой рамкой «Око за око». */
+.squad-mark {
+  margin-right: 5px;
+  color: var(--ally);
+  font-size: 10px;
+  cursor: help;
+}

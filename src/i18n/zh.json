@@ -287,5 +287,6 @@
   "code.close": "继续",
   "acc.gameNick": "游戏内昵称",
   "acc.gameNickHint": "会自动填入设置，无需手动输入；不必写战队标签",
-  "acc.gameNickOptional": "可以留空，之后在设置中填写"
+  "acc.gameNickOptional": "可以留空，之后在设置中填写",
+  "player.squad": "在你的小队中"
 }
