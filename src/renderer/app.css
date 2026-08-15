@@ -108,6 +108,21 @@ td.num, th.num { text-align: right; width: 30px; white-space: nowrap; }
 td.nick { white-space: nowrap; }
 td.nick.self { text-decoration: underline; font-weight: 600; }
 tr.row-left { opacity: .45; }
+/* Цель для «Око за око»: тёплая золотая обводка, снимается сама, когда
+   медаль уже не получить. */
+tr.revenge td {
+  background: linear-gradient(90deg, rgba(224, 179, 84, .16), transparent 60%);
+  box-shadow: inset 0 0 0 1px rgba(224, 179, 84, .55);
+}
+tr.revenge td.nick { color: #f0c96b; font-weight: 600; }
+
+.awards {
+  color: #e0b354;
+  cursor: help;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: var(--panel); }
 tr.detail-row > td { background: var(--panel-2); padding: 10px; }

@@ -125,6 +125,16 @@ class Db {
       );
       CREATE INDEX IF NOT EXISTS idx_duels_victim ON duels(victim_id);
 
+      -- Награды за бой: игра пишет их в кил-фид, поэтому они собираются
+      -- по каждому игроку и сохраняются вместе с боем.
+      CREATE TABLE IF NOT EXISTS awards (
+        battle_id INTEGER NOT NULL REFERENCES battles(id) ON DELETE CASCADE,
+        player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        name      TEXT    NOT NULL,
+        count     INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (battle_id, player_id, name)
+      );
+
       -- Ручные пометки на игрока: всплывают при следующей встрече.
       CREATE TABLE IF NOT EXISTS player_notes (
         player_id  INTEGER PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
@@ -209,6 +219,10 @@ class Db {
         `INSERT INTO duels (battle_id, killer_id, victim_id, count) VALUES (?, ?, ?, ?)
          ON CONFLICT(battle_id, killer_id, victim_id) DO UPDATE SET count = count + excluded.count`
       );
+      const insAward = this.db.prepare(
+        `INSERT INTO awards (battle_id, player_id, name, count) VALUES (?, ?, ?, ?)
+         ON CONFLICT(battle_id, player_id, name) DO UPDATE SET count = excluded.count`
+      );
       const ids = new Map();
 
       for (const p of players) {
@@ -221,6 +235,10 @@ class Db {
           if (!s.vehicle) return;
           insSortie.run(battleId, id, seq, s.vehicle, s.kills || 0, s.destroyed ? 1 : 0);
         });
+
+        for (const a of p.awards || []) {
+          insAward.run(battleId, id, a.name, a.count || 1);
+        }
 
         insBp.run(
           battleId,
@@ -272,6 +290,7 @@ class Db {
       this.db.prepare('DELETE FROM battle_players WHERE battle_id = ?').run(id);
       this.db.prepare('DELETE FROM sorties WHERE battle_id = ?').run(id);
       this.db.prepare('DELETE FROM duels WHERE battle_id = ?').run(id);
+      this.db.prepare('DELETE FROM awards WHERE battle_id = ?').run(id);
       this.db.prepare('DELETE FROM battles WHERE id = ?').run(id);
       this.db.exec('COMMIT');
     } catch (e) {
@@ -331,6 +350,18 @@ class Db {
       )
       .all(id)
       .map((r) => ({ ...r, vehicles: JSON.parse(r.vehicles || '[]') }));
+
+    // Награды подкладываем к своим игрокам, чтобы их было видно в составе боя.
+    const awards = this.db
+      .prepare(
+        `SELECT p.nick, a.name, a.count FROM awards a
+         JOIN players p ON p.id = a.player_id WHERE a.battle_id = ?`
+      )
+      .all(id);
+    for (const p of players) {
+      p.awards = awards.filter((a) => a.nick === p.nick).map((a) => ({ name: a.name, count: a.count }));
+    }
+
     return {
       ...battle,
       my_vehicles: JSON.parse(battle.my_vehicles || '[]'),

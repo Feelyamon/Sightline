@@ -7,6 +7,8 @@ const {
   LEFT_PATTERNS,
   NOISE_PATTERNS,
   AIR_VERBS,
+  AWARD_PATTERNS,
+  NAMED_AWARDS,
 } = require('./verbs');
 
 // Длинные глаголы вперёд: «тяжело повредил» должен победить «повредил»,
@@ -72,6 +74,37 @@ function findVerb(msg, verbs) {
 }
 
 /**
+ * Награда за бой: «Ник (Техника) получил "Снайпер"», «... получил
+ * "Спасатель танков: x2"», «... ударил первым!».
+ * @returns {{type:'award', actor, award, count}|null}
+ */
+function parseAward(text) {
+  for (const re of AWARD_PATTERNS) {
+    const m = re.exec(text);
+    if (!m) continue;
+    const actor = parseParticipant(text.slice(0, m.index));
+    if (!actor) continue;
+    // Повторяемые награды приходят с хвостом «: x3».
+    const raw = m[1].trim();
+    const withCount = /^(.*?):\s*x\s*(\d+)$/i.exec(raw);
+    return {
+      type: 'award',
+      actor,
+      award: withCount ? withCount[1].trim() : raw,
+      count: withCount ? Number(withCount[2]) : 1,
+    };
+  }
+
+  for (const { re, name } of NAMED_AWARDS) {
+    const m = re.exec(text);
+    if (!m) continue;
+    const actor = parseParticipant(text.slice(0, m.index));
+    if (actor) return { type: 'award', actor, award: name, count: 1 };
+  }
+  return null;
+}
+
+/**
  * Разбирает одно сообщение кил-фида.
  *
  * @returns {object} одно из:
@@ -86,6 +119,11 @@ function findVerb(msg, verbs) {
 function parseMessage(msg) {
   const text = String(msg || '').trim();
   if (!text) return { type: 'noise' };
+
+  // Награды проверяем раньше шума: часть их формулировок иначе была бы
+  // отброшена как «ачивка».
+  const award = parseAward(text);
+  if (award) return award;
 
   if (NOISE_PATTERNS.some((re) => re.test(text))) return { type: 'noise' };
 
@@ -120,4 +158,4 @@ function parseMessage(msg) {
   return { type: 'unknown' };
 }
 
-module.exports = { parseMessage, parseParticipant };
+module.exports = { parseMessage, parseParticipant, parseAward };

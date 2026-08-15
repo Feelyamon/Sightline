@@ -144,13 +144,19 @@ function playersTable(players) {
   const table = el('table');
   table.innerHTML =
     '<thead><tr><th class="nick">Ник</th><th class="num">K</th><th class="num">D</th>' +
-    '<th class="num">A</th><th>Статус</th><th>Техника (последняя — текущая)</th></tr></thead>';
+    '<th class="num">A</th><th class="num">★</th><th>Статус</th>' +
+    '<th>Техника (последняя — текущая)</th></tr></thead>';
   const tbody = el('tbody');
 
   for (const p of players) {
     const tr = el('tr');
     if (p.status === 'left') tr.classList.add('row-left');
     if (p.status === 'dead') tr.classList.add('row-dead');
+    // Обидчик, за которого ещё можно взять «Око за око».
+    if (p.isRevengeTarget) {
+      tr.classList.add('revenge');
+      tr.title = 'Убил тебя последним — за него даётся «Око за око»';
+    }
 
     const nick = el('td', `nick${p.isSelf ? ' self' : ''}`);
     const nameEl = el('span', 'nick-name', p.nick);
@@ -179,11 +185,23 @@ function playersTable(players) {
     const assists = el('td', 'num', String(p.assists || 0));
     assists.title = 'ассисты: повредил цель, но добил её другой (считается приложением)';
 
+    // Награды за бой — те, что игра пишет в кил-фид.
+    const awardsCell = el('td', 'num');
+    if (p.awards && p.awards.length) {
+      const total = p.awards.reduce((s, a) => s + (a.count || 1), 0);
+      const badge = el('span', 'awards', `★${total}`);
+      badge.title = p.awards
+        .map((a) => (a.count > 1 ? `${a.name} ×${a.count}` : a.name))
+        .join('\n');
+      awardsCell.append(badge);
+    }
+
     tr.append(
       nick,
       el('td', 'num', String(p.kills)),
       el('td', 'num', String(p.deaths)),
       assists,
+      awardsCell,
       st,
       vehiclesCell(p)
     );
@@ -191,6 +209,54 @@ function playersTable(players) {
   }
   table.append(tbody);
   return table;
+}
+
+/**
+ * Неопознанных разводим по группам связей: внутри группы точно известно, кто
+ * против кого, неизвестно лишь, какая из сторон моя. Как только появится связь
+ * с моей командой, группа целиком переедет в «Свои» и «Противники».
+ */
+function unknownGroups(players) {
+  const wrap = el('div');
+  const byComponent = new Map();
+  for (const p of players) {
+    if (!byComponent.has(p.component)) byComponent.set(p.component, []);
+    byComponent.get(p.component).push(p);
+  }
+
+  // Одиночки — те, кто ни с кем ещё не пересёкся.
+  const loners = [];
+  const groups = [];
+  for (const [, list] of byComponent) {
+    if (list.length < 2) loners.push(...list);
+    else groups.push(list);
+  }
+  groups.sort((a, b) => b.length - a.length);
+
+  groups.forEach((list, i) => {
+    const sideA = list.filter((p) => p.side === 0);
+    const sideB = list.filter((p) => p.side === 1);
+    if (!sideA.length || !sideB.length) {
+      // Все на одной стороне — просто список, делить нечего.
+      wrap.append(el('div', 'section-title', `Группа ${i + 1} — одна сторона`), playersTable(list));
+      return;
+    }
+    const split = el('div', 'split');
+    for (const [label, rows] of [[`Группа ${i + 1}: сторона A`, sideA], [`Группа ${i + 1}: сторона B`, sideB]]) {
+      const side = el('div', 'side');
+      side.append(el('div', 'side-title', `${label} — ${rows.length}`), playersTable(rows));
+      split.append(side);
+    }
+    wrap.append(split);
+  });
+
+  if (loners.length) {
+    wrap.append(
+      el('div', 'section-title', `Ни с кем не пересекались — ${loners.length}`),
+      playersTable(loners)
+    );
+  }
+  return wrap;
 }
 
 function renderBattle(state) {
@@ -218,7 +284,7 @@ function renderBattle(state) {
   $('unknownBox').hidden = unknown.length === 0;
   if (unknown.length) {
     $('unknownTitle').textContent = `Команда не определена — ${unknown.length}`;
-    $('unknownBody').replaceChildren(playersTable(unknown));
+    $('unknownBody').replaceChildren(unknownGroups(unknown));
   }
 
   if (!nickDirty && document.activeElement !== $('nick')) $('nick').value = state.selfNick || '';
@@ -270,7 +336,8 @@ function battleRoster(details) {
 
     const table = el('table');
     table.innerHTML =
-      '<thead><tr><th class="nick">Ник</th><th>КДА</th><th>Техника</th></tr></thead>';
+      '<thead><tr><th class="nick">Ник</th><th>КДА</th><th>Награды</th>' +
+      '<th>Техника</th></tr></thead>';
     const tbody = el('tbody');
     for (const p of rows) {
       const tr = el('tr');
@@ -279,7 +346,13 @@ function battleRoster(details) {
       nick.title = p.nick;
       const kda = el('td');
       kda.append(kdaBadge(p.kills, p.deaths, p.assists));
-      tr.append(nick, kda, el('td', 'muted', p.vehicles.join(' · ') || '—'));
+
+      const awards = el('td', 'muted');
+      awards.textContent = (p.awards || [])
+        .map((a) => (a.count > 1 ? `${a.name} ×${a.count}` : a.name))
+        .join(', ') || '—';
+
+      tr.append(nick, kda, awards, el('td', 'muted', p.vehicles.join(' · ') || '—'));
       tbody.append(tr);
     }
     table.append(tbody);

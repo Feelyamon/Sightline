@@ -121,14 +121,66 @@ test('живое: «разбился» распознаётся (кирилли�
   assert.equal(find(snap, '=LHina= Ник').killedOn, 'Ми-28НМ');
 });
 
-test('живое: бортовые сообщения и награда за добивание — шум', () => {
+test('живое: бортовое сообщение — шум, «последний удар» — награда', () => {
   const s = new BattleState('Me');
   const snap = feed(s, [
     'Двигатель перегрелся',
     '[120B] Ник (Challenger 2 OES) нанёс последний удар!',
   ]);
   assert.deepEqual(snap.unparsed, []);
-  assert.equal(snap.players.length, 0);
+  assert.equal(snap.players.length, 1, 'бортовое сообщение игрока не создаёт');
+  assert.deepEqual(find(snap, '[120B] Ник').awards, [{ name: 'Последний удар', count: 1 }]);
+});
+
+test('награды собираются по игрокам, повторяемые — с количеством', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Ace (БМПТ-72) уничтожил X (M1A2)',
+    'Ace (БМПТ-72) получил "Снайпер"',
+    'Ace (БМПТ-72) получил "Спасатель танков: x2"',
+    'Ace (БМПТ-72) ударил первым!',
+  ]);
+  assert.deepEqual(snap.unparsed, []);
+  const awards = find(snap, 'Ace').awards;
+  assert.deepEqual(
+    awards.sort((a, b) => a.name.localeCompare(b.name)),
+    [
+      { name: 'Спасатель танков', count: 2 },
+      { name: 'Снайпер', count: 1 },
+      { name: 'Ударил первым', count: 1 },
+    ].sort((a, b) => a.name.localeCompare(b.name))
+  );
+});
+
+test('«Око за око»: цель появляется после моей смерти и снимается', () => {
+  const s = new BattleState('Me');
+
+  feed(s, ['Killer (Leopard 2A4) уничтожил Me (Т-80БВМ)']);
+  let snap = s.snapshot();
+  assert.equal(snap.revengeTarget, 'Killer');
+  assert.equal(find(snap, 'Killer').isRevengeTarget, true);
+
+  // Отомстил — отметка не нужна.
+  s.ingest({ id: 90, msg: 'Me (Т-80БВМ) уничтожил Killer (Leopard 2A4)', time: 90 });
+  assert.equal(s.snapshot().revengeTarget, null);
+});
+
+test('«Око за око»: цель снимается, если обидчика убил кто-то другой', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Killer (Leopard 2A4) уничтожил Me (Т-80БВМ)',
+    'Mate (ИС-2) уничтожил Killer (Leopard 2A4)',
+  ]);
+  assert.equal(snap.revengeTarget, null, 'медаль уже не получить');
+});
+
+test('«Око за око»: новый обидчик заменяет прежнего', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Killer1 (Leopard 2A4) уничтожил Me (Т-80БВМ)',
+    'Killer2 (M1A2) уничтожил Me (Т-72Б3)',
+  ]);
+  assert.equal(snap.revengeTarget, 'Killer2');
 });
 
 test('служебные символы из имени техники не показываются', () => {

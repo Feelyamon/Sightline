@@ -88,6 +88,7 @@ class WtClient extends EventEmitter {
     this.lastTime = -1;
     this.lastChatId = 0;
     this.idleSince = null;
+    this.skipHistory = false;
   }
 
   start() {
@@ -170,6 +171,11 @@ class WtClient extends EventEmitter {
       if (gap >= IDLE_NEW_BATTLE_MS || (this.idleSince && mapChanged)) {
         this.beginNewBattle();
       }
+      // Вернулись в бой — всё, что уже лежит в журнале, относится к прошлым
+      // боям: свои события новая катка ещё не успела записать. Пропускаем их.
+      // Для респавна это безвредно: те записи уже прочитаны, курсор лишь
+      // подтверждает достигнутое.
+      if (this.idleSince) this.skipHistory = true;
       this.idleSince = null;
       this.inBattle = true;
       this.mapSignature = signature;
@@ -210,6 +216,16 @@ class WtClient extends EventEmitter {
     // сессии игры и в новом бою не обнуляются. Единственный надёжный признак
     // границы — поле time (секунды с начала боя): внутри боя оно только растёт,
     // а на стыке падает.
+
+    // Возврат в бой из ангара: весь накопленный журнал — прошлые бои.
+    if (this.skipHistory) {
+      this.skipHistory = false;
+      this.started = true;
+      for (const d of damage) {
+        if (typeof d?.id === 'number') this.lastDmg = Math.max(this.lastDmg, d.id);
+      }
+      return;
+    }
 
     // Первый тик: приложение могло запуститься посреди сессии. Отматываем
     // курсор к началу текущего боя, чтобы не втянуть предыдущие.

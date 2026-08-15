@@ -101,9 +101,22 @@ test('живое: дисконнект — выход из боя, его дуб
   );
 });
 
-test('живое: награды и «ударил первым» — шум', () => {
-  assert.equal(parseMessage('=CLNE= Ник (БМПТ-72) получил "Снайпер"').type, 'noise');
-  assert.equal(parseMessage('[CLNC] Ник (Leopard 2A4M) ударил первым!').type, 'noise');
+test('живое: награды разбираются с названием и количеством', () => {
+  const sniper = parseMessage('=CLNE= Ник (БМПТ-72) получил "Снайпер"');
+  assert.equal(sniper.type, 'award');
+  assert.equal(sniper.award, 'Снайпер');
+  assert.equal(sniper.count, 1);
+  assert.equal(sniper.actor.vehicle, 'БМПТ-72');
+
+  // Повторяемые награды приходят с хвостом «: xN».
+  const saver = parseMessage('=CLNE= Ник (БМПТ-72) получил "Спасатель танков: x2"');
+  assert.equal(saver.award, 'Спасатель танков');
+  assert.equal(saver.count, 2);
+
+  // Награда без кавычек — своя формулировка.
+  const first = parseMessage('[CLNC] Ник (Leopard 2A4M) ударил первым!');
+  assert.equal(first.type, 'award');
+  assert.equal(first.award, 'Ударил первым');
 });
 
 test('участник без техники', () => {
