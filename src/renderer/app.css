@@ -130,6 +130,9 @@ tr.revenge td {
 }
 tr.revenge td.nick { color: #f0c96b; font-weight: 600; }
 
+.result-win { color: var(--ally); }
+.result-loss { color: var(--enemy); }
+
 .awards {
   color: #e0b354;
   cursor: help;

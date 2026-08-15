@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS battles (
   duration    INTEGER NOT NULL,          -- секунды по часам кил-фида
   my_kills    INTEGER NOT NULL DEFAULT 0,
   my_deaths   INTEGER NOT NULL DEFAULT 0,
+  my_assists  INTEGER NOT NULL DEFAULT 0,
   my_vehicles TEXT    NOT NULL DEFAULT '[]',
   players_seen INTEGER NOT NULL DEFAULT 0,
   result      TEXT    NOT NULL DEFAULT 'unknown'  -- win | loss | unknown
@@ -97,6 +98,9 @@ class Db {
     }
     if (!hasColumn('battle_players', 'assists')) {
       this.db.exec('ALTER TABLE battle_players ADD COLUMN assists INTEGER NOT NULL DEFAULT 0');
+    }
+    if (!hasColumn('battles', 'my_assists')) {
+      this.db.exec('ALTER TABLE battles ADD COLUMN my_assists INTEGER NOT NULL DEFAULT 0');
     }
     if (!hasColumn('battles', 'result')) {
       this.db.exec("ALTER TABLE battles ADD COLUMN result TEXT NOT NULL DEFAULT 'unknown'");
@@ -187,8 +191,8 @@ class Db {
     const tx = () => {
       const battleId = this.db
         .prepare(
-          `INSERT INTO battles (started_at, ended_at, duration, my_kills, my_deaths, my_vehicles, players_seen, result)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO battles (started_at, ended_at, duration, my_kills, my_deaths, my_assists, my_vehicles, players_seen, result)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           start,
@@ -196,6 +200,7 @@ class Db {
           snapshot.clock || 0,
           me ? me.kills : 0,
           me ? me.deaths : 0,
+          me ? me.assists || 0 : 0,
           JSON.stringify(me ? me.vehicles : []),
           players.length,
           result
@@ -330,7 +335,8 @@ class Db {
   recentBattles(limit = 50) {
     return this.db
       .prepare(
-        `SELECT id, started_at, duration, my_kills, my_deaths, my_vehicles, players_seen
+        `SELECT id, started_at, duration, my_kills, my_deaths, my_assists, my_vehicles,
+                players_seen, result
          FROM battles ORDER BY started_at DESC LIMIT ?`
       )
       .all(limit)

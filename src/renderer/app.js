@@ -378,8 +378,15 @@ function battleRoster(details) {
 
 async function refreshBattles() {
   const limit = Number($('battlesLimit').value) || 10;
-  const battles = await window.wt.db.recentBattles(limit);
+  const [battles, stats] = await Promise.all([
+    window.wt.db.recentBattles(limit),
+    window.wt.db.stats(),
+  ]);
   const body = $('battlesBody');
+
+  // Хранится всё: ограничение здесь — только сколько строк рисовать.
+  const mb = (stats.sizeBytes / 1024 / 1024).toFixed(1);
+  $('battlesTotal').textContent = `всего в базе: ${stats.battles}, ${mb} МБ`;
 
   if (!battles.length) {
     body.replaceChildren(el('div', 'empty', 'Боёв пока нет. Первый запишется, когда закончится.'));
@@ -388,8 +395,8 @@ async function refreshBattles() {
 
   const table = el('table');
   table.innerHTML =
-    '<thead><tr><th>Когда</th><th class="num">Длит.</th><th class="num">K</th>' +
-    '<th class="num">D</th><th>Моя техника</th><th class="num">Игроков</th><th></th></tr></thead>';
+    '<thead><tr><th>Когда</th><th class="num">Длит.</th><th>Исход</th><th>КДА</th>' +
+    '<th>Моя техника</th><th class="num">Игроков</th><th></th></tr></thead>';
   const tbody = el('tbody');
 
   for (const b of battles) {
@@ -405,11 +412,20 @@ async function refreshBattles() {
     });
     actions.append(del);
 
+    const kda = el('td');
+    kda.append(kdaBadge(b.my_kills, b.my_deaths, b.my_assists));
+
+    const RESULT = {
+      win: ['победа', 'result-win'],
+      loss: ['поражение', 'result-loss'],
+    };
+    const [resultLabel, resultClass] = RESULT[b.result] || ['—', 'muted'];
+
     tr.append(
       el('td', null, dateText(b.started_at)),
       el('td', 'num', clockText(b.duration)),
-      el('td', 'num', String(b.my_kills)),
-      el('td', 'num', String(b.my_deaths)),
+      el('td', resultClass, resultLabel),
+      kda,
       el('td', null, b.my_vehicles.join(', ') || '—'),
       el('td', 'num', String(b.players_seen)),
       actions
