@@ -111,7 +111,16 @@ th.sorted { color: var(--accent); }
 /* Ник показываем целиком и одной строкой: перенос рвал его посреди слова.
    Если не влезает — половина экрана прокручивается по горизонтали (.side). */
 td.nick { white-space: nowrap; }
-td.nick.self { text-decoration: underline; font-weight: 600; }
+td.nick.self { font-weight: 700; }
+
+/* Своя строка — чуть светлее остальных плюс акцентная полоса слева, чтобы
+   находить себя в таблице взглядом, а не поиском. */
+tr.is-self td { background: rgba(110, 168, 254, .13); }
+tr.is-self td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+tr.is-self:hover td { background: rgba(110, 168, 254, .18); }
+/* Приглушение мёртвых и вышедших не должно съедать эту подсветку. */
+tr.is-self.row-left { opacity: .8; }
+tr.is-self.row-dead td.nick { color: var(--text); }
 tr.row-left { opacity: .45; }
 /* Цель для «Око за око»: тёплая золотая обводка, снимается сама, когда
    медаль уже не получить. */

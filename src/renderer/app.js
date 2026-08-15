@@ -66,6 +66,16 @@ $('tabs').addEventListener('click', (e) => {
 
 // --- Утилиты ------------------------------------------------------------
 
+/**
+ * Мой ли это ник. В базе ники лежат с клан-тегом («[CLAN] Username»),
+ * а в настройках он записан без него — сверяем и по хвосту.
+ */
+function isMyNick(nick) {
+  const self = (lastState?.selfNick || '').trim();
+  if (!self || !nick) return false;
+  return nick === self || nick.endsWith(` ${self}`);
+}
+
 function clockText(seconds) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '—';
   const m = Math.floor(seconds / 60);
@@ -150,6 +160,7 @@ function playersTable(players) {
 
   for (const p of players) {
     const tr = el('tr');
+    if (p.isSelf) tr.classList.add('is-self');
     if (p.status === 'left') tr.classList.add('row-left');
     if (p.status === 'dead') tr.classList.add('row-dead');
     // Обидчик, за которого ещё можно взять «Око за око».
@@ -341,8 +352,9 @@ function battleRoster(details) {
     const tbody = el('tbody');
     for (const p of rows) {
       const tr = el('tr');
+      if (isMyNick(p.nick)) tr.classList.add('is-self');
       if (p.left_battle) tr.classList.add('row-left');
-      const nick = el('td', 'nick', p.nick);
+      const nick = el('td', `nick${isMyNick(p.nick) ? ' self' : ''}`, p.nick);
       nick.title = p.nick;
       const kda = el('td');
       kda.append(kdaBadge(p.kills, p.deaths, p.assists));
