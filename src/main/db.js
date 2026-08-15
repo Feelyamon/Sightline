@@ -477,7 +477,7 @@ class Db {
     const rows = this.db
       .prepare(
         `SELECT id, started_at, duration, my_kills, my_deaths, my_assists, my_vehicles,
-                players_seen, result, cancelled, cancel_reason
+                players_seen, result, cancelled, cancel_reason, trust
          FROM battles b
          WHERE ${sql}
          ORDER BY started_at DESC, id DESC
@@ -569,6 +569,45 @@ class Db {
 
   deleteBattle(id) {
     this.db.prepare('DELETE FROM battles WHERE id = ?').run(id);
+  }
+
+  /**
+   * Запоминает ключ, под которым бой лежит на сервере.
+   *
+   * Ключ считает сервер (хэш от состава), и без него нельзя спросить, чем
+   * кончилась сверка: локальный номер боя на сервере ничего не значит — там
+   * тот же бой есть и у других игроков, под их номерами.
+   */
+  setBattleKey(id, key) {
+    this.db
+      .prepare("UPDATE battles SET server_key = ?, trust = CASE WHEN trust = 'local' THEN 'pending' ELSE trust END WHERE id = ?")
+      .run(key, id);
+  }
+
+  /** Ключи боёв, про которые ещё имеет смысл спрашивать сверку. */
+  battleKeysToRefresh(limit = 200) {
+    return this.db
+      .prepare(
+        // Подтверждённый бой переспрашивать незачем: подтверждение не
+        // отзывается. А вот спорный и ожидающий — да: свидетель может
+        // прислать свою запись через час после боя.
+        `SELECT server_key FROM battles
+          WHERE server_key IS NOT NULL AND trust IN ('pending', 'alone', 'disputed')
+          ORDER BY started_at DESC LIMIT ?`
+      )
+      .all(limit)
+      .map((r) => r.server_key);
+  }
+
+  /** @param {Array<{battle_key: string, trust: string}>} rows */
+  applyTrust(rows) {
+    const update = this.db.prepare('UPDATE battles SET trust = ? WHERE server_key = ?');
+    let changed = 0;
+    for (const r of rows) {
+      if (!r?.battle_key || !r?.trust) continue;
+      changed += update.run(r.trust, r.battle_key).changes;
+    }
+    return changed;
   }
 
   /**

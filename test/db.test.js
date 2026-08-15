@@ -388,3 +388,31 @@ test('удаление одного боя не трогает остальны�
   assert.equal(db.recentBattles()[0].id !== first, true);
   db.close();
 });
+
+test('ключ боя с сервера и отметка доверия', () => {
+  const db = tmpDb();
+  const id = db.saveBattle(battle(['Me (Т-80БВМ) уничтожил Foe (M1A2)']));
+
+  // Пока бой никуда не уезжал, отметки нет: 'local' — это «не отправлялся», и
+  // путать его с серверным 'alone' («отправлен, свидетелей не нашлось»)
+  // нельзя, иначе в списке боёв появится смысл, которого там нет.
+  assert.equal(db.searchBattles({}).rows[0].trust, 'local');
+  assert.deepEqual(db.battleKeysToRefresh(), [], 'без ключа спрашивать нечего');
+
+  db.setBattleKey(id, 'abc123');
+  assert.equal(db.searchBattles({}).rows[0].trust, 'pending');
+  assert.deepEqual(db.battleKeysToRefresh(), ['abc123']);
+
+  assert.equal(db.applyTrust([{ battle_key: 'abc123', trust: 'confirmed' }]), 1);
+  assert.equal(db.searchBattles({}).rows[0].trust, 'confirmed');
+
+  // Подтверждённый переспрашивать незачем: подтверждение не отзывается.
+  assert.deepEqual(db.battleKeysToRefresh(), []);
+});
+
+test('чужой ключ ничего не портит', () => {
+  const db = tmpDb();
+  db.saveBattle(battle(['Me (Т-80БВМ) уничтожил Foe (M1A2)']));
+  assert.equal(db.applyTrust([{ battle_key: 'которого нет', trust: 'confirmed' }]), 0);
+  assert.equal(db.searchBattles({}).rows[0].trust, 'local');
+});

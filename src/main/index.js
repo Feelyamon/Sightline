@@ -15,6 +15,7 @@ const rules = require('./window-rules');
 const { Account } = require('./account');
 const { Friends } = require('./friends');
 const { Avatars } = require('./avatars');
+const { Sync, battlePayload } = require('./sync');
 
 // Схему адресов аватарок объявляем до готовности приложения — позже окно её
 // уже не увидит.
@@ -30,6 +31,7 @@ let settings;
 let account;
 let friends;
 let avatars;
+let sync;
 let db;
 let mainWindow = null;
 let tray = null;
@@ -87,7 +89,11 @@ function schedulePush() {
 }
 
 /** Записывает текущий бой в базу, если в нём есть что записывать. */
-function persistBattle() {
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.final] - бой точно закончился, можно отправлять
+ */
+function persistBattle({ final = false } = {}) {
   if (!battle) return;
   const snapshot = battle.snapshot();
   if (!snapshot.players.length) return;
@@ -104,6 +110,12 @@ function persistBattle() {
         ? db.saveBattle(snapshot, opts)
         : db.updateBattle(battleRowId, snapshot, opts);
     send('db:changed');
+
+    // На сервер бой уходит только когда он кончился: пока идёт, состав и счёт
+    // ещё меняются, и отправлять промежуточные версии значит слать одно и то
+    // же по десять раз. Ключ очереди — локальный id, поэтому повторный вызов
+    // заменяет запись, а не добавляет вторую.
+    if (final) sync.enqueue(battleRowId, battlePayload(snapshot, opts));
   } catch (e) {
     // Единственная строка, которую собирает main: словарь берём тот же, что
     // и рендерер, иначе ошибка приходила бы на чужом языке.
@@ -234,8 +246,8 @@ function startClient() {
   client = new WtClient({ mock: MOCK });
 
   client.on('status', (s) => {
-    // Ушли в ангар — бой закончился, самое время его записать.
-    if (s.status !== 'battle') persistBattle();
+    // Ушли в ангар — бой закончился, самое время его записать и отправить.
+    if (s.status !== 'battle') persistBattle({ final: true });
 
     // Игра поднялась или закрылась — окно реагирует по настройкам. Отдельного
     // слежения за процессом игры не нужно: статус клиента и есть ответ на
@@ -259,7 +271,10 @@ function startClient() {
   });
 
   client.on('reset', () => {
-    persistBattle(); // предыдущий бой, если его ещё не записали
+    // Начался следующий бой — значит предыдущий кончился окончательно, даже
+    // если в ангар между ними мы не заходили. Без final: true бой, за которым
+    // сразу пошёл новый, никогда бы не уехал на сервер.
+    persistBattle({ final: true });
     battle.reset();
     battleStartedAt = Date.now();
     battleRowId = null; // следующий бой — новая запись
@@ -338,6 +353,11 @@ app.whenReady().then(() => {
   friends = new Friends(account, settings);
   avatars = new Avatars(app.getPath('userData'));
   avatars.install();
+  sync = new Sync(app.getPath('userData'), account, db);
+  // Отметка доверия поменялась — список боёв надо перерисовать, иначе галочка
+  // появится только после переключения вкладки.
+  sync.onTrustChanged = () => send('db:changed');
+  sync.start();
   db.startSession(); // «бои с запуска» считаются от старта приложения
   startClient();
   startFriends();
@@ -646,6 +666,8 @@ async function afterSignIn() {
     }
   }
   await friends.refresh();
+  // Бои, накопившиеся в очереди до входа, ждали именно этого момента.
+  sync.start();
 }
 handle('account:saveRecoveryCode', async (_e, code) => {
   // Диалог сохранения, а не тихая запись в заранее выбранную папку: человек
