@@ -13,6 +13,7 @@
       <button class="tab" data-tab="counters">Счётчики</button>
       <button class="tab" data-tab="battles">Бои</button>
       <button class="tab" data-tab="players">Игроки</button>
+      <button class="tab" data-tab="mine">Моя техника</button>
       <button class="tab" data-tab="settings">Настройки</button>
     </nav>
     <div class="status" id="status">
@@ -96,6 +97,32 @@
       </div>
     </section>
 
+    <!-- Моя техника -->
+    <section class="panel" id="panel-mine">
+      <div class="controls">
+        <label class="row">
+          <span class="muted">Период</span>
+          <select id="minePeriod">
+            <option value="month">за месяц</option>
+            <option value="week">за неделю</option>
+            <option value="today">за сегодня</option>
+            <option value="">за всё время</option>
+          </select>
+        </label>
+        <div class="tile inline" id="winrateTile"></div>
+      </div>
+      <div class="split">
+        <div class="side">
+          <div class="side-title ally">На чём воюю я</div>
+          <div id="myVehicles"></div>
+        </div>
+        <div class="side">
+          <div class="side-title enemy">Что выкатывают против</div>
+          <div id="enemyVehicles"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Настройки -->
     <section class="panel" id="panel-settings">
       <label class="row field">
@@ -130,6 +157,23 @@
       </div>
     </section>
   </main>
+
+  <!-- Карточка игрока: история встреч и ручная заметка -->
+  <div class="modal-backdrop" id="cardModal" hidden>
+    <div class="modal wide">
+      <h2 id="cardNick">Игрок</h2>
+      <div class="muted" id="cardSummary"></div>
+      <label class="row field">
+        <span class="muted">Заметка — всплывёт при следующей встрече</span>
+        <input type="text" id="cardNote" placeholder="Например: камперит на Ка-50" autocomplete="off" />
+      </label>
+      <div id="cardBody"></div>
+      <div class="buttons">
+        <button id="cardSave">Сохранить заметку</button>
+        <button id="cardClose">Закрыть</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Подтверждение опасных действий: закрывает случайный мисклик -->
   <div class="modal-backdrop" id="modal" hidden>

@@ -29,6 +29,25 @@ const COUNTER_LABEL = {
 let lastState = null;
 let nickDirty = false;
 
+// Досье подтягиваем пачкой на новых игроков боя и держим до его конца:
+// запрашивать базу на каждое обновление таблицы незачем.
+let dossierCache = {};
+let dossierPending = false;
+
+async function ensureDossier(nicks) {
+  const missing = nicks.filter((n) => !(n in dossierCache));
+  if (!missing.length || dossierPending) return;
+  dossierPending = true;
+  try {
+    Object.assign(dossierCache, await window.wt.db.dossier(missing));
+    // Игроки, которых в базе нет, тоже помечаем — чтобы не спрашивать снова.
+    for (const n of missing) if (!(n in dossierCache)) dossierCache[n] = null;
+    if (lastState) renderBattle(lastState);
+  } finally {
+    dossierPending = false;
+  }
+}
+
 // --- Вкладки ------------------------------------------------------------
 
 $('tabs').addEventListener('click', (e) => {
@@ -40,6 +59,7 @@ $('tabs').addEventListener('click', (e) => {
   }
   if (tab.dataset.tab === 'counters') refreshCounters();
   if (tab.dataset.tab === 'battles') refreshBattles();
+  if (tab.dataset.tab === 'mine') refreshMine();
   if (tab.dataset.tab === 'players') refreshPlayers();
   if (tab.dataset.tab === 'settings') refreshDbStats();
 });
@@ -132,8 +152,25 @@ function playersTable(players) {
     if (p.status === 'left') tr.classList.add('row-left');
     if (p.status === 'dead') tr.classList.add('row-dead');
 
-    const nick = el('td', `nick${p.isSelf ? ' self' : ''}`, p.nick);
+    const nick = el('td', `nick${p.isSelf ? ' self' : ''}`);
+    const nameEl = el('span', 'nick-name', p.nick);
+    nameEl.addEventListener('click', () => openCard(p.nick));
+    nick.append(nameEl);
     nick.title = p.nick;
+
+    // Досье из базы: сколько раз уже встречались и на чём он обычно ездит.
+    const d = dossierCache[p.nick];
+    if (d && d.battles > 0 && !p.isSelf) {
+      const mark = el('span', 'dossier', `${d.battles}`);
+      const fav = d.favourite[0];
+      mark.title =
+        `встреч: ${d.battles}` +
+        (fav ? `\nчаще всего: ${fav.vehicle} (${fav.sorties} вылетов)` : '') +
+        `\nон убивал меня ${d.killedMe}, я его ${d.killedByMe}` +
+        (d.note ? `\n\nзаметка: ${d.note}` : '');
+      if (d.note) mark.classList.add('has-note');
+      nick.append(mark);
+    }
 
     const [label, cls] = PLAYER_STATUS[p.status] || PLAYER_STATUS.unknown;
     const st = el('td');
@@ -157,7 +194,10 @@ function playersTable(players) {
 }
 
 function renderBattle(state) {
+  const isNewBattle = lastState && state.startedAt !== lastState.startedAt;
   lastState = state;
+  if (isNewBattle) dossierCache = {};
+  ensureDossier(state.players.map((p) => p.nick));
 
   $('dot').className = `dot ${state.status || 'offline'}`;
   $('statusText').textContent =
@@ -377,6 +417,141 @@ async function refreshPlayers() {
 
 $('period').addEventListener('change', refreshPlayers);
 $('minBattles').addEventListener('change', refreshPlayers);
+
+// --- Вкладка «Моя техника» ----------------------------------------------
+
+function vehicleTable(rows, { mine }) {
+  if (!rows.length) {
+    return el('div', 'empty', mine ? 'Данных пока нет' : 'Противники ещё не набрались');
+  }
+
+  const table = el('table');
+  table.innerHTML = mine
+    ? '<thead><tr><th>Техника</th><th class="num">Вылетов</th><th class="num">Фрагов</th>' +
+      '<th class="num">Потерь</th><th>Винрейт</th></tr></thead>'
+    : '<thead><tr><th>Техника</th><th class="num">Вылетов</th><th class="num">Фрагов</th>' +
+      '<th class="num">Игроков</th></tr></thead>';
+  const tbody = el('tbody');
+
+  for (const r of rows) {
+    const tr = el('tr');
+    const veh = el('td');
+    veh.append(vehicleNode(r.vehicle, null));
+
+    if (mine) {
+      const decided = (r.wins || 0) + (r.losses_battles || 0);
+      const wr = decided ? `${Math.round((r.wins / decided) * 100)}%` : '—';
+      const cell = el('td', decided ? '' : 'muted', wr);
+      cell.title = decided
+        ? `побед ${r.wins} из ${decided} боёв с известным исходом`
+        : 'исход этих боёв не определён';
+      tr.append(
+        veh,
+        el('td', 'num', String(r.sorties)),
+        el('td', 'num', String(r.kills || 0)),
+        el('td', 'num', String(r.losses || 0)),
+        cell
+      );
+    } else {
+      tr.append(
+        veh,
+        el('td', 'num', String(r.sorties)),
+        el('td', 'num', String(r.kills || 0)),
+        el('td', 'num', String(r.players))
+      );
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  return table;
+}
+
+async function refreshMine() {
+  const period = $('minePeriod').value || null;
+  const [wr, mine, enemy] = await Promise.all([
+    window.wt.db.winrate({ period }),
+    window.wt.db.myVehicles({ period }),
+    window.wt.db.enemyVehicles({ period }),
+  ]);
+
+  const tile = $('winrateTile');
+  tile.replaceChildren(
+    el('div', 'label', 'Винрейт'),
+    el('div', 'value', wr.percent === null ? '—' : `${wr.percent}%`),
+    el(
+      'div',
+      'since',
+      wr.percent === null
+        ? `боёв ${wr.total}, исход ни одного не определён`
+        : `${wr.wins} побед / ${wr.losses} поражений${wr.unknown ? `, ${wr.unknown} без исхода` : ''}`
+    )
+  );
+
+  $('myVehicles').replaceChildren(vehicleTable(mine, { mine: true }));
+  $('enemyVehicles').replaceChildren(vehicleTable(enemy, { mine: false }));
+}
+
+$('minePeriod').addEventListener('change', refreshMine);
+
+// --- Карточка игрока ----------------------------------------------------
+
+let cardNick = null;
+
+async function openCard(nick) {
+  cardNick = nick;
+  $('cardNick').textContent = nick;
+  $('cardSummary').textContent = 'Загружаю…';
+  $('cardBody').replaceChildren();
+  $('cardModal').hidden = false;
+
+  const [card, dossier] = await Promise.all([
+    window.wt.db.playerCard(nick),
+    window.wt.db.dossier([nick]),
+  ]);
+  const d = dossier[nick];
+  $('cardNote').value = d?.note || '';
+
+  if (!card) {
+    $('cardSummary').textContent = 'Этого игрока ещё нет в базе — он попадёт туда, когда бой закончится.';
+    return;
+  }
+
+  const asAlly = card.encounters.filter((e) => e.team === 'ally').length;
+  const asEnemy = card.encounters.filter((e) => e.team === 'enemy').length;
+  $('cardSummary').textContent =
+    `Встреч: ${card.encounters.length} (в моей команде ${asAlly}, против ${asEnemy})` +
+    (d ? ` · он убивал меня ${d.killedMe}, я его ${d.killedByMe}` : '');
+
+  const table = el('table');
+  table.innerHTML =
+    '<thead><tr><th>Когда</th><th>Команда</th><th>КДА</th><th>Техника</th></tr></thead>';
+  const tbody = el('tbody');
+  for (const e of card.encounters.slice(0, 50)) {
+    const tr = el('tr');
+    const kda = el('td');
+    kda.append(kdaBadge(e.kills, e.deaths, e.assists));
+    tr.append(
+      el('td', null, dateText(e.started_at)),
+      el('td', `nick ${e.team}`, e.team === 'ally' ? 'свой' : e.team === 'enemy' ? 'против' : '—'),
+      kda,
+      el('td', 'muted', e.vehicles.join(' · ') || '—')
+    );
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  $('cardBody').replaceChildren(table);
+}
+
+$('cardClose').addEventListener('click', () => {
+  $('cardModal').hidden = true;
+  cardNick = null;
+});
+$('cardSave').addEventListener('click', async () => {
+  if (!cardNick) return;
+  await window.wt.db.setNote(cardNick, $('cardNote').value);
+  $('cardModal').hidden = true;
+  cardNick = null;
+});
 
 // --- Вкладка «Настройки» ------------------------------------------------
 

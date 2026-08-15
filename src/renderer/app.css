@@ -47,6 +47,14 @@ body {
 }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); background: var(--panel-2); border-color: var(--line); }
+/* «Бой» — главная вкладка, выделена приглушённым акцентом, чтобы взгляд
+   находил её сразу, но глаз не резало. */
+.tab[data-tab="battle"] { color: #8fb8ea; }
+.tab[data-tab="battle"].active {
+  color: #cfe2ff;
+  background: #16202e;
+  border-color: #2f4a6d;
+}
 
 .status { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
@@ -247,4 +255,24 @@ label.field { flex-direction: column; align-items: stretch; max-width: 420px; }
   width: min(440px, 90vw);
 }
 .modal h2 { margin: 0 0 8px; font-size: 15px; }
+.modal.wide { width: min(760px, 92vw); max-height: 82vh; overflow: auto; }
+
+/* Метка досье у ника: сколько раз уже встречались. */
+.dossier {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 10px;
+  cursor: help;
+}
+.dossier.has-note { border-color: #e0b354; color: #e0b354; }
+.nick-name { cursor: pointer; }
+.nick-name:hover { text-decoration: underline; }
+
+.tile.inline { padding: 6px 12px; }
+.tile.inline .value { font-size: 20px; }
 .modal input { margin-top: 6px; }
