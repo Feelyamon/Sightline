@@ -44,9 +44,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,
-      "createDesktopShortcut": true,
-      "installerIcon": "assets/icon.png",
-      "uninstallerIcon": "assets/icon.png"
+      "createDesktopShortcut": true
     }
   }
 }
