@@ -87,16 +87,28 @@ function vehiclesCell(p) {
   }
 
   const wrap = el('div', 'chips');
+  const lastIndex = sorties.length - 1;
   sorties.forEach((s, i) => {
-    const isCurrent = i === sorties.length - 1 && !s.destroyed && p.status === 'alive';
-    const chip = el('span', `chip${s.destroyed ? ' destroyed' : ''}${isCurrent ? ' current' : ''}`);
-    chip.append(vehicleNode(s.vehicle, s.class, { dead: s.destroyed }));
+    const isCurrent = i === lastIndex && !s.destroyed && p.status === 'alive';
+    // Вылет закончился, но гибели в кил-фиде не было: игрок пересел на другую
+    // машину. Умер он от ИИ, разбился или строку не разобрал парсер — точно
+    // неизвестно, поэтому не зачёркиваем, а гасим.
+    const isEnded = i < lastIndex && !s.destroyed;
+    const chip = el(
+      'span',
+      `chip${s.destroyed ? ' destroyed' : ''}${isEnded ? ' ended' : ''}${isCurrent ? ' current' : ''}`
+    );
+    chip.append(vehicleNode(s.label || s.vehicle, s.class, { dead: s.destroyed }));
     if (s.kills > 0) chip.append(el('b', null, `×${s.kills}`));
-    chip.title = s.destroyed
+    const state = s.destroyed
       ? 'уничтожен на этой машине'
       : isCurrent
         ? 'сейчас на этой машине'
-        : 'машина цела';
+        : isEnded
+          ? 'пересел на другую машину — гибели в кил-фиде не было'
+          : 'машина цела';
+    // В подсказке — полное имя из игры со служебными символами и смысл ×N.
+    chip.title = `${s.vehicle}\n${state}\nфрагов на этой машине: ${s.kills}`;
     wrap.append(chip);
   });
   td.append(wrap);

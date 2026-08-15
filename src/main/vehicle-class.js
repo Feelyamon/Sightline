@@ -121,6 +121,17 @@ function classify(vehicle) {
   return 'tank';
 }
 
+/**
+ * Имя для показа: игра приписывает к названиям служебные символы («◍M1A1 HC»,
+ * «▄Su-30MK»). В таблице они читаются как мусор, поэтому режем ведущие
+ * не-буквенные символы. Исходное имя остаётся в подсказке и уходит в базу.
+ */
+function displayName(vehicle) {
+  if (!vehicle) return vehicle;
+  const clean = vehicle.replace(/^[^\p{L}\p{N}]+/u, '').trim();
+  return clean || vehicle;
+}
+
 const iconFor = (vehicle) => ICONS[classify(vehicle)];
 const labelFor = (vehicle) => LABELS[classify(vehicle)];
 
@@ -151,6 +162,7 @@ function isEntityNick(nick) {
 
 module.exports = {
   classify,
+  displayName,
   iconFor,
   labelFor,
   learn,

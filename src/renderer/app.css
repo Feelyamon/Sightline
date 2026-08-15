@@ -130,6 +130,9 @@ details[hidden] { display: none; }
 .chip .veh-name { max-width: 170px; }
 .chip b { color: var(--accent); font-weight: 600; }
 .chip.destroyed { color: var(--muted); opacity: .7; }
+/* Вылет закончен, но гибели в фиде не было — гасим, но не зачёркиваем:
+   зачёркивание означает подтверждённое уничтожение. */
+.chip.ended { color: var(--muted); opacity: .55; border-style: dashed; }
 /* Текущая машина — последний чип; рамкой отличаем её от истории. */
 .chip.current { border-color: var(--accent); background: #16202e; }
 

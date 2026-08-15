@@ -1,7 +1,7 @@
 'use strict';
 
 const { parseMessage } = require('./killfeed-parser');
-const { classify, learn, isEntityNick } = require('./vehicle-class');
+const { classify, displayName, learn, isEntityNick } = require('./vehicle-class');
 
 const isDrone = (vehicle) => !!vehicle && classify(vehicle) === 'drone';
 
@@ -288,7 +288,11 @@ class BattleState {
         // Класс считаем здесь: в renderer модулей main нет.
         currentClass: alive && cur && !cur.destroyed ? classify(cur.vehicle) : null,
         killedOnClass: cur && cur.destroyed ? classify(cur.vehicle) : null,
-        sorties: p.sorties.map((s) => ({ ...s, class: classify(s.vehicle) })),
+        sorties: p.sorties.map((s) => ({
+          ...s,
+          class: classify(s.vehicle),
+          label: displayName(s.vehicle),
+        })),
         vehicles: [...new Set(p.sorties.map((s) => s.vehicle).filter(Boolean))],
         lastSeen: p.lastSeen,
         isSelf: ref !== null && p.nick === ref,

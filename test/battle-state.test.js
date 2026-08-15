@@ -81,6 +81,15 @@ test('сбитый разведдрон не считается ни смерт�
   assert.equal(find(snap, 'Ally'), undefined);
 });
 
+test('служебные символы из имени техники не показываются', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, ['Foe (▄Su-30MK) сбил Ally (◍M1A1 HC)']);
+  const foe = find(snap, 'Foe');
+  assert.equal(foe.sorties[0].label, 'Su-30MK', 'для показа — без символов');
+  assert.equal(foe.sorties[0].vehicle, '▄Su-30MK', 'исходное имя сохранено');
+  assert.equal(foe.sorties[0].class, 'plane');
+});
+
 test('дрон не даёт двойного фрага: обе строки про него игнорируются', () => {
   const s = new BattleState('Me');
   // Игра шлёт на один сбитый дрон две строки подряд.
