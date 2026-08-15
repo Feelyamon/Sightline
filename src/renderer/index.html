@@ -19,6 +19,9 @@
       <button class="tab" data-tab="help" data-i18n="tab.help"></button>
       <button class="tab" data-tab="about" data-i18n="tab.about"></button>
     </nav>
+    <!-- Отряд: своё место и три свободных. Стоит в шапке, потому что нужен
+         одним взглядом, но занимает одну строку и никуда не лезет. -->
+    <div class="squad" id="squadStrip"></div>
     <button class="help-btn" id="helpBtn" data-i18n-title="help.open">?</button>
     <div class="status" id="status">
       <span class="dot" id="dot"></span>
@@ -386,6 +389,43 @@
 
   <!-- Код восстановления: показывается один раз и закрывается только после
        подтверждения. Код, показанный мельком, равносилен его отсутствию. -->
+  <!-- Друзья -->
+  <div class="modal-backdrop" id="friendsModal" hidden>
+    <div class="modal wide">
+      <h2 data-i18n="friends.title"></h2>
+
+      <div class="note-block" id="friendsGuest" hidden>
+        <p class="muted" data-i18n="friends.needAccount"></p>
+      </div>
+
+      <div id="friendsBody" hidden>
+        <label class="row field">
+          <span class="muted" data-i18n="friends.search"></span>
+          <input type="search" id="friendSearch" data-i18n-placeholder="friends.searchPlaceholder"
+                 autocomplete="off" />
+        </label>
+        <div id="friendSearchResults"></div>
+
+        <div class="auth-error" id="friendsError" hidden></div>
+
+        <div class="section-title" id="friendsIncomingTitle" hidden></div>
+        <div id="friendsIncoming"></div>
+
+        <div class="section-title" id="friendsOutgoingTitle" hidden></div>
+        <div id="friendsOutgoing"></div>
+
+        <div class="section-title" id="friendsListTitle"></div>
+        <div id="friendsList"></div>
+
+        <p class="muted small" data-i18n="friends.squadNote"></p>
+      </div>
+
+      <div class="buttons">
+        <button id="friendsClose" data-i18n="friends.close"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- Устаревшая сборка. Закрыть нельзя намеренно: сервер с такой версией
        разговаривать отказался, и всё, что программа может показать дальше, —
        это неправда разной степени свежести. -->

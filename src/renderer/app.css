@@ -69,6 +69,64 @@ body {
   border-color: #2f4a6d;
 }
 
+/* --- Отряд в шапке --- */
+.squad { display: flex; align-items: center; gap: 4px; }
+.squad-slot {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  position: relative;
+  /* Переход короткий намеренно: панель попадает в поле зрения во время боя,
+     и всё, что тянется дольше, там раздражает. */
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.squad-slot:hover { border-color: var(--accent); color: var(--text); }
+/* Своё место не кнопка выбора, а напоминание, кто ты. */
+.squad-slot.self { border-color: #3a4557; cursor: default; }
+.squad-slot.self:hover { border-color: #3a4557; }
+.squad-slot.taken { color: var(--text); background: #1d2530; }
+/* Кружок состояния в углу — как в мессенджерах: виден, но не спорит с
+   аватаркой за место. */
+.squad-slot .presence {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--muted);
+}
+.squad-slot .presence.battle { background: var(--ally); }
+.squad-slot .presence.hangar { background: #e0b354; }
+
+/* --- Окно друзей --- */
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.friend-row:last-child { border-bottom: none; }
+.friend-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Не в сети — приглушённым: список читается сверху вниз, и внизу должно быть
+   видно, что там уже никого нет. */
+.friend-row.offline .friend-name { color: var(--muted); }
+.friend-status { color: var(--muted); font-size: 11px; }
+.friend-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.friend-dot.battle { background: var(--ally); }
+.friend-dot.hangar { background: #e0b354; }
+
 .status { display: flex; align-items: center; gap: 8px; }
 /* Ошибку в строке состояния видно сразу: без выделения она теряется среди
    обычных сообщений вроде «В ангаре». */
@@ -570,6 +628,10 @@ label.row.consent input { margin-top: 3px; }
   user-select: all;
 }
 
+/* Друг не в отряде: тот же зелёный, но пустой кружок. Заполненный означает
+   «точно со мной», пустой — «свой человек, но сторона неизвестна». */
+.squad-mark.friend { opacity: 0.75; }
+
 /* Значок отряда рядом с ником. Значок, а не подсветка строки: подсветка
    конфликтовала бы со своей строкой и с золотой рамкой «Око за око». */
 .squad-mark {
@@ -578,3 +640,6 @@ label.row.consent input { margin-top: 3px; }
   font-size: 10px;
   cursor: help;
 }
+
+/* Предупреждение в строке друга: не ошибка, но и не проходная подпись. */
+.friend-status.warn { color: #e0b354; }

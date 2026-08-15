@@ -179,7 +179,60 @@ window.wt = {
       return { current, bestWin, worstLoss, recent: asc.slice(-recent).map((b) => ({ id: b.id, result: b.result })) };
     },
   },
+  // Аккаунт и друзья: стенд всегда «вошёл», иначе половину интерфейса не
+  // посмотреть. Сервера здесь нет и быть не может — данные выдуманные.
+  account: {
+    state: async () => ({
+      signedIn: true,
+      login: 'Username',
+      role: 'admin',
+      isAdmin: true,
+      expiresAt: null,
+      version: null,
+    }),
+    checkVersion: async () => null,
+    openDownload: async () => {},
+    register: async () => ({ recoveryCode: 'ABCD-EFGH-JKMN-PQRS' }),
+    signIn: async () => ({ signedIn: true, login: 'Username' }),
+    signOut: async () => ({ signedIn: false }),
+    saveRecoveryCode: async () => null,
+  },
+
+  friends: (() => {
+    const state = {
+      signedIn: true,
+      limit: 100,
+      squad: ['Sokol'],
+      incoming: [{ login: 'Novichok', avatar: null }],
+      outgoing: [],
+      friends: [
+        { login: 'Sokol', game_nick: '[CLAN] Sokol', avatar: null, presence: 'battle', score: { kills: 3, deaths: 1, assists: 2 } },
+        { login: 'Tihiy', game_nick: 'Tihiy', avatar: null, presence: 'hangar' },
+        { login: 'Dalniy', game_nick: null, avatar: null, presence: 'offline' },
+      ],
+    };
+    const copy = () => JSON.parse(JSON.stringify(state));
+    return {
+      state: async () => copy(),
+      refresh: async () => copy(),
+      search: async (q) => [{ login: 'Poisk_' + q, avatar: null, relation: 'none' }],
+      request: async () => copy(),
+      accept: async () => copy(),
+      remove: async () => copy(),
+      addToSquad: async (login) => {
+        if (!state.squad.includes(login) && state.squad.length < 3) state.squad.push(login);
+        return copy();
+      },
+      removeFromSquad: async (login) => {
+        state.squad = state.squad.filter((l) => l !== login);
+        return copy();
+      },
+    };
+  })(),
+
   onUpdate: () => () => {},
   onDbChanged: () => () => {},
   onError: () => () => {},
+  onFriendsUpdate: () => () => {},
+  onProofProgress: () => () => {},
 };

@@ -26,6 +26,17 @@ contextBridge.exposeInMainWorld('wt', {
     saveRecoveryCode: (code) => invoke('account:saveRecoveryCode', code),
   },
 
+  friends: {
+    state: () => invoke('friends:state'),
+    refresh: () => invoke('friends:refresh'),
+    search: (query) => invoke('friends:search', query),
+    request: (login) => invoke('friends:request', login),
+    accept: (login) => invoke('friends:accept', login),
+    remove: (login) => invoke('friends:remove', login),
+    addToSquad: (login) => invoke('friends:addToSquad', login),
+    removeFromSquad: (login) => invoke('friends:removeFromSquad', login),
+  },
+
   db: {
     counters: () => invoke('db:counters'),
     stats: () => invoke('db:stats'),
@@ -63,6 +74,11 @@ contextBridge.exposeInMainWorld('wt', {
     const handler = (_e, tab) => cb(tab);
     ipcRenderer.on('app:openTab', handler);
     return () => ipcRenderer.off('app:openTab', handler);
+  },
+  onFriendsUpdate: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('friends:update', handler);
+    return () => ipcRenderer.off('friends:update', handler);
   },
   onProofProgress: (cb) => {
     const handler = (_e, tried) => cb(tried);

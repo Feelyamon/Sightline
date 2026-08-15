@@ -437,3 +437,34 @@ test('ник из одних значков не сливается с друг�
   ]);
   assert.equal(snap.players.length, 2);
 });
+
+test('отряд из программы — якорь: команды видны до того, как я засветился', () => {
+  // Ради этого друзья и заводились. Сокомандник, попавший в кил-фид раньше
+  // меня, тянет за собой всех, кого он убил, — в противники, а всех, кого
+  // убили вместе с ним, разбор доводит по цепочке.
+  const s = new BattleState('Me');
+  s.setKnownPlayers({ squad: ['Buddy'], friends: ['Buddy', 'Neutral'] });
+  const snap = feed(s, ['Buddy (T-34) уничтожил Foe (Tiger H1)']);
+
+  assert.equal(find(snap, 'Buddy').team, 'ally', 'отряд — своя сторона');
+  assert.equal(find(snap, 'Foe').team, 'enemy', 'его жертва — противник');
+  assert.equal(find(snap, 'Buddy').inSquad, true);
+});
+
+test('друг вне отряда помечается, но команду за него не додумывают', () => {
+  const s = new BattleState('Me');
+  s.setKnownPlayers({ squad: [], friends: ['Buddy'] });
+  const snap = feed(s, ['Buddy (T-34) уничтожил Foe (Tiger H1)']);
+
+  assert.equal(find(snap, 'Buddy').isFriend, true);
+  // Друг вполне может играть против меня — записать его в союзники значило бы
+  // раскрасить таблицу неправильно.
+  assert.equal(find(snap, 'Buddy').team, 'unknown');
+});
+
+test('значки в нике не мешают узнать друга', () => {
+  const s = new BattleState('Me');
+  s.setKnownPlayers({ squad: ['^ILAZ^ DeathVision'], friends: [] });
+  const snap = feed(s, ['⋇^ILAZ^ DeathVision (M1A2) уничтожил Foe (Т-80БВМ)']);
+  assert.equal(find(snap, '⋇^ILAZ^ DeathVision').team, 'ally');
+});

@@ -207,6 +207,13 @@ function playersTable(players) {
       const mark = el('span', 'squad-mark', '●');
       mark.title = t('player.squad');
       nick.append(mark);
+    } else if (p.isFriend && !p.isSelf) {
+      // Друг не в отряде — тоже зелёным, но пустым кружком: он свой человек,
+      // однако на какой он стороне, программа не знает. Заполненный значок
+      // означает «точно со мной», и путать эти два случая нельзя.
+      const mark = el('span', 'squad-mark friend', '○');
+      mark.title = t('player.friend');
+      nick.append(mark);
     }
     const nameEl = el('span', 'nick-name', p.nick);
     nameEl.addEventListener('click', () => openCard(p.nick));
@@ -985,6 +992,242 @@ function showAuthScreen(id) {
   for (const box of ['siError', 'regError']) $(box).hidden = true;
 }
 
+// --- Друзья и отряд ------------------------------------------------------
+
+// Последнее, что известно про друзей. Приходит из main и обновляется само —
+// окно друзей может быть закрыто, а отряд разбору боя нужен всё равно.
+let friendsState = { friends: [], incoming: [], outgoing: [], squad: [], limit: 100, signedIn: false };
+// Свой логин — только чтобы подписать своё место в отряде. Обновляется вместе
+// с состоянием аккаунта.
+let accountLogin = null;
+
+const PRESENCE_CLASS = { battle: 'battle', hangar: 'hangar', offline: '' };
+
+/** Подпись под ником: «В бою · 3/1/0», «В ангаре», «Не в сети». */
+function presenceText(friend) {
+  if (friend.presence === 'battle' && friend.score) {
+    const s = friend.score;
+    return t('friends.inBattleScore', { k: s.kills, d: s.deaths, a: s.assists });
+  }
+  return t(`friends.presence.${friend.presence}`);
+}
+
+/** Первая буква логина — заглушка вместо аватарки, пока их нет. */
+const initial = (login) => String(login || '?').trim().charAt(0).toUpperCase();
+
+function renderSquad() {
+  const strip = $('squadStrip');
+  strip.replaceChildren();
+  // Без аккаунта отряд собрать не из кого, и пустые квадратики только
+  // занимали бы место и вызывали вопросы.
+  strip.hidden = !friendsState.signedIn;
+  if (strip.hidden) return;
+
+  const me = el('button', 'squad-slot self taken', '●');
+  me.textContent = initial(accountLogin || '?');
+  me.title = t('friends.you');
+  strip.append(me);
+
+  const byLogin = new Map(friendsState.friends.map((f) => [f.login.toLowerCase(), f]));
+  for (let i = 0; i < 3; i++) {
+    const login = friendsState.squad[i];
+    const friend = login ? byLogin.get(login.toLowerCase()) : null;
+
+    if (!login) {
+      const plus = el('button', 'squad-slot', '+');
+      plus.title = t('friends.addSlot');
+      plus.addEventListener('click', openFriends);
+      strip.append(plus);
+      continue;
+    }
+
+    const slot = el('button', 'squad-slot taken', initial(login));
+    slot.title = friend
+      ? `${login} · ${presenceText(friend)}\n${t('friends.clickToRemove')}`
+      : `${login}\n${t('friends.clickToRemove')}`;
+    const dot = el('span', `presence ${PRESENCE_CLASS[friend?.presence] || ''}`);
+    slot.append(dot);
+    slot.addEventListener('click', async () => {
+      friendsState = await window.wt.friends.removeFromSquad(login);
+      renderSquad();
+    });
+    strip.append(slot);
+  }
+}
+
+function friendRow(friend, actions) {
+  const row = el('div', `friend-row ${friend.presence === 'offline' ? 'offline' : ''}`);
+  row.append(el('span', `friend-dot ${PRESENCE_CLASS[friend.presence] || ''}`));
+
+  const name = el('div', 'friend-name');
+  name.append(el('div', null, friend.login));
+  if (friend.presence) name.append(el('div', 'friend-status', presenceText(friend)));
+  // Друг, не заявивший игровой ник, в бою неузнаваем: в кил-фиде он под ником,
+  // а у нас только логин. Молчать об этом нельзя — человек поставит его в
+  // отряд, не увидит никакого эффекта и решит, что отряд не работает.
+  if (friend.presence && !friend.game_nick) {
+    name.append(el('div', 'friend-status warn', t('friends.noGameNick')));
+  }
+  row.append(name);
+
+  for (const [label, handler, cls] of actions) {
+    const button = el('button', `small ${cls || ''}`, label);
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await handler();
+      } catch (e) {
+        showFriendsError(e);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    row.append(button);
+  }
+  return row;
+}
+
+function showFriendsError(error) {
+  const box = $('friendsError');
+  box.textContent = error?.offline ? t('acc.offline') : error?.message || String(error);
+  box.hidden = false;
+}
+
+/**
+ * Действие над дружбой. Список после него приходит уже обновлённым — main
+ * перечитывает его сам, чтобы окно не показывало состояние, которого на
+ * сервере уже нет.
+ */
+const afterAction = async (promise) => renderFriends(await promise);
+
+function renderFriends(state) {
+  if (state) friendsState = state;
+  renderSquad();
+  if ($('friendsModal').hidden) return;
+
+  $('friendsGuest').hidden = friendsState.signedIn;
+  $('friendsBody').hidden = !friendsState.signedIn;
+  if (!friendsState.signedIn) return;
+
+  if (friendsState.error) showFriendsError({ message: friendsState.error });
+
+  const section = (titleId, bodyId, rows, titleKey) => {
+    $(titleId).hidden = !rows.length;
+    $(titleId).textContent = t(titleKey, { n: rows.length });
+    $(bodyId).replaceChildren(...rows);
+  };
+
+  section(
+    'friendsIncomingTitle',
+    'friendsIncoming',
+    friendsState.incoming.map((f) =>
+      friendRow(f, [
+        [t('friends.accept'), () => afterAction(window.wt.friends.accept(f.login))],
+        [t('friends.decline'), () => afterAction(window.wt.friends.remove(f.login))],
+      ])
+    ),
+    'friends.incoming'
+  );
+
+  section(
+    'friendsOutgoingTitle',
+    'friendsOutgoing',
+    friendsState.outgoing.map((f) =>
+      friendRow(f, [[t('friends.cancel'), () => afterAction(window.wt.friends.remove(f.login))]])
+    ),
+    'friends.outgoing'
+  );
+
+  $('friendsListTitle').textContent = t('friends.list', {
+    n: friendsState.friends.length,
+    limit: friendsState.limit,
+  });
+
+  const inSquad = new Set(friendsState.squad.map((l) => l.toLowerCase()));
+  const full = friendsState.squad.length >= 3;
+  $('friendsList').replaceChildren(
+    ...(friendsState.friends.length
+      ? friendsState.friends.map((f) => {
+          const actions = [];
+          if (inSquad.has(f.login.toLowerCase())) {
+            actions.push([
+              t('friends.leaveSquad'),
+              async () => {
+                friendsState = await window.wt.friends.removeFromSquad(f.login);
+                renderFriends();
+              },
+            ]);
+          } else if (!full) {
+            actions.push([
+              t('friends.toSquad'),
+              async () => {
+                friendsState = await window.wt.friends.addToSquad(f.login);
+                renderFriends();
+              },
+            ]);
+          }
+          actions.push([
+            t('friends.remove'),
+            () => afterAction(window.wt.friends.remove(f.login)),
+            'danger',
+          ]);
+          return friendRow(f, actions);
+        })
+      : [el('div', 'empty', t('friends.none'))])
+  );
+}
+
+async function openFriends() {
+  $('friendsModal').hidden = false;
+  $('friendsError').hidden = true;
+  $('friendSearch').value = '';
+  $('friendSearchResults').replaceChildren();
+  renderFriends(await window.wt.friends.refresh());
+}
+
+$('friendsClose').addEventListener('click', () => {
+  $('friendsModal').hidden = true;
+});
+
+// Поиск с задержкой: печатать быстрее, чем ходит запрос, — обычное дело, а
+// каждый нажатый символ отдельным обращением к серверу не нужен никому.
+let friendSearchTimer = null;
+$('friendSearch').addEventListener('input', (e) => {
+  const query = e.target.value.trim();
+  clearTimeout(friendSearchTimer);
+  if (query.length < 3) {
+    $('friendSearchResults').replaceChildren();
+    return;
+  }
+  friendSearchTimer = setTimeout(async () => {
+    try {
+      const found = await window.wt.friends.search(query);
+      $('friendSearchResults').replaceChildren(
+        ...(found.length
+          ? found.map((p) => {
+              const row = friendRow(
+                { login: p.login, presence: null },
+                p.relation === 'none'
+                  ? [[t('friends.add'), () => afterAction(window.wt.friends.request(p.login))]]
+                  : []
+              );
+              // Уже друг, уже позвали, это я сам — кнопки нет, но сказать,
+              // почему её нет, надо: иначе выглядит как неработающий поиск.
+              if (p.relation !== 'none') {
+                row.append(el('span', 'friend-status', t(`friends.relation.${p.relation}`)));
+              }
+              return row;
+            })
+          : [el('div', 'empty', t('friends.notFound'))])
+      );
+    } catch (err) {
+      showFriendsError(err);
+    }
+  }, 300);
+});
+
+window.wt.onFriendsUpdate((state) => renderFriends(state));
+
 // --- Версия программы ----------------------------------------------------
 
 /**
@@ -1022,6 +1265,8 @@ $('outdatedRetry').addEventListener('click', checkVersion);
 async function refreshAccount() {
   const state = await window.wt.account.state();
   applyVersion(state.version);
+  accountLogin = state.login;
+  renderSquad();
   if (state.signedIn) {
     $('accLogin').textContent = state.login;
     $('accRole').textContent = t(state.isAdmin ? 'acc.role.admin' : 'acc.role.user');
@@ -1500,4 +1745,7 @@ window.wt.getState().then((state) => {
   // вкладку аккаунта: устаревшая сборка не должна успеть показать человеку
   // хоть что-то, чему нельзя верить.
   checkVersion();
+  // Отряд рисуем сразу: он в шапке и виден с первого экрана, а не только
+  // после захода во вкладку аккаунта.
+  refreshAccount().then(() => window.wt.friends.state().then(renderFriends));
 });

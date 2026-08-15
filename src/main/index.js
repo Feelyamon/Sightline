@@ -13,6 +13,7 @@ const locale = require('./locale');
 const { createTray } = require('./tray');
 const rules = require('./window-rules');
 const { Account } = require('./account');
+const { Friends } = require('./friends');
 
 /** Дополняет строки статистики классом техники — renderer сам его не знает. */
 const withVehicleClass = (rows) =>
@@ -22,6 +23,7 @@ const MOCK = process.argv.includes('--mock');
 
 let settings;
 let account;
+let friends;
 let db;
 let mainWindow = null;
 let tray = null;
@@ -280,6 +282,34 @@ function startClient() {
   client.start();
 }
 
+/**
+ * Друзья: список, присутствие и отряд.
+ *
+ * Список нужен разбору боя, а не только окну: отряд из программы — это якорь
+ * для графа команд. Поэтому он живёт в main и обновляется независимо от того,
+ * открыто ли окно друзей.
+ */
+function startFriends() {
+  friends.onChange = (state) => {
+    battle.setKnownPlayers({ squad: friends.squadNicks(), friends: friends.friendNicks() });
+    send('friends:update', state);
+    schedulePush();
+  };
+
+  friends.start(() => {
+    const snap = battle.snapshot();
+    const me = snap.players.find((p) => p.isSelf);
+    return {
+      // «Не в сети» не отправляем никогда — см. friends.js. Пока программа
+      // работает, человек как минимум в ангаре.
+      status: status.status === 'battle' ? 'battle' : 'hangar',
+      kills: me?.kills || 0,
+      deaths: me?.deaths || 0,
+      assists: me?.assists || 0,
+    };
+  });
+}
+
 // Второй запуск не поднимает вторую копию: две копии писали бы в одну базу.
 // Вместо этого показываем окно уже работающей.
 if (!app.requestSingleInstanceLock()) {
@@ -292,8 +322,10 @@ app.whenReady().then(() => {
   settings = new Settings(app.getPath('userData'));
   db = new Db(app.getPath('userData'));
   account = new Account(app.getPath('userData'));
+  friends = new Friends(account, settings);
   db.startSession(); // «бои с запуска» считаются от старта приложения
   startClient();
+  startFriends();
   setupTray();
   applyLaunchWithSystem();
 
@@ -397,12 +429,42 @@ handle('app:setUiScale', (_e, value) => {
   return scale;
 });
 
-handle('app:setNick', (_e, nick) => {
+handle('app:setNick', async (_e, nick) => {
   const clean = String(nick || '').trim();
   settings.set('selfNick', clean);
   battle.setSelfNick(clean);
   schedulePush();
+
+  // Ник уходит на сервер, иначе друзья не узнают человека в бою: в списке он
+  // под логином, а в кил-фиде — под игровым ником. Молча: если ник занят или
+  // сервер недоступен, локально всё продолжает работать, а ругаться на это
+  // прямо во время правки поля незачем.
+  if (account.isSignedIn && clean) {
+    try {
+      await account.request('/auth/nick', { method: 'POST', body: { nick: clean }, auth: true });
+    } catch (e) {
+      console.error('не удалось заявить игровой ник:', e.message);
+    }
+  }
   return clean;
+});
+
+handle('friends:state', () => friends.state());
+handle('friends:refresh', () => friends.refresh());
+handle('friends:search', (_e, query) => friends.search(String(query || '')));
+handle('friends:request', (_e, login) => friends.act('request', String(login || '')));
+handle('friends:accept', (_e, login) => friends.act('accept', String(login || '')));
+handle('friends:remove', (_e, login) => friends.act('remove', String(login || '')));
+
+handle('friends:addToSquad', (_e, login) => {
+  friends.addToSquad(String(login || ''));
+  friends.onChange(friends.state());
+  return friends.state();
+});
+handle('friends:removeFromSquad', (_e, login) => {
+  friends.removeFromSquad(String(login || ''));
+  friends.onChange(friends.state());
+  return friends.state();
 });
 
 handle('app:setAlwaysOnTop', (_e, value) => {
@@ -422,14 +484,39 @@ handle('app:resetBattle', () => {
 
 handle('account:state', () => account.state());
 handle('account:checkVersion', () => account.checkVersion());
-handle('account:register', (event, form) =>
+handle('account:register', async (event, form) => {
   // Прогресс отдаём в то же окно, откуда пришёл запрос: считать приходится
   // секунды, и без полосы человек решит, что программа зависла.
-  account.register(form || {}, (tried) => {
+  const state = await account.register(form || {}, (tried) => {
     if (!event.sender.isDestroyed()) event.sender.send('account:proofProgress', tried);
-  })
-);
-handle('account:signIn', (_e, form) => account.signIn(form || {}));
+  });
+  await afterSignIn();
+  return state;
+});
+handle('account:signIn', async (_e, form) => {
+  const state = await account.signIn(form || {});
+  await afterSignIn();
+  return state;
+});
+
+/**
+ * Что делается сразу после входа: заявить игровой ник и подтянуть друзей.
+ *
+ * Ник заявляем именно здесь, а не только при его правке: человек мог вписать
+ * его до того, как завёл аккаунт, — и тогда на сервере ника нет, а друзья не
+ * узнают его в бою.
+ */
+async function afterSignIn() {
+  const nick = settings.get('selfNick');
+  if (nick) {
+    try {
+      await account.request('/auth/nick', { method: 'POST', body: { nick }, auth: true });
+    } catch (e) {
+      console.error('не удалось заявить игровой ник:', e.message);
+    }
+  }
+  await friends.refresh();
+}
 handle('account:saveRecoveryCode', async (_e, code) => {
   // Диалог сохранения, а не тихая запись в заранее выбранную папку: человек
   // должен знать, где лежит единственный ключ от его аккаунта.
@@ -465,7 +552,12 @@ handle('account:openDownload', () => {
   return shell.openExternal(url.href);
 });
 
-handle('account:signOut', () => account.signOut());
+handle('account:signOut', async () => {
+  const state = await account.signOut();
+  // Список друзей чужой памяти не оставляет: вышел — и в окне пусто.
+  await friends.refresh();
+  return state;
+});
 
 handle('db:counters', () => db.counters());
 handle('db:stats', () => db.stats());
