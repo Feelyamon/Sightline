@@ -12,6 +12,7 @@ const { classify, displayName } = require('./vehicle-class');
 const locale = require('./locale');
 const { createTray } = require('./tray');
 const rules = require('./window-rules');
+const { Account } = require('./account');
 
 /** Дополняет строки статистики классом техники — renderer сам его не знает. */
 const withVehicleClass = (rows) =>
@@ -20,6 +21,7 @@ const withVehicleClass = (rows) =>
 const MOCK = process.argv.includes('--mock');
 
 let settings;
+let account;
 let db;
 let mainWindow = null;
 let tray = null;
@@ -284,6 +286,7 @@ if (!app.requestSingleInstanceLock()) {
 app.whenReady().then(() => {
   settings = new Settings(app.getPath('userData'));
   db = new Db(app.getPath('userData'));
+  account = new Account(app.getPath('userData'));
   db.startSession(); // «бои с запуска» считаются от старта приложения
   startClient();
   setupTray();
@@ -411,6 +414,11 @@ handle('app:resetBattle', () => {
   battleCancelReason = null;
   schedulePush();
 });
+
+handle('account:state', () => account.state());
+handle('account:register', (_e, form) => account.register(form || {}));
+handle('account:signIn', (_e, form) => account.signIn(form || {}));
+handle('account:signOut', () => account.signOut());
 
 handle('db:counters', () => db.counters());
 handle('db:stats', () => db.stats());

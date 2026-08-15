@@ -15,6 +15,13 @@ contextBridge.exposeInMainWorld('wt', {
   setWindowFlag: (name, value) => invoke('app:setWindowFlag', name, value),
   resetBattle: () => invoke('app:resetBattle'),
 
+  account: {
+    state: () => invoke('account:state'),
+    register: (form) => invoke('account:register', form),
+    signIn: (form) => invoke('account:signIn', form),
+    signOut: () => invoke('account:signOut'),
+  },
+
   db: {
     counters: () => invoke('db:counters'),
     stats: () => invoke('db:stats'),
