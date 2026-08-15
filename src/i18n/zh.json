@@ -327,5 +327,21 @@
   "friends.relation.outgoing": "邀请已发送",
   "friends.relation.self": "这是你",
   "friends.squadNote": "这里的小队是你自己的名单，不是游戏内的小队：游戏不会把队伍成员发出来，程序也无法邀请任何人加入。它的作用是：你放进来的人都算作己方，因此战斗中的阵营会立刻确定，而不必等到第一次击杀。",
-  "friends.noGameNick": "未填写游戏昵称——战斗中无法识别"
+  "friends.noGameNick": "未填写游戏昵称——战斗中无法识别",
+  "acc.avatar": "头像",
+  "acc.avatarChoose": "选择图片",
+  "acc.avatarRemove": "移除",
+  "acc.avatarHint": "PNG 或 JPEG，不超过 1 MB。服务器会裁成正方形并缩小到 128 像素——原图不会保存。只有把你加为好友的人才能看到你的头像。",
+  "period.year": "今年",
+  "counter.year": "今年",
+  "delBattle.title": "删除这场战斗？",
+  "delBattle.what": "{when} 的战斗，KDA {kda}",
+  "delBattle.text": "该战斗将从历史和图表中消失，且无法恢复——游戏不会再次提供那场战斗的击杀信息。",
+  "delBattle.confirmedTitle": "这场战斗已被确认",
+  "delBattle.confirmedText": "另一位参战者提交了这场战斗的记录，并与你的记录一致。这样的战斗是你统计数据的证据，请慎重删除。累计总数（总场次、总胜场）不会因此改变：若按缩短后的历史重新计算，任何人都能靠删除不理想的战斗来美化自己的统计。",
+  "delBattle.agree": "我明白我正在删除一场已确认的战斗",
+  "delBattle.go": "删除",
+  "delBattle.cancel": "保留",
+  "trust.confirmed": "战斗已确认：另一位参战者提交了一致的记录",
+  "trust.disputed": "记录不一致：他人对这场战斗的记录与你的不符，由管理员处理"
 }

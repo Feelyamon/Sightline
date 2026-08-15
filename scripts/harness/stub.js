@@ -35,6 +35,10 @@ for (let i = 0; i < 220; i++) {
     my_vehicles: [pick(MY)],
     players_seen: 4 + Math.floor(rnd() * 8),
     result: r < 0.5 ? 'win' : r < 0.9 ? 'loss' : 'unknown',
+    // Состояние доверия. В живой программе оно приходит с сервера и пока
+    // всегда 'alone' — синхронизации боёв ещё нет. В стенде подмешиваем
+    // подтверждённые и спорные, иначе их отметки негде увидеть.
+    trust: r < 0.25 ? 'confirmed' : r < 0.32 ? 'disputed' : 'alone',
     nicks: [pick(NICKS), pick(NICKS)],
   });
 }
@@ -46,6 +50,7 @@ const since = (period) => {
   d.setHours(0, 0, 0, 0);
   if (period === 'week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   if (period === 'month') d.setDate(1);
+  if (period === 'year') d.setMonth(0, 1);
   return d.getTime();
 };
 
@@ -126,6 +131,7 @@ window.wt = {
       today: { battles: 8, from: Date.now() },
       week: { battles: 31, from: Date.now() },
       month: { battles: 140, from: Date.now() },
+      year: { battles: 812, from: Date.now() },
     }),
     stats: async () => ({ battles: ALL.length, players: 11, sizeBytes: 237568, file: 'stub' }),
     searchBattles: async (o) => search(o),
@@ -192,6 +198,12 @@ window.wt = {
     }),
     checkVersion: async () => null,
     openDownload: async () => {},
+    // В браузере файл выбрать некуда и загружать некуда: стенд показывает
+    // только вёрстку с буквой вместо картинки.
+    chooseAvatar: async () => {
+      throw new Error('в стенде вёрстки аватарка не загружается');
+    },
+    removeAvatar: async () => ({ avatar: null }),
     register: async () => ({ recoveryCode: 'ABCD-EFGH-JKMN-PQRS' }),
     signIn: async () => ({ signedIn: true, login: 'Username' }),
     signOut: async () => ({ signedIn: false }),
@@ -202,6 +214,7 @@ window.wt = {
     const state = {
       signedIn: true,
       limit: 100,
+      me: { login: 'Username', game_nick: '[CLAN] Username', avatar: null },
       squad: ['Sokol'],
       incoming: [{ login: 'Novichok', avatar: null }],
       outgoing: [],

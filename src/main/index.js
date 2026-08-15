@@ -14,6 +14,11 @@ const { createTray } = require('./tray');
 const rules = require('./window-rules');
 const { Account } = require('./account');
 const { Friends } = require('./friends');
+const { Avatars } = require('./avatars');
+
+// Схему адресов аватарок объявляем до готовности приложения — позже окно её
+// уже не увидит.
+Avatars.registerScheme();
 
 /** Дополняет строки статистики классом техники — renderer сам его не знает. */
 const withVehicleClass = (rows) =>
@@ -24,6 +29,7 @@ const MOCK = process.argv.includes('--mock');
 let settings;
 let account;
 let friends;
+let avatars;
 let db;
 let mainWindow = null;
 let tray = null;
@@ -323,6 +329,8 @@ app.whenReady().then(() => {
   db = new Db(app.getPath('userData'));
   account = new Account(app.getPath('userData'));
   friends = new Friends(account, settings);
+  avatars = new Avatars(app.getPath('userData'));
+  avatars.install();
   db.startSession(); // «бои с запуска» считаются от старта приложения
   startClient();
   startFriends();
@@ -447,6 +455,35 @@ handle('app:setNick', async (_e, nick) => {
     }
   }
   return clean;
+});
+
+handle('account:chooseAvatar', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [{ name: 'PNG, JPEG', extensions: ['png', 'jpg', 'jpeg'] }],
+  });
+  if (canceled || !filePaths?.length) return null;
+
+  const bytes = require('node:fs').readFileSync(filePaths[0]);
+  // Мегабайт — столько принимает сервер. Отсекаем здесь, чтобы человек узнал
+  // об этом сразу, а не после того, как файл уехал по сети.
+  if (bytes.length > 1024 * 1024) throw new Error('картинка больше мегабайта');
+
+  const type = /\.png$/i.test(filePaths[0]) ? 'image/png' : 'image/jpeg';
+  const result = await account.request('/avatar', {
+    method: 'POST',
+    raw: bytes,
+    contentType: type,
+    auth: true,
+  });
+  await friends.refresh();
+  return result;
+});
+
+handle('account:removeAvatar', async () => {
+  const result = await account.request('/avatar', { method: 'DELETE', auth: true });
+  await friends.refresh();
+  return result;
 });
 
 handle('friends:state', () => friends.state());

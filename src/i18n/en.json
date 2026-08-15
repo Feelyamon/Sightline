@@ -327,5 +327,21 @@
   "friends.relation.outgoing": "invite sent",
   "friends.relation.self": "this is you",
   "friends.squadNote": "The squad here is your own list, not the in-game one: the game does not expose its roster and the app cannot invite anyone into it. What it does give you: everyone you put here counts as your side, so teams in battle are worked out at once instead of waiting for the first kills.",
-  "friends.noGameNick": "has not stated a game nick — cannot be recognised in battle"
+  "friends.noGameNick": "has not stated a game nick — cannot be recognised in battle",
+  "acc.avatar": "Avatar",
+  "acc.avatarChoose": "Choose a picture",
+  "acc.avatarRemove": "Remove",
+  "acc.avatarHint": "PNG or JPEG, up to one megabyte. The server crops it to a square and scales it to 128 pixels — the original is not kept. Your avatar is visible to people who have you as a friend.",
+  "period.year": "this year",
+  "counter.year": "Year",
+  "delBattle.title": "Delete this battle?",
+  "delBattle.what": "Battle of {when}, KDA {kda}",
+  "delBattle.text": "The battle will disappear from history and from the charts. It cannot be brought back — the game will not hand out that kill feed again.",
+  "delBattle.confirmedTitle": "This battle is confirmed",
+  "delBattle.confirmedText": "Another participant submitted a record of this battle and it matched yours. Such a battle is evidence for your statistics, so delete it only deliberately. Accumulated totals (battles played, wins) do not change: recomputing them from a shortened history would let anyone paint their own statistics by deleting bad battles.",
+  "delBattle.agree": "I understand I am deleting a confirmed battle",
+  "delBattle.go": "Delete",
+  "delBattle.cancel": "Keep it",
+  "trust.confirmed": "Battle confirmed: another participant submitted a matching record",
+  "trust.disputed": "Discrepancy: someone else's record of this battle did not match yours. An administrator reviews it"
 }

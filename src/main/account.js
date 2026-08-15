@@ -124,8 +124,20 @@ class Account {
    * @param {object} [opts.body]
    * @param {boolean} [opts.auth] - приложить токен
    */
-  async request(route, { method = 'GET', body, auth = false } = {}) {
-    const headers = { 'Content-Type': 'application/json', [VERSION_HEADER]: APP_VERSION };
+  /**
+   * @param {string} route
+   * @param {object} [opts]
+   * @param {string} [opts.method]
+   * @param {object} [opts.body] - уедет как JSON
+   * @param {Buffer} [opts.raw] - уедет как есть; тогда нужен contentType
+   * @param {string} [opts.contentType]
+   * @param {boolean} [opts.auth] - приложить токен
+   */
+  async request(route, { method = 'GET', body, raw, contentType, auth = false } = {}) {
+    const headers = {
+      'Content-Type': raw ? contentType || 'application/octet-stream' : 'application/json',
+      [VERSION_HEADER]: APP_VERSION,
+    };
     if (auth) {
       if (!this.isSignedIn) throw new Error('нужен вход в аккаунт');
       headers.Authorization = `Bearer ${this.session.token}`;
@@ -136,7 +148,7 @@ class Account {
       response = await fetch(`${this.baseUrl}${route}`, {
         method,
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: raw || (body ? JSON.stringify(body) : undefined),
         // Сервер может лежать, а интернет — пропасть. Без таймаута запрос
         // висел бы до победного, и интерфейс ждал бы вместе с ним.
         signal: AbortSignal.timeout(15000),

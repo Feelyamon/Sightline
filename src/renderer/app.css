@@ -161,6 +161,9 @@ body {
   border: 2px solid var(--panel);
   background: var(--muted);
 }
+/* Скругление у самой картинки, а не обрезка по квадратику: overflow: hidden
+   на квадратике срезал бы кружок состояния — он специально торчит за край. */
+.squad-slot .avatar-img { border-radius: 5px; }
 .squad-slot .presence.battle { background: var(--ally); }
 .squad-slot .presence.hangar { background: #e0b354; }
 
@@ -476,6 +479,9 @@ details[hidden] { display: none; }
 .chart .axis { fill: var(--muted); font-size: 12px; }
 .chart .axis.mid { text-anchor: middle; }
 .chart .axis.end { text-anchor: end; }
+/* Повторённый вечерний час: тот же 23, что и справа, поэтому подпись
+   приглушена — это напоминание, а не отдельная точка на оси. */
+.chart .axis.repeated { opacity: .6; }
 .chart .axis.kda { fill: var(--accent); }
 .chart .axis.wr { fill: var(--ally); }
 
@@ -729,3 +735,50 @@ label.row.consent input { margin-top: 3px; }
 
 /* Предупреждение в строке друга: не ошибка, но и не проходная подпись. */
 .friend-status.warn { color: #e0b354; }
+
+/* --- Аватарки --- */
+/* Картинка заполняет квадрат целиком: сервер уже привёл её к квадрату, так
+   что обрезать тут нечего, но cover страхует от неожиданностей. */
+.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+.avatar-letter { font-weight: 600; }
+
+.friend-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.avatar-editor { display: flex; align-items: center; gap: 12px; margin: 6px 0 4px; }
+.avatar-big {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 26px;
+  flex: none;
+}
+
+/* Отметка доверия у даты боя. Маленькая и рядом с датой, а не отдельной
+   колонкой: колонка ради значка, которого у большинства боёв не будет,
+   съедала бы ширину у техники. */
+.trust {
+  margin-left: 6px;
+  font-size: 11px;
+  cursor: help;
+  font-weight: 700;
+}
+.trust.confirmed { color: var(--ally); }
+.trust.disputed { color: #e0b354; }

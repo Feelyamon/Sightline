@@ -2,7 +2,10 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+  <!-- img-src нужен для аватарок: они приходят по своей схеме, которую
+       обслуживает main-процесс из локального кэша. Сеть при этом окну
+       по-прежнему недоступна — картинку скачивает и проверяет main. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' sightline-avatar:" />
   <title>Sightline</title>
   <link rel="stylesheet" href="app.css" />
 </head>
@@ -28,9 +31,13 @@
       <rect x="2" y="12" width="14" height="6" rx="1.5" />
       <path d="M6 12V9h6v3M16 14h6" /><circle cx="6" cy="20" r="1.4" /><circle cx="12" cy="20" r="1.4" />
     </symbol>
+    <!-- Шестерёнка одним замкнутым контуром: кольцо с восемью зубьями плюс
+         отверстие. Раньше здесь был круг с восемью лучами — он честно читался
+         как солнышко, то есть как переключатель светлой темы, которого в
+         программе нет и не планируется. -->
     <symbol id="i-settings" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M19.1 4.9l-2.2 2.2M7.1 16.9l-2.2 2.2" />
+      <path d="M20.80 10.13L20.80 13.87L18.02 13.84L17.56 14.96L19.55 16.90L16.90 19.55L14.96 17.56L13.84 18.02L13.87 20.80L10.13 20.80L10.16 18.02L9.04 17.56L7.10 19.55L4.45 16.90L6.44 14.96L5.98 13.84L3.20 13.87L3.20 10.13L5.98 10.16L6.44 9.04L4.45 7.10L7.10 4.45L9.04 6.44L10.16 5.98L10.13 3.20L13.87 3.20L13.84 5.98L14.96 6.44L16.90 4.45L19.55 7.10L17.56 9.04L18.02 10.16Z" />
+      <circle cx="12" cy="12" r="3.1" />
     </symbol>
     <symbol id="i-account" viewBox="0 0 24 24">
       <circle cx="12" cy="8" r="3.6" /><path d="M4.5 20c0-3.8 3.4-6.3 7.5-6.3s7.5 2.5 7.5 6.3" />
@@ -140,6 +147,7 @@
           <span class="muted" data-i18n="stats.period">Период графиков</span>
           <span class="sel"><select id="statsPeriod">
             <option value="month" data-i18n="period.month"></option>
+            <option value="year" data-i18n="period.year"></option>
             <option value="week" data-i18n="period.week"></option>
             <option value="" data-i18n="period.all"></option>
           </select></span>
@@ -198,6 +206,7 @@
             <option value="today" data-i18n="period.today"></option>
             <option value="week" data-i18n="period.week"></option>
             <option value="month" data-i18n="period.month"></option>
+            <option value="year" data-i18n="period.year"></option>
             <option value="custom" data-i18n="period.custom"></option>
           </select></span>
         </label>
@@ -239,6 +248,7 @@
           <span class="muted" data-i18n="period.label"></span>
           <span class="sel"><select id="period">
             <option value="month" data-i18n="period.month"></option>
+            <option value="year" data-i18n="period.year"></option>
             <option value="week" data-i18n="period.week"></option>
             <option value="today" data-i18n="period.today"></option>
             <option value="" data-i18n="period.all"></option>
@@ -268,6 +278,7 @@
           <span class="muted" data-i18n="period.label"></span>
           <span class="sel"><select id="minePeriod">
             <option value="month" data-i18n="period.month"></option>
+            <option value="year" data-i18n="period.year"></option>
             <option value="week" data-i18n="period.week"></option>
             <option value="today" data-i18n="period.today"></option>
             <option value="" data-i18n="period.all"></option>
@@ -441,6 +452,18 @@
         <h2 data-i18n="acc.signedInAs"></h2>
         <p class="account-login" id="accLogin"></p>
         <p class="muted" id="accRole"></p>
+
+        <div class="section-title" data-i18n="acc.avatar"></div>
+        <div class="avatar-editor">
+          <div class="avatar-big" id="accAvatar"></div>
+          <div class="buttons">
+            <button id="avatarChoose" data-i18n="acc.avatarChoose"></button>
+            <button id="avatarRemove" data-i18n="acc.avatarRemove"></button>
+          </div>
+        </div>
+        <p class="muted small" data-i18n="acc.avatarHint"></p>
+        <div class="auth-error" id="avatarError" hidden></div>
+
         <div class="buttons">
           <button id="authSignOut" data-i18n="acc.signOut"></button>
         </div>
@@ -467,6 +490,34 @@
 
   <!-- Код восстановления: показывается один раз и закрывается только после
        подтверждения. Код, показанный мельком, равносилен его отсутствию. -->
+  <!-- Удаление боя. Спрашиваем всегда: строка удаляется без следа, а кнопка
+       стоит в таблице рядом с обычными действиями и нажимается мимоходом. -->
+  <div class="modal-backdrop" id="deleteBattleModal" hidden>
+    <div class="modal">
+      <h2 data-i18n="delBattle.title"></h2>
+      <p id="delBattleWhat" class="muted"></p>
+      <p data-i18n="delBattle.text"></p>
+
+      <!-- Только для подтверждённого боя: его видел кто-то ещё, и удаление
+           здесь трогает не только свои данные. -->
+      <div id="delBattleConfirmed" hidden>
+        <div class="note-block">
+          <b data-i18n="delBattle.confirmedTitle"></b>
+          <p class="muted" data-i18n="delBattle.confirmedText"></p>
+        </div>
+        <label class="row consent">
+          <input type="checkbox" id="delBattleAgree" />
+          <span data-i18n="delBattle.agree"></span>
+        </label>
+      </div>
+
+      <div class="buttons">
+        <button id="delBattleGo" class="danger" data-i18n="delBattle.go"></button>
+        <button id="delBattleCancel" data-i18n="delBattle.cancel"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- Друзья -->
   <div class="modal-backdrop" id="friendsModal" hidden>
     <div class="modal wide">

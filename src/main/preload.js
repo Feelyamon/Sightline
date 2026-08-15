@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('wt', {
     state: () => invoke('account:state'),
     checkVersion: () => invoke('account:checkVersion'),
     openDownload: () => invoke('account:openDownload'),
+    chooseAvatar: () => invoke('account:chooseAvatar'),
+    removeAvatar: () => invoke('account:removeAvatar'),
     register: (form) => invoke('account:register', form),
     signIn: (form) => invoke('account:signIn', form),
     signOut: () => invoke('account:signOut'),

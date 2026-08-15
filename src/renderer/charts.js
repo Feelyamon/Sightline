@@ -68,8 +68,22 @@ function hoursChart(hours, { width = 720 } = {}) {
   const bottom = 32; // место под подписи часов
   const top = 14;
   const plot = H - bottom - top;
-  const step = W / 24;
+
+  // Вечерний час повторяется в начале графика.
+  //
+  // Сутки на оси начинаются с 00, а игровой вечер — нет: катка, начатая в 23,
+  // продолжается в 00 и 01, и на обычной оси она разорвана по разным концам
+  // картинки. Поэтому 23 показывается ещё раз слева, с отбивкой, — видно, что
+  // это тот же час, а не начало суток.
+  const evening = hours.find((h) => h.hour === 23);
+  const rows = evening ? [{ ...evening, repeated: true }, ...hours] : [...hours];
+  // Отбивка после повтора — половина шага. Без неё повтор читается как ещё
+  // один час, а не как продолжение той же ночи.
+  const GAP = 0.5;
+  const slots = rows.length + (evening ? GAP : 0);
+  const step = W / slots;
   const barW = step - 6;
+  const offsetAfterRepeat = evening ? GAP * step : 0;
 
   const svg = canvas(W, H, 'chart-hours');
   const max = Math.max(1, ...hours.map((h) => h.battles));
@@ -81,8 +95,8 @@ function hoursChart(hours, { width = 720 } = {}) {
     svg.append(svgEl('text', { x: 2, y: y - 3, class: 'axis' }, String(Math.round(max * frac))));
   }
 
-  hours.forEach((h, i) => {
-    const x = i * step + 3;
+  rows.forEach((h, i) => {
+    const x = i * step + 3 + (h.repeated ? 0 : offsetAfterRepeat);
     if (h.battles > 0) {
       const total = plot * (h.battles / max);
       let y = top + plot;
@@ -111,10 +125,16 @@ function hoursChart(hours, { width = 720 } = {}) {
     );
 
     // На узкой карточке 24 подписи сливаются — оставляем каждую шестую.
+    // Повторённый вечерний час подписан всегда: без подписи он выглядел бы
+    // просто лишним столбиком в начале.
     const every = step < 34 ? 6 : 3;
-    if (h.hour % every === 0) {
+    if (h.repeated || h.hour % every === 0) {
       svg.append(
-        svgEl('text', { x: x + barW / 2, y: H - 8, class: 'axis mid' }, `${pad2(h.hour)}`)
+        svgEl(
+          'text',
+          { x: x + barW / 2, y: H - 8, class: `axis mid${h.repeated ? ' repeated' : ''}` },
+          `${pad2(h.hour)}`
+        )
       );
     }
   });

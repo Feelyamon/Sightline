@@ -2,10 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const zlib = require('node:zlib');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const rules = require('../src/main/window-rules');
-const { appIcon } = require('../src/main/icon');
 
 // --- Показ и скрытие окна -------------------------------------------------
 
@@ -50,8 +50,11 @@ test('предупреждение про трей показывается од
 
 // --- Иконка ---------------------------------------------------------------
 
-test('иконка — валидный PNG нужного размера', () => {
-  const png = appIcon(32);
+test('иконка приложения — PNG не меньше 256 пикселей', () => {
+  // Один и тот же файл идёт в трей, на панель задач и в установщик.
+  // electron-builder собирает из него .ico и требует не меньше 256; меньший
+  // размер он молча не примет, и это выяснится на сборке релиза.
+  const png = fs.readFileSync(path.join(__dirname, '..', 'assets', 'icon.png'));
 
   assert.deepEqual(
     [...png.subarray(0, 8)],
@@ -59,35 +62,8 @@ test('иконка — валидный PNG нужного размера', () =
     'сигнатура PNG'
   );
   assert.equal(png.subarray(12, 16).toString('ascii'), 'IHDR');
-  assert.equal(png.readUInt32BE(16), 32, 'ширина');
-  assert.equal(png.readUInt32BE(20), 32, 'высота');
-  assert.equal(png[24], 8, 'бит на канал');
-  assert.equal(png[25], 6, 'RGBA');
-  assert.equal(png.subarray(png.length - 8, png.length - 4).toString('ascii'), 'IEND');
-});
-
-test('в иконке действительно что-то нарисовано', () => {
-  const size = 32;
-  const png = appIcon(size);
-
-  // Достаём IDAT и разжимаем: пустая картинка означала бы, что тест на
-  // сигнатуру проходит, а в трее пусто.
-  const start = png.indexOf(Buffer.from('IDAT', 'ascii'));
-  const length = png.readUInt32BE(start - 4);
-  const raw = zlib.inflateSync(png.subarray(start + 4, start + 4 + length));
-
-  let visible = 0;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      if (raw[y * (size * 4 + 1) + 1 + x * 4 + 3] > 0) visible += 1;
-    }
-  }
-  assert.ok(visible > size, `непрозрачных пикселей маловато: ${visible}`);
-  assert.ok(visible < size * size, 'фон должен остаться прозрачным');
-});
-
-test('иконка строится в любом размере', () => {
-  for (const size of [16, 32, 64]) {
-    assert.equal(appIcon(size).readUInt32BE(16), size);
-  }
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  assert.equal(width, height, 'иконка должна быть квадратной');
+  assert.ok(width >= 256, `сторона ${width} — установщику нужно не меньше 256`);
 });

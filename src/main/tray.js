@@ -1,7 +1,7 @@
 'use strict';
 
+const path = require('node:path');
 const { Tray, Menu, nativeImage } = require('electron');
-const { appIcon } = require('./icon');
 
 // Значок в трее и его меню. Единственный способ выйти из приложения
 // по-настоящему, когда включено «сворачивать в трей»: крестик окна в этом
@@ -15,12 +15,18 @@ const { appIcon } = require('./icon');
  * @param {(key: string) => string} deps.t - перевод
  */
 function createTray({ onShow, onSettings, onQuit, t }) {
-  const icon = nativeImage.createFromBuffer(appIcon(32));
-  // Windows берёт из значка 16 пикселей; отдаём 32 и просим уменьшить, иначе
-  // на экранах с масштабированием иконка выглядит мыльной.
+  // То же самое лого, что на панели задач и на сайте. Раньше знак для трея
+  // рисовался кодом упрощённым — так он лучше читался в шестнадцати пикселях,
+  // но это была вторая версия логотипа, и человек видел в трее одно, а в
+  // панели задач другое. Одна картинка на всё лучше двух похожих.
+  const icon = nativeImage.createFromPath(
+    path.join(__dirname, '..', '..', 'assets', 'icon.png')
+  );
   icon.setTemplateImage(false);
 
-  const tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  // Windows берёт из значка 16 пикселей. Уменьшаем сами и качественно: при
+  // уменьшении «на лету» тонкие линии лого превращаются в кашу.
+  const tray = new Tray(icon.resize({ width: 16, height: 16, quality: 'best' }));
   const state = { status: '', detail: '' };
 
   function rebuild() {

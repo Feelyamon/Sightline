@@ -39,7 +39,7 @@ const PLAYER_STATUS = {
 };
 // Иконки классов приходят из main вместе со снапшотом (см. vehicle-class.js).
 const CLASS_ICON = { tank: '▮', spaa: '◬', plane: '✈', heli: '⊹', drone: '⌖' };
-const COUNTER_KEYS = ['session', 'today', 'week', 'month'];
+const COUNTER_KEYS = ['session', 'today', 'week', 'month', 'year'];
 
 let lastState = null;
 let nickDirty = false;
@@ -543,17 +543,82 @@ let battlesRequest = 0;
 
 const RESULT_CLASS = { win: 'result-win', loss: 'result-loss' };
 
+/**
+ * Значок доверия к записи о бое.
+ *
+ *   confirmed — кто-то ещё из участников прислал такую же запись;
+ *   disputed  — чужая запись об этом бою расходится с нашей.
+ *
+ * Для pending и alone значка нет намеренно. Пока пользователей мало, игрок
+ * в большинстве боёв единственный, и подтверждать его записи попросту некому;
+ * значок «не подтверждено» у всех подряд читался бы как подозрение.
+ */
+const TRUST_MARK = { confirmed: '✓', disputed: '!' };
+
+// --- Удаление боя --------------------------------------------------------
+
+// Какой бой сейчас в окне подтверждения. Держим отдельно, чтобы обработчик
+// кнопки не зависел от того, что успело перерисоваться в таблице.
+let battleToDelete = null;
+
+/**
+ * Спрашивает подтверждение и только потом удаляет.
+ *
+ * Подтверждённый бой — это бой, который прислал кто-то ещё из участников, и
+ * записи сошлись. Такой удаляется через отдельную галочку: у обычного боя цена
+ * ошибки — своя же строка в истории, а тут человек трогает то, что служит
+ * доказательством и ему самому.
+ *
+ * ВАЖНО, чего удаление НЕ делает и делать не будет: оно не уменьшает
+ * накопительные итоги. Всего боёв, всего побед и КДА за всё время считаются
+ * отдельно от списка (account_totals на сервере) и от удаления не меняются.
+ * Иначе «удалить неудачные бои» стало бы способом нарисовать себе статистику,
+ * и всей сверке грош цена.
+ */
+function askDeleteBattle(b) {
+  battleToDelete = b;
+  const confirmed = b.trust === 'confirmed';
+
+  $('delBattleWhat').textContent = t('delBattle.what', {
+    when: dateText(b.started_at),
+    kda: b.cancelled ? '—' : `${b.my_kills}/${b.my_deaths}/${b.my_assists}`,
+  });
+  $('delBattleConfirmed').hidden = !confirmed;
+  $('delBattleAgree').checked = false;
+  // У обычного боя кнопка активна сразу: лишний клик по галочке там ничего не
+  // защищает, а раздражает каждый раз.
+  $('delBattleGo').disabled = confirmed;
+  $('deleteBattleModal').hidden = false;
+}
+
+$('delBattleAgree').addEventListener('change', (e) => {
+  $('delBattleGo').disabled = !e.target.checked;
+});
+
+$('delBattleCancel').addEventListener('click', () => {
+  $('deleteBattleModal').hidden = true;
+  battleToDelete = null;
+});
+
+$('delBattleGo').addEventListener('click', async () => {
+  if (!battleToDelete) return;
+  const id = battleToDelete.id;
+  $('deleteBattleModal').hidden = true;
+  battleToDelete = null;
+  await window.wt.db.deleteBattle(id);
+  refreshBattles();
+  refreshCounters();
+});
+
 /** Одна строка боя плюс скрытая строка с составом под ней. */
 function battleRow(b) {
   const tr = el('tr', 'clickable');
 
   const actions = el('td');
   const del = el('button', 'small danger', t('battles.delete'));
-  del.addEventListener('click', async (e) => {
+  del.addEventListener('click', (e) => {
     e.stopPropagation(); // не раскрывать строку по клику на удаление
-    await window.wt.db.deleteBattle(b.id);
-    refreshBattles();
-    refreshCounters();
+    askDeleteBattle(b);
   });
   actions.append(del);
 
@@ -580,8 +645,21 @@ function battleRow(b) {
     tr.title = t('battles.cancelledHint');
   }
 
+  // Отметка доверия у даты. Показывается только когда есть что сказать:
+  // у боя, которого никто больше не видел, отметки нет вовсе — отсутствие
+  // подтверждения обвинением не является, и «серая галочка» читалась бы
+  // именно как обвинение.
+  const when = el('td', null);
+  when.append(document.createTextNode(dateText(b.started_at)));
+  const mark = TRUST_MARK[b.trust];
+  if (mark) {
+    const badge = el('span', `trust ${b.trust}`, mark);
+    badge.title = t(`trust.${b.trust}`);
+    when.append(badge);
+  }
+
   tr.append(
-    el('td', null, dateText(b.started_at)),
+    when,
     el('td', 'num', clockText(b.duration)),
     el('td', resultClass, resultLabel),
     kda,
@@ -1012,8 +1090,26 @@ function presenceText(friend) {
   return t(`friends.presence.${friend.presence}`);
 }
 
-/** Первая буква логина — заглушка вместо аватарки, пока их нет. */
+/** Первая буква логина — то, что показывается, пока аватарки нет. */
 const initial = (login) => String(login || '?').trim().charAt(0).toUpperCase();
+
+/**
+ * Содержимое квадратика: картинка, если аватарка есть, иначе первая буква.
+ *
+ * Картинка идёт по своей схеме адресов, а не по http: файл скачивается один
+ * раз и лежит в кэше, поэтому список друзей не ходит в сеть на каждый показ и
+ * не пустеет, когда сети нет.
+ */
+function avatarContent(login, avatar) {
+  if (!avatar) return el('span', 'avatar-letter', initial(login));
+  const img = el('img', 'avatar-img');
+  img.src = `sightline-avatar://${avatar}`;
+  img.alt = '';
+  // Файл мог не скачаться — тогда возвращаемся к букве, а не показываем
+  // сломанную картинку.
+  img.addEventListener('error', () => img.replaceWith(el('span', 'avatar-letter', initial(login))));
+  return img;
+}
 
 function renderSquad() {
   const strip = $('squadStrip');
@@ -1023,8 +1119,9 @@ function renderSquad() {
   strip.hidden = !friendsState.signedIn;
   if (strip.hidden) return;
 
-  const me = el('button', 'squad-slot self taken', '●');
-  me.textContent = initial(accountLogin || '?');
+  const mine = friendsState.me || { login: accountLogin, avatar: null };
+  const me = el('button', 'squad-slot self taken');
+  me.append(avatarContent(mine.login || accountLogin, mine.avatar));
   me.title = t('friends.you');
   strip.append(me);
 
@@ -1041,7 +1138,8 @@ function renderSquad() {
       continue;
     }
 
-    const slot = el('button', 'squad-slot taken', initial(login));
+    const slot = el('button', 'squad-slot taken');
+    slot.append(avatarContent(login, friend?.avatar));
     slot.title = friend
       ? `${login} · ${presenceText(friend)}\n${t('friends.clickToRemove')}`
       : `${login}\n${t('friends.clickToRemove')}`;
@@ -1057,7 +1155,9 @@ function renderSquad() {
 
 function friendRow(friend, actions) {
   const row = el('div', `friend-row ${friend.presence === 'offline' ? 'offline' : ''}`);
-  row.append(el('span', `friend-dot ${PRESENCE_CLASS[friend.presence] || ''}`));
+  const face = el('span', 'friend-avatar');
+  face.append(avatarContent(friend.login, friend.avatar));
+  row.append(face, el('span', `friend-dot ${PRESENCE_CLASS[friend.presence] || ''}`));
 
   const name = el('div', 'friend-name');
   name.append(el('div', null, friend.login));
@@ -1177,6 +1277,38 @@ function renderFriends(state) {
   );
 }
 
+// --- Своя аватарка -------------------------------------------------------
+
+function renderMyAvatar() {
+  const mine = friendsState.me || { login: accountLogin, avatar: null };
+  $('accAvatar').replaceChildren(avatarContent(mine.login || accountLogin, mine.avatar));
+  $('avatarRemove').disabled = !mine.avatar;
+}
+
+/** Обёртка над действиями с аватаркой: одна кнопка, одно место для ошибки. */
+async function avatarAction(button, run) {
+  $('avatarError').hidden = true;
+  button.disabled = true;
+  try {
+    await run();
+    renderFriends(await window.wt.friends.state());
+    renderMyAvatar();
+  } catch (e) {
+    $('avatarError').textContent = e?.offline ? t('acc.offline') : e?.message || String(e);
+    $('avatarError').hidden = false;
+  } finally {
+    button.disabled = false;
+    renderMyAvatar();
+  }
+}
+
+$('avatarChoose').addEventListener('click', (e) =>
+  avatarAction(e.currentTarget, () => window.wt.account.chooseAvatar())
+);
+$('avatarRemove').addEventListener('click', (e) =>
+  avatarAction(e.currentTarget, () => window.wt.account.removeAvatar())
+);
+
 async function openFriends() {
   $('friendsModal').hidden = false;
   $('friendsError').hidden = true;
@@ -1267,6 +1399,7 @@ async function refreshAccount() {
   applyVersion(state.version);
   accountLogin = state.login;
   renderSquad();
+  renderMyAvatar();
   if (state.signedIn) {
     $('accLogin').textContent = state.login;
     $('accRole').textContent = t(state.isAdmin ? 'acc.role.admin' : 'acc.role.user');

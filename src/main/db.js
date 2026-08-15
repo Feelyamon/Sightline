@@ -70,7 +70,9 @@ CREATE TABLE IF NOT EXISTS counters (
 );
 `;
 
-const COUNTERS = ['session', 'today', 'week', 'month'];
+// Счётчики боёв в шапке статистики. Новое имя достаточно дописать сюда:
+// строка в таблице заводится при старте, а окно считает windowStart().
+const COUNTERS = ['session', 'today', 'week', 'month', 'year'];
 
 /** Экранирует спецсимволы LIKE, чтобы ник вроде «100%_pro» искался буквально. */
 const escapeLike = (s) => String(s || '').replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -96,6 +98,12 @@ function windowStart(name, now = Date.now()) {
     case 'month':
       d.setHours(0, 0, 0, 0);
       d.setDate(1);
+      return d.getTime();
+    // Календарный год, а не «последние 365 дней»: «в этом году» люди понимают
+    // как «с января», и в январе такой период честно окажется коротким.
+    case 'year':
+      d.setHours(0, 0, 0, 0);
+      d.setMonth(0, 1);
       return d.getTime();
     default:
       return 0; // session — только по ручному сбросу
