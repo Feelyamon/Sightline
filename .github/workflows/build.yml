@@ -1,0 +1,80 @@
+name: Сборка и релиз
+
+# Тесты гоняем на каждый push и pull request, а установщик собираем только по
+# тегу вида v1.2.3. Собирать .exe на каждый коммит — это минуты машинного
+# времени ради артефакта, который никто не скачает.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write # нужно, чтобы приложить установщик к релизу
+
+jobs:
+  tests:
+    name: Тесты
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # npm ci требует package-lock.json и ставит ровно то, что в нём записано.
+      - run: npm ci
+      - run: npm test
+
+  build:
+    name: Установщик для Windows
+    # Собирается только по тегу и только после успешных тестов: выкладывать
+    # сборку, не прошедшую проверку, — верный способ раздать поломку.
+    needs: tests
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+
+      - name: Сверка версии с тегом
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Тег $GITHUB_REF_NAME не совпадает с версией в package.json ($PKG)."
+            echo "Иначе в релизе v$TAG лежал бы установщик, который сам себя считает $PKG."
+            exit 1
+          fi
+
+      - name: Сборка
+        # Подписи нет: сертификата у проекта пока нет, и SmartScreen будет
+        # предупреждать при установке. Это осознанное состояние, а не упущение.
+        run: npm run dist
+
+      - name: Контрольные суммы
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/*.exe | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "$h  $($_.Name)" | Out-File -Append -Encoding utf8 dist/SHA256SUMS.txt
+          }
+          Get-Content dist/SHA256SUMS.txt
+
+      - name: Публикация релиза
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true # черновик: посмотреть глазами перед тем, как раздавать
+          files: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+          body: |
+            Установщик собран автоматически из тега ${{ github.ref_name }}.
+
+            **Сборка не подписана.** Windows SmartScreen покажет предупреждение
+            «неизвестный издатель». Чтобы установить: «Подробнее» → «Выполнить
+            в любом случае». Сверить загруженный файл можно по SHA256SUMS.txt.

@@ -8,11 +8,41 @@
     "start": "electron .",
     "mock": "electron . --mock",
     "test": "node --test \"test/*.test.js\"",
-    "harness": "node scripts/harness/build.js"
+    "harness": "node scripts/harness/build.js",
+    "dist": "electron-builder --win --publish never"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^43.4.0"
+    "electron": "^43.4.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ru.feelyamon.sightline",
+    "productName": "Sightline",
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!**/__*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true
+    }
   }
 }
