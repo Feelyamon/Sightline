@@ -45,20 +45,65 @@ body {
   flex: none;
 }
 
-/* Вкладок восемь, и в узком окне они не помещаются в строку. Переносим их
-   внутри своего блока, а не выдавливаем статус на вторую строку: статус —
-   первое, куда смотрит человек, проверяя, видит ли программа игру. */
-.tabs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+/* Спрайт значков: он только хранилище для <use>, показывать его нечего. */
+.sprite { display: none; }
+
+/* Значки нарисованы линиями и наследуют цвет текста — подсветка раздела
+   красит подпись и значок одним правилом, а не двумя. */
+.tab-icon, .brand-mark {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand { display: flex; align-items: center; gap: 7px; color: #d8b46b; }
+.brand-mark { width: 20px; height: 20px; }
+.brand-name { font-weight: 600; letter-spacing: .02em; color: var(--text); }
+.brand-name span { color: #d8b46b; }
+
+/* Окно: разделы слева, содержимое справа. */
+.shell { flex: 1; display: flex; min-height: 0; }
+
+/* Разделы сбоку, а не строкой сверху: их девять, в строку они не помещались и
+   переносились на вторую, отъедая у окна самое ценное место — верх. */
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  width: 148px;
+  flex: none;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto;
+}
+/* Отбивка между разделами про игру и служебными. Тянется, поэтому настройки,
+   аккаунт, инструкция и «о программе» прижимаются к низу. */
+.tabs-gap { flex: 1; min-height: 8px; }
+
 .tab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   background: transparent;
   border: 1px solid transparent;
   color: var(--muted);
-  padding: 5px 12px;
-  border-radius: 6px;
+  padding: 6px 9px;
+  border-radius: 7px;
   cursor: pointer;
   font: inherit;
+  text-align: left;
+  /* Подсветка появляется плавно, но быстро: окно смотрят краем глаза во время
+     боя, и всё, что тянется дольше полутора десятых секунды, там мешает. */
+  transition: background 130ms ease, color 130ms ease, border-color 130ms ease;
 }
-.tab:hover { color: var(--text); }
+.tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab:hover { color: var(--text); background: #202836; }
 .tab.active { color: var(--text); background: var(--panel-2); border-color: var(--line); }
 /* «Бой» — главная вкладка, выделена приглушённым акцентом, чтобы взгляд
    находил её сразу, но глаз не резало. */
@@ -67,6 +112,16 @@ body {
   color: #cfe2ff;
   background: #16202e;
   border-color: #2f4a6d;
+}
+
+/* Узкое окно: подписи убираем, значки остаются. Девять подписей по 148
+   пикселей в окне шириной 520 съедали бы треть экрана у таблицы боя — а
+   таблица здесь главное. Название раздела остаётся в подсказке. */
+@media (max-width: 700px) {
+  .tabs { width: auto; padding: 8px 5px; }
+  .tab-label { display: none; }
+  .tab { justify-content: center; padding: 7px; }
+  .brand-name { display: none; }
 }
 
 /* --- Отряд в шапке --- */
@@ -136,9 +191,25 @@ body {
 .dot.idle { background: #e0b354; }
 .dot.offline { background: var(--enemy); }
 
-main { flex: 1; overflow: auto; padding: 12px; }
+main { flex: 1; overflow: auto; padding: 12px; min-width: 0; }
 .panel { display: none; }
-.panel.active { display: block; }
+.panel.active {
+  display: block;
+  /* Раздел не возникает рывком, а проявляется. Восемьдесят миллисекунд —
+     ровно столько, чтобы переход был заметен как плавность, а не как
+     задержка. */
+  animation: panel-in 140ms ease-out;
+}
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Кому системная настройка говорит «поменьше движения» — тому его не будет
+   вовсе. Это не украшательство, для части людей анимация вызывает тошноту. */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
 
 /* --- Сплит: свои слева, враги справа --- */
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
@@ -443,8 +514,13 @@ button {
   padding: 5px 11px;
   cursor: pointer;
   font: inherit;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease,
+    transform 60ms ease;
 }
-button:hover:not(:disabled) { border-color: var(--accent); }
+button:hover:not(:disabled) { border-color: var(--accent); background: #202836; }
+/* Нажатие отзывается на глаз: без этого кнопка выглядит неживой, а человек
+   не уверен, попал ли он по ней. */
+button:active:not(:disabled) { transform: translateY(1px); }
 button:disabled { opacity: .5; cursor: default; }
 button.danger { color: var(--danger); border-color: #46282c; }
 button.danger:hover:not(:disabled) { border-color: var(--danger); }
@@ -457,6 +533,7 @@ input[type="text"], input[type="number"], input[type="search"], input[type="date
   border-radius: 6px;
   padding: 6px 9px;
   font: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 input[type="text"] { width: 100%; }
 input[type="number"] { width: 70px; }
@@ -497,6 +574,15 @@ input[type="checkbox"] { width: 15px; height: 15px; }
   pointer-events: none;
 }
 .sel:hover::after { border-top-color: var(--text); }
+/* Модалка не выскакивает, а проявляется: резкое появление окна поверх
+   таблицы боя читается как сбой, а не как открытое окно. */
+.modal-backdrop:not([hidden]) { animation: fade-in 120ms ease-out; }
+.modal-backdrop:not([hidden]) .modal { animation: modal-in 140ms ease-out; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+  to { opacity: 1; transform: none; }
+}
 
 /* Полосы прокрутки: системные светлые сильно выбиваются из тёмного окна. */
 ::-webkit-scrollbar { width: 12px; height: 12px; }
