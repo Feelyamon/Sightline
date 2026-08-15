@@ -79,6 +79,7 @@ class WtClient extends EventEmitter {
     this.mapSignature = null;
     this.started = false;
     this.lastTime = -1;
+    this.lastChatId = 0;
   }
 
   start() {
@@ -105,6 +106,7 @@ class WtClient extends EventEmitter {
    */
   beginNewBattle() {
     this.lastTime = -1;
+    this.lastChatId = 0;
     this.emit('reset');
   }
 
@@ -154,6 +156,16 @@ class WtClient extends EventEmitter {
       this.inBattle = false;
       this.mapSignature = null;
     }
+    // Исход боя лежит в mission.json: пока идёт бой там "running", а по
+    // окончании появляется результат. Точные значения зависят от режима,
+    // поэтому строку отдаём как есть, а трактует её battle-result.js.
+    try {
+      const mission = await getJson('/mission.json', { host: this.host, port: this.port });
+      if (mission?.status) this.emit('mission', mission);
+    } catch {
+      // Не критично: без исхода бой всё равно запишется.
+    }
+
     this.setStatus(valid ? 'battle' : 'idle', valid ? '' : 'В ангаре — ждём начала боя');
     if (!valid) return;
 
@@ -205,6 +217,22 @@ class WtClient extends EventEmitter {
     }
     for (const e of events) {
       if (typeof e?.id === 'number') this.lastEvt = Math.max(this.lastEvt, e.id);
+    }
+
+    // Командный чат виден только своей команде, поэтому его отправители —
+    // гарантированно союзники. Это второй, независимый от кил-фида источник
+    // для определения команд.
+    try {
+      const chat = await getJson(`/gamechat?lastId=${this.lastChatId}`, {
+        host: this.host,
+        port: this.port,
+      });
+      for (const m of Array.isArray(chat) ? chat : []) {
+        if (typeof m?.id === 'number') this.lastChatId = Math.max(this.lastChatId, m.id);
+        if (m?.sender) this.emit('chat', m);
+      }
+    } catch {
+      // Чат — приятное дополнение, без него всё работает.
     }
   }
 

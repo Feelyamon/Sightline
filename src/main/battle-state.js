@@ -92,6 +92,8 @@ class BattleState {
     this.duels = new Map();
     this.teams = new ParityUnionFind();
     this.unparsed = [];
+    // Ники, замеченные в командном чате: он виден только своей команде.
+    this.chatAllies = new Set();
     this.events = 0;
     this.startedAt = Date.now();
   }
@@ -198,6 +200,21 @@ class BattleState {
     p.damagers.clear();
   }
 
+  /**
+   * Сообщение из /gamechat. Командный и отрядный чат до чужой команды не
+   * доходят, поэтому их отправитель — точно союзник. Общий чат («Все»)
+   * такого не гарантирует и игнорируется.
+   */
+  ingestChat(entry) {
+    const mode = String(entry?.mode || '');
+    const sender = String(entry?.sender || '').trim();
+    if (!sender) return false;
+    if (!/команд|team|отряд|squad/i.test(mode)) return false;
+
+    this.chatAllies.add(sender);
+    return true;
+  }
+
   /** Скармливает одну запись из /hudmsg (поле damage). */
   ingest(entry) {
     const at = typeof entry?.time === 'number' ? entry.time : Date.now();
@@ -298,6 +315,15 @@ class BattleState {
   /** Снапшот для UI. Он маленький — шлём целиком, без диффов. */
   snapshot() {
     const ref = this.resolveSelf();
+
+    // Союзники из чата подмешиваются в тот же граф: их жертвы автоматически
+    // становятся противниками, как и при обычном разборе кил-фида.
+    if (ref) {
+      for (const nick of this.chatAllies) {
+        const known = this.matchExisting(nick);
+        if (known && known !== ref) this.teams.union(known, ref, 0);
+      }
+    }
     const rows = [];
     for (const p of this.players.values()) {
       const parity = this.teams.parityTo(p.nick, ref);

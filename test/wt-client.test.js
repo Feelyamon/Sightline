@@ -9,11 +9,13 @@ const { WtClient } = require('../src/main/wt-client');
  * Поднимает подставной сервер вместо игры. Журнал задаётся снаружи, чтобы
  * воспроизвести скользящее окно и стык боёв — то, на чём ломалась смена боя.
  */
-function fakeGame(getDamage) {
+function fakeGame(getDamage, isValid = () => true) {
   const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     if (req.url.startsWith('/map_info')) {
-      res.end(JSON.stringify({ valid: true, map_generation: 1, grid_zero: [0, 0] }));
+      res.end(JSON.stringify({ valid: isValid(), map_generation: 1, grid_zero: [0, 0] }));
+    } else if (req.url.startsWith('/mission')) {
+      res.end(JSON.stringify({ status: isValid() ? 'running' : 'success' }));
     } else if (req.url.startsWith('/hudmsg')) {
       res.end(JSON.stringify({ events: [], damage: getDamage() }));
     } else {
@@ -79,6 +81,38 @@ test('скользящее окно не вызывает ложных сбро�
   await client.tick();
 
   assert.equal(resets - baseline, 0, 'сдвиг окна — не новый бой');
+});
+
+test('выход в ангар не сбрасывает таблицу — сброс только на старте нового боя', async (t) => {
+  const log = [
+    { id: 400, time: 100, msg: 'A (Т-80) уничтожил B (M1A2)' },
+    { id: 401, time: 120, msg: 'A (Т-80) уничтожил C (M1A2)' },
+  ];
+  let inBattle = true;
+  const server = await fakeGame(() => log, () => inBattle);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const client = new WtClient({ host: '127.0.0.1', port });
+  let resets = 0;
+  const statuses = [];
+  client.on('reset', () => resets++);
+  client.on('status', (s) => statuses.push(s.status));
+
+  await client.tick();
+  const baseline = resets;
+
+  // Ушли в ангар: состояние прошлого боя должно остаться на экране.
+  inBattle = false;
+  await client.tick();
+  await client.tick();
+  assert.equal(resets - baseline, 0, 'в ангаре таблица не сбрасывается');
+  assert.equal(statuses.at(-1), 'idle');
+
+  // Начался следующий бой — вот теперь сброс.
+  inBattle = true;
+  await client.tick();
+  assert.equal(resets - baseline, 1, 'сброс происходит на старте нового боя');
 });
 
 test('запуск посреди сессии не втягивает предыдущий бой', async (t) => {

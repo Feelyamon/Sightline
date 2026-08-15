@@ -191,6 +191,28 @@ test('раскрашивает команды транзитивно от мое
   assert.equal(find(snap, 'Foe2').team, 'enemy');
 });
 
+test('командный чат определяет союзника, а его жертву — противником', () => {
+  const s = new BattleState('Me');
+  feed(s, [
+    'Me (Т-80) уничтожил Foe (M1A2)',
+    // Эта пара ни с кем не пересеклась — по кил-фиду команда неизвестна.
+    'Talker (Leopard 2PL) уничтожил Silent (Т-72)',
+  ]);
+  assert.equal(find(s.snapshot(), 'Talker').team, 'unknown');
+
+  s.ingestChat({ sender: 'Talker', mode: 'Команда', msg: 'Воздух!' });
+  const snap = s.snapshot();
+  assert.equal(find(snap, 'Talker').team, 'ally', 'писал в командный чат — свой');
+  assert.equal(find(snap, 'Silent').team, 'enemy', 'его жертва — противник');
+});
+
+test('общий чат команду не выдаёт', () => {
+  const s = new BattleState('Me');
+  feed(s, ['Me (Т-80) уничтожил Foe (M1A2)', 'Talker (Leopard) уничтожил X (Т-72)']);
+  s.ingestChat({ sender: 'Talker', mode: 'Все', msg: 'gg' });
+  assert.equal(find(s.snapshot(), 'Talker').team, 'unknown');
+});
+
 test('несвязанные с моим боем игроки — unknown', () => {
   const s = new BattleState('Me');
   const snap = feed(s, [

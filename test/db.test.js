@@ -107,6 +107,29 @@ test('очистка истории обнуляет счётчики и дел�
   db.close();
 });
 
+test('повторное сохранение обновляет бой, а не плодит копии', () => {
+  const db = tmpDb();
+  const first = db.saveBattle(battle(['Me (Т-80) уничтожил Foe (M1A2)']));
+  assert.equal(db.stats().battles, 1);
+
+  // Бой продолжился: тот же бой сохраняем ещё раз.
+  const updated = db.updateBattle(
+    first,
+    battle([
+      'Me (Т-80) уничтожил Foe (M1A2)',
+      'Me (Т-80) уничтожил Foe2 (Leopard 2A4)',
+    ])
+  );
+
+  assert.equal(db.stats().battles, 1, 'записей по-прежнему одна');
+  assert.equal(db.recentBattles()[0].id, updated);
+  assert.equal(db.recentBattles()[0].my_kills, 2, 'данные обновились');
+
+  const card = db.playerCard('Foe');
+  assert.equal(card.encounters.length, 1, 'встреча не задвоилась');
+  db.close();
+});
+
 test('удаление одного боя не трогает остальные', () => {
   const db = tmpDb();
   const snap = battle(['Me (Т-80) уничтожил Foe (M1A2)']);

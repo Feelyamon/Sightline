@@ -7,6 +7,7 @@ const { WtClient } = require('./wt-client');
 const { BattleState } = require('./battle-state');
 const { Settings } = require('./settings');
 const { Db, windowStart } = require('./db');
+const { classifyResult } = require('./battle-result');
 
 const MOCK = process.argv.includes('--mock');
 
@@ -21,7 +22,13 @@ let pushScheduled = false;
 // Границы текущего боя и защита от двойной записи: бой заканчивается либо
 // выходом в ангар, либо стартом следующего — оба пути ведут сюда.
 let battleStartedAt = null;
-let battleSaved = false;
+// id записи текущего боя в базе. Пока бой не сменился, повторные сохранения
+// обновляют эту запись, а не создают новую — иначе один бой попадал в базу
+// несколько раз и раздувал статистику.
+let battleRowId = null;
+// Последний исход из mission.json. Пока бой идёт там 'running', результат
+// появляется в конце — держим его до момента записи боя.
+let battleResult = 'unknown';
 
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
@@ -39,12 +46,20 @@ function schedulePush() {
 
 /** Записывает текущий бой в базу, если в нём есть что записывать. */
 function persistBattle() {
-  if (battleSaved || !battle) return;
+  if (!battle) return;
   const snapshot = battle.snapshot();
   if (!snapshot.players.length) return;
+
+  const opts = {
+    startedAt: battleStartedAt || Date.now(),
+    endedAt: Date.now(),
+    result: battleResult,
+  };
   try {
-    db.saveBattle(snapshot, { startedAt: battleStartedAt || Date.now(), endedAt: Date.now() });
-    battleSaved = true;
+    battleRowId =
+      battleRowId === null
+        ? db.saveBattle(snapshot, opts)
+        : db.updateBattle(battleRowId, snapshot, opts);
     send('db:changed');
   } catch (e) {
     send('app:error', `Не удалось записать бой: ${e.message}`);
@@ -87,17 +102,28 @@ function startClient() {
     schedulePush();
   });
 
+  client.on('mission', (mission) => {
+    // 'running' — бой идёт; результат появляется в конце и держится до записи.
+    const parsed = classifyResult(mission.status);
+    if (parsed === 'win' || parsed === 'loss') battleResult = parsed;
+  });
+
   client.on('reset', () => {
     persistBattle(); // предыдущий бой, если его ещё не записали
     battle.reset();
     battleStartedAt = Date.now();
-    battleSaved = false;
+    battleRowId = null; // следующий бой — новая запись
+    battleResult = 'unknown';
     schedulePush();
   });
 
   client.on('damage', (entry) => {
     battle.ingest(entry);
     schedulePush();
+  });
+
+  client.on('chat', (entry) => {
+    if (battle.ingestChat(entry)) schedulePush();
   });
 
   client.on('error', (err) => {
@@ -155,7 +181,7 @@ ipcMain.handle('app:setAlwaysOnTop', (_e, value) => {
 ipcMain.handle('app:resetBattle', () => {
   battle.reset();
   battleStartedAt = Date.now();
-  battleSaved = false;
+  battleRowId = null;
   schedulePush();
 });
 
@@ -167,10 +193,21 @@ ipcMain.handle('db:topPlayers', (_e, opts = {}) => {
   // «Часто попадался за месяц» — окно считаем здесь, чтобы renderer не знал
   // про календарную арифметику.
   const since = opts.period ? windowStart(opts.period) : 0;
-  return db.topPlayers({ ...opts, since });
+  return db.topPlayers({ ...opts, since, excludeNick: settings.get('selfNick') });
 });
 
 ipcMain.handle('db:playerCard', (_e, nick) => db.playerCard(nick));
+ipcMain.handle('db:dossier', (_e, nicks) => db.dossier(nicks, settings.get('selfNick')));
+ipcMain.handle('db:myVehicles', (_e, opts = {}) =>
+  db.myVehicles(settings.get('selfNick'), { since: opts.period ? windowStart(opts.period) : 0 })
+);
+ipcMain.handle('db:enemyVehicles', (_e, opts = {}) =>
+  db.enemyVehicles({ since: opts.period ? windowStart(opts.period) : 0 })
+);
+ipcMain.handle('db:winrate', (_e, opts = {}) =>
+  db.winrate({ since: opts.period ? windowStart(opts.period) : 0 })
+);
+ipcMain.handle('db:setNote', (_e, nick, note) => db.setNote(nick, note));
 ipcMain.handle('db:battleDetails', (_e, id) => db.battleDetails(id));
 ipcMain.handle('db:resetCounter', (_e, name) => {
   db.resetCounter(name);
