@@ -295,5 +295,6 @@
   "battle.unknownHint": "阵营是从击杀信息里推出来的：在有人击杀或击伤之前，没有可分的依据。之后关系会顺着链条扩散——只要这里的任何人与你的队伍交手，他所在的那一半就会立刻归入「友方」或「敌方」。",
   "battle.pair": "第 {n} 组 — 这些人与那些人交战，但哪一半是你的还不清楚",
   "battle.pairSideA": "一方",
-  "battle.pairSideB": "另一方"
+  "battle.pairSideB": "另一方",
+  "acc.proof": "正在证明你不是机器人… {n}k"
 }

@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { Worker } = require('node:worker_threads');
 const { safeStorage } = require('electron');
 
 // Аккаунт: обращения к серверу и хранение токена.
@@ -219,10 +220,56 @@ class Account {
     return this.version;
   }
 
-  async register({ login, password, lang, acceptTerms }) {
+  /**
+   * Берёт у сервера задачу и считает к ней ответ.
+   *
+   * Смысл — не в том, чтобы отличить человека от машины (это невозможно), а в
+   * том, чтобы регистрация стоила времени процессора. Для одного человека это
+   * несколько секунд один раз в жизни; для того, кто заводит аккаунты пачками,
+   * — вся его пачка, умноженная на те же секунды.
+   *
+   * @param {(tried: number) => void} [onProgress]
+   * @returns {Promise<{challenge: string, nonce: string}>}
+   */
+  async solveChallenge(onProgress) {
+    const task = await this.request('/auth/challenge');
+    const worker = new Worker(path.join(__dirname, 'pow-worker.js'), {
+      workerData: { challenge: task.challenge, difficulty: task.difficulty },
+    });
+
+    try {
+      return await new Promise((resolve, reject) => {
+        worker.on('message', (m) => {
+          if (m.done) resolve({ challenge: task.challenge, nonce: m.nonce });
+          else if (onProgress) onProgress(m.tried);
+        });
+        worker.on('error', reject);
+        worker.on('exit', (code) => {
+          // Штатный выход после ответа промис уже разрешил, и этот reject
+          // ничего не сделает. А вот убитый поток иначе повесил бы окно
+          // навсегда — ждать было бы нечего.
+          if (code !== 0) reject(new Error('проверка от ботов не завершилась'));
+        });
+      });
+    } finally {
+      await worker.terminate();
+    }
+  }
+
+  async register({ login, password, lang, acceptTerms }, onProgress) {
+    // Задачу решаем до отправки формы: сервер откажет в регистрации без неё,
+    // и узнать об этом после ввода пароля было бы обидно.
+    const proof = await this.solveChallenge(onProgress);
     const data = await this.request('/auth/register', {
       method: 'POST',
-      body: { login, password, lang, accept_terms: !!acceptTerms },
+      body: {
+        login,
+        password,
+        lang,
+        accept_terms: !!acceptTerms,
+        challenge: proof.challenge,
+        nonce: proof.nonce,
+      },
     });
     this.applySession(data);
     // Код восстановления возвращается ровно один раз и нигде не сохраняется:

@@ -1050,6 +1050,15 @@ function setBusy(button, busy) {
   button.textContent = busy ? t('acc.working') : button.dataset.label;
 }
 
+// Проверка от ботов занимает несколько секунд настоящих вычислений. Без
+// отчёта о ходе работы это выглядит как зависшая программа, и человек нажмёт
+// кнопку ещё раз или закроет окно.
+window.wt.onProofProgress((tried) => {
+  const button = $('regSubmit');
+  if (!button.disabled) return;
+  button.textContent = t('acc.proof', { n: Math.round(tried / 1000) });
+});
+
 $('authShowSignIn').addEventListener('click', () => showAuthScreen('authSignIn'));
 $('authShowRegister').addEventListener('click', () => {
   if (!$('regNick').value) $('regNick').value = $('nick').value || '';

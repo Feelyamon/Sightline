@@ -64,6 +64,11 @@ contextBridge.exposeInMainWorld('wt', {
     ipcRenderer.on('app:openTab', handler);
     return () => ipcRenderer.off('app:openTab', handler);
   },
+  onProofProgress: (cb) => {
+    const handler = (_e, tried) => cb(tried);
+    ipcRenderer.on('account:proofProgress', handler);
+    return () => ipcRenderer.off('account:proofProgress', handler);
+  },
   onError: (cb) => {
     const handler = (_e, message) => cb(message);
     ipcRenderer.on('app:error', handler);

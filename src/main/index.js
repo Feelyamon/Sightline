@@ -422,7 +422,13 @@ handle('app:resetBattle', () => {
 
 handle('account:state', () => account.state());
 handle('account:checkVersion', () => account.checkVersion());
-handle('account:register', (_e, form) => account.register(form || {}));
+handle('account:register', (event, form) =>
+  // Прогресс отдаём в то же окно, откуда пришёл запрос: считать приходится
+  // секунды, и без полосы человек решит, что программа зависла.
+  account.register(form || {}, (tried) => {
+    if (!event.sender.isDestroyed()) event.sender.send('account:proofProgress', tried);
+  })
+);
 handle('account:signIn', (_e, form) => account.signIn(form || {}));
 handle('account:saveRecoveryCode', async (_e, code) => {
   // Диалог сохранения, а не тихая запись в заранее выбранную папку: человек

@@ -295,5 +295,6 @@
   "battle.unknownHint": "Teams are worked out from the kill feed: until someone kills or damages someone, there is nothing to split. From there the links spread along the chain — the moment anyone here meets your team, that whole half moves to Allies or Enemies at once.",
   "battle.pair": "Pair {n} — these fight those, but which half is yours is not known yet",
   "battle.pairSideA": "One side",
-  "battle.pairSideB": "The other side"
+  "battle.pairSideB": "The other side",
+  "acc.proof": "Proving you are not a bot… {n}k"
 }
