@@ -206,6 +206,20 @@ test('командный чат определяет союзника, а его
   assert.equal(find(snap, 'Silent').team, 'enemy', 'его жертва — противник');
 });
 
+test('команды раскрашиваются по чату, даже если меня ещё нет в кил-фиде', () => {
+  const s = new BattleState('Me');
+  // Начало боя: я ещё никого не убил и меня не убили.
+  feed(s, ['Mate (Т-80) уничтожил Foe (M1A2)', 'Foe2 (Leopard) уничтожил Mate2 (Т-72)']);
+  assert.equal(s.snapshot().selfSeen, false);
+  assert.equal(find(s.snapshot(), 'Mate').team, 'unknown');
+
+  s.ingestChat({ sender: 'Mate', mode: 'Команда', msg: 'иду на точку' });
+  const snap = s.snapshot();
+  assert.equal(snap.selfSeen, false, 'меня по-прежнему нет в фиде');
+  assert.equal(find(snap, 'Mate').team, 'ally');
+  assert.equal(find(snap, 'Foe').team, 'enemy', 'жертва союзника — противник');
+});
+
 test('общий чат команду не выдаёт', () => {
   const s = new BattleState('Me');
   feed(s, ['Me (Т-80) уничтожил Foe (M1A2)', 'Talker (Leopard) уничтожил X (Т-72)']);

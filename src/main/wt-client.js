@@ -162,7 +162,14 @@ class WtClient extends EventEmitter {
     // Сбрасываем только после долгого перерыва; короткий — это респавн.
     if (valid) {
       const gap = this.idleSince ? Date.now() - this.idleSince : 0;
-      if (gap >= IDLE_NEW_BATTLE_MS) this.beginNewBattle();
+      // Отпечаток карты меняется от боя к бою, а внутри боя постоянен
+      // (проверено на живой игре). Но менять его мог и респавн, поэтому
+      // доверяем ему только после перерыва «не в бою» — тогда сброс
+      // происходит сразу на старте боя, не дожидаясь первого убийства.
+      const mapChanged = this.mapSignature !== null && signature !== this.mapSignature;
+      if (gap >= IDLE_NEW_BATTLE_MS || (this.idleSince && mapChanged)) {
+        this.beginNewBattle();
+      }
       this.idleSince = null;
       this.inBattle = true;
       this.mapSignature = signature;
