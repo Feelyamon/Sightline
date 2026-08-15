@@ -171,6 +171,7 @@ ipcMain.handle('db:topPlayers', (_e, opts = {}) => {
 });
 
 ipcMain.handle('db:playerCard', (_e, nick) => db.playerCard(nick));
+ipcMain.handle('db:battleDetails', (_e, id) => db.battleDetails(id));
 ipcMain.handle('db:resetCounter', (_e, name) => {
   db.resetCounter(name);
   return db.counters();

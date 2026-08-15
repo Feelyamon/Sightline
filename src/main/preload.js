@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('wt', {
     recentBattles: (limit) => invoke('db:recentBattles', limit),
     topPlayers: (opts) => invoke('db:topPlayers', opts),
     playerCard: (nick) => invoke('db:playerCard', nick),
+    battleDetails: (id) => invoke('db:battleDetails', id),
     resetCounter: (name) => invoke('db:resetCounter', name),
     deleteBattle: (id) => invoke('db:deleteBattle', id),
     clearHistory: (opts) => invoke('db:clearHistory', opts),

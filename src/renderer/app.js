@@ -9,9 +9,11 @@ const el = (tag, cls, text) => {
 };
 
 const STATUS_TEXT = { battle: 'В бою', idle: 'В ангаре', offline: 'Игра не запущена' };
+// «Уничтожен» само по себе читается как «выбыл из боя навсегда», поэтому
+// добавлено «выбирает»: игрок жив, он в ангаре выбирает следующую машину.
 const PLAYER_STATUS = {
   alive: ['в бою', 'alive'],
-  dead: ['уничтожен', 'dead'],
+  dead: ['уничтожен · выбирает', 'dead'],
   left: ['вышел', 'left'],
   unknown: ['не выехал', 'idle'],
 };
@@ -37,6 +39,7 @@ $('tabs').addEventListener('click', (e) => {
     p.classList.toggle('active', p.id === `panel-${tab.dataset.tab}`);
   }
   if (tab.dataset.tab === 'counters') refreshCounters();
+  if (tab.dataset.tab === 'battles') refreshBattles();
   if (tab.dataset.tab === 'players') refreshPlayers();
   if (tab.dataset.tab === 'settings') refreshDbStats();
 });
@@ -121,7 +124,7 @@ function playersTable(players) {
   const table = el('table');
   table.innerHTML =
     '<thead><tr><th class="nick">Ник</th><th class="num">K</th><th class="num">D</th>' +
-    '<th>Статус</th><th>Техника (последняя — текущая)</th></tr></thead>';
+    '<th class="num">A</th><th>Статус</th><th>Техника (последняя — текущая)</th></tr></thead>';
   const tbody = el('tbody');
 
   for (const p of players) {
@@ -136,10 +139,14 @@ function playersTable(players) {
     const st = el('td');
     st.append(el('span', `badge ${cls}`, label));
 
+    const assists = el('td', 'num', String(p.assists || 0));
+    assists.title = 'ассисты: повредил цель, но добил её другой (считается приложением)';
+
     tr.append(
       nick,
       el('td', 'num', String(p.kills)),
       el('td', 'num', String(p.deaths)),
+      assists,
       st,
       vehiclesCell(p)
     );
@@ -205,8 +212,50 @@ async function refreshCounters() {
     tiles.append(tile);
   }
 
-  const battles = await window.wt.db.recentBattles(50);
+}
+
+// --- Вкладка «Бои» ------------------------------------------------------
+
+/** Состав боя: две колонки, свои и противники, как во вкладке «Бой». */
+function battleRoster(details) {
+  const wrap = el('div', 'roster');
+  const split = el('div', 'split');
+
+  for (const [team, title] of [['ally', 'Свои'], ['enemy', 'Противники'], ['unknown', 'Без команды']]) {
+    const rows = details.players.filter((p) => p.team === team);
+    if (!rows.length) continue;
+
+    const side = el('div', 'side');
+    side.append(el('div', `side-title ${team}`, `${title} — ${rows.length}`));
+
+    const table = el('table');
+    table.innerHTML =
+      '<thead><tr><th class="nick">Ник</th><th>КДА</th><th>Техника</th></tr></thead>';
+    const tbody = el('tbody');
+    for (const p of rows) {
+      const tr = el('tr');
+      if (p.left_battle) tr.classList.add('row-left');
+      const nick = el('td', 'nick', p.nick);
+      nick.title = p.nick;
+      const kda = el('td');
+      kda.append(kdaBadge(p.kills, p.deaths, p.assists));
+      tr.append(nick, kda, el('td', 'muted', p.vehicles.join(' · ') || '—'));
+      tbody.append(tr);
+    }
+    table.append(tbody);
+    side.append(table);
+    split.append(side);
+  }
+
+  wrap.append(split);
+  return wrap;
+}
+
+async function refreshBattles() {
+  const limit = Number($('battlesLimit').value) || 10;
+  const battles = await window.wt.db.recentBattles(limit);
   const body = $('battlesBody');
+
   if (!battles.length) {
     body.replaceChildren(el('div', 'empty', 'Боёв пока нет. Первый запишется, когда закончится.'));
     return;
@@ -217,15 +266,20 @@ async function refreshCounters() {
     '<thead><tr><th>Когда</th><th class="num">Длит.</th><th class="num">K</th>' +
     '<th class="num">D</th><th>Моя техника</th><th class="num">Игроков</th><th></th></tr></thead>';
   const tbody = el('tbody');
+
   for (const b of battles) {
-    const tr = el('tr');
+    const tr = el('tr', 'clickable');
+
     const actions = el('td');
     const del = el('button', 'small danger', 'Удалить');
-    del.addEventListener('click', async () => {
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation(); // не раскрывать строку по клику на удаление
       await window.wt.db.deleteBattle(b.id);
+      refreshBattles();
       refreshCounters();
     });
     actions.append(del);
+
     tr.append(
       el('td', null, dateText(b.started_at)),
       el('td', 'num', clockText(b.duration)),
@@ -235,33 +289,75 @@ async function refreshCounters() {
       el('td', 'num', String(b.players_seen)),
       actions
     );
-    tbody.append(tr);
+
+    // Строка с составом — открывается и закрывается по клику на бой.
+    const detailRow = el('tr', 'detail-row');
+    const detailCell = el('td');
+    detailCell.colSpan = 7;
+    detailRow.append(detailCell);
+    detailRow.hidden = true;
+
+    let loaded = false;
+    tr.addEventListener('click', async () => {
+      detailRow.hidden = !detailRow.hidden;
+      if (detailRow.hidden || loaded) return;
+      const details = await window.wt.db.battleDetails(b.id);
+      detailCell.replaceChildren(
+        details ? battleRoster(details) : el('div', 'empty', 'Состав не найден')
+      );
+      loaded = true;
+    });
+
+    tbody.append(tr, detailRow);
   }
+
   table.append(tbody);
   body.replaceChildren(table);
 }
 
+$('battlesLimit').addEventListener('change', refreshBattles);
+
 // --- Вкладка «Игроки» ---------------------------------------------------
+
+/** Плашка КДА: убийства / смерти / ассисты и отношение (K+A)/D. */
+function kdaBadge(kills, deaths, assists) {
+  const k = kills ?? 0;
+  const d = deaths ?? 0;
+  const a = assists ?? 0;
+  const ratio = d > 0 ? ((k + a) / d).toFixed(2) : (k + a).toFixed(2);
+
+  const badge = el('span', 'kda');
+  badge.append(
+    el('b', 'kda-k', String(k)),
+    el('i', 'kda-sep', '/'),
+    el('b', 'kda-d', String(d)),
+    el('i', 'kda-sep', '/'),
+    el('b', 'kda-a', String(a)),
+    el('span', 'kda-ratio', ratio)
+  );
+  badge.title = `убийств ${k}, смертей ${d}, ассистов ${a}\n(K+A)/D = ${ratio}${
+    d === 0 ? ' — смертей не было' : ''
+  }`;
+  return badge;
+}
 
 function topTable(rows) {
   if (!rows.length) return el('div', 'empty', 'Никто не набрал нужного числа встреч');
 
   const table = el('table');
   table.innerHTML =
-    '<thead><tr><th class="nick">Ник</th><th class="num">Боёв</th><th class="num">K</th>' +
-    '<th class="num">D</th><th>Последний раз</th></tr></thead>';
+    '<thead><tr><th class="nick">Ник</th><th class="num">Боёв</th><th>КДА</th>' +
+    '<th>Последний раз</th></tr></thead>';
   const tbody = el('tbody');
   for (const r of rows) {
     const tr = el('tr');
     const nick = el('td', 'nick', r.nick);
     nick.title = r.nick;
-    tr.append(
-      nick,
-      el('td', 'num', String(r.battles)),
-      el('td', 'num', String(r.kills ?? 0)),
-      el('td', 'num', String(r.deaths ?? 0)),
-      el('td', null, dateText(r.last_seen))
-    );
+
+    const kda = el('td');
+    kda.append(kdaBadge(r.kills, r.deaths, r.assists));
+
+    tr.append(nick, el('td', 'num', String(r.battles)), kda, el('td', null, dateText(r.last_seen)));
     tbody.append(tr);
   }
   table.append(tbody);
@@ -366,6 +462,7 @@ $('clearPlayers').addEventListener('click', () =>
 window.wt.onUpdate(renderBattle);
 window.wt.onDbChanged(() => {
   refreshCounters();
+  refreshBattles();
   refreshDbStats();
 });
 window.wt.onError((message) => {

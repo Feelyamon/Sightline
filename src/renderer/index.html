@@ -11,6 +11,7 @@
     <nav class="tabs" id="tabs">
       <button class="tab active" data-tab="battle">Бой</button>
       <button class="tab" data-tab="counters">Счётчики</button>
+      <button class="tab" data-tab="battles">Бои</button>
       <button class="tab" data-tab="players">Игроки</button>
       <button class="tab" data-tab="settings">Настройки</button>
     </nav>
@@ -48,7 +49,21 @@
     <!-- Счётчики -->
     <section class="panel" id="panel-counters">
       <div class="tiles" id="tiles"></div>
-      <div class="section-title">Последние бои</div>
+    </section>
+
+    <!-- Бои -->
+    <section class="panel" id="panel-battles">
+      <div class="controls">
+        <label class="row">
+          <span class="muted">Показывать</span>
+          <select id="battlesLimit">
+            <option value="10">последние 10</option>
+            <option value="25">последние 25</option>
+            <option value="100">последние 100</option>
+          </select>
+        </label>
+        <span class="muted">Нажми на бой, чтобы увидеть состав</span>
+      </div>
       <div id="battlesBody"></div>
     </section>
 

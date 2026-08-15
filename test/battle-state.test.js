@@ -81,6 +81,56 @@ test('сбитый разведдрон не считается ни смерт�
   assert.equal(find(snap, 'Ally'), undefined);
 });
 
+test('ассист: повредил цель, добил другой', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Helper (Т-80БВМ) поджёг Victim (M1A2)',
+    'Finisher (ИС-2) уничтожил Victim (M1A2)',
+  ]);
+  assert.equal(find(snap, 'Helper').assists, 1);
+  assert.equal(find(snap, 'Helper').kills, 0);
+  assert.equal(find(snap, 'Finisher').kills, 1);
+  assert.equal(find(snap, 'Finisher').assists, 0, 'добивший ассист себе не пишет');
+});
+
+test('ассист не начисляется тому, кто сам и добил', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Solo (Т-80БВМ) поджёг Victim (M1A2)',
+    'Solo (Т-80БВМ) уничтожил Victim (M1A2)',
+  ]);
+  assert.equal(find(snap, 'Solo').kills, 1);
+  assert.equal(find(snap, 'Solo').assists, 0);
+});
+
+test('после гибели урон по новой жизни считается заново', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Helper (Т-80) поджёг Victim (M1A2)',
+    'Finisher (ИС-2) уничтожил Victim (M1A2)',
+    'Finisher (ИС-2) уничтожил Victim (M1A1)',
+  ]);
+  assert.equal(find(snap, 'Helper').assists, 1, 'старый урон не даёт второй ассист');
+});
+
+test('живое: «разбился» распознаётся (кириллица и \\b несовместимы)', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, ['=LHina= Ник (Ми-28НМ) разбился']);
+  assert.deepEqual(snap.unparsed, []);
+  assert.equal(find(snap, '=LHina= Ник').deaths, 1);
+  assert.equal(find(snap, '=LHina= Ник').killedOn, 'Ми-28НМ');
+});
+
+test('живое: бортовые сообщения и награда за добивание — шум', () => {
+  const s = new BattleState('Me');
+  const snap = feed(s, [
+    'Двигатель перегрелся',
+    '[120B] Ник (Challenger 2 OES) нанёс последний удар!',
+  ]);
+  assert.deepEqual(snap.unparsed, []);
+  assert.equal(snap.players.length, 0);
+});
+
 test('служебные символы из имени техники не показываются', () => {
   const s = new BattleState('Me');
   const snap = feed(s, ['Foe (▄Su-30MK) сбил Ally (◍M1A1 HC)']);

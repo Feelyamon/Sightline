@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS battle_players (
   team      TEXT    NOT NULL,            -- ally | enemy | unknown
   kills     INTEGER NOT NULL DEFAULT 0,
   deaths    INTEGER NOT NULL DEFAULT 0,
+  assists   INTEGER NOT NULL DEFAULT 0,
   vehicles  TEXT    NOT NULL DEFAULT '[]',
   left_battle INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (battle_id, player_id)
@@ -86,10 +87,15 @@ class Db {
     this.db = new DatabaseSync(this.file);
     this.db.exec(SCHEMA);
 
-    // Базы, созданные до появления reset_id, донастраиваем на месте.
-    const cols = this.db.prepare('PRAGMA table_info(counters)').all();
-    if (!cols.some((c) => c.name === 'reset_id')) {
+    // Базы, созданные раньше нужных колонок, донастраиваем на месте.
+    const hasColumn = (table, name) =>
+      this.db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name);
+
+    if (!hasColumn('counters', 'reset_id')) {
       this.db.exec('ALTER TABLE counters ADD COLUMN reset_id INTEGER NOT NULL DEFAULT 0');
+    }
+    if (!hasColumn('battle_players', 'assists')) {
+      this.db.exec('ALTER TABLE battle_players ADD COLUMN assists INTEGER NOT NULL DEFAULT 0');
     }
 
     const now = Date.now();
@@ -155,8 +161,8 @@ class Db {
       );
       const findPlayer = this.db.prepare('SELECT id FROM players WHERE nick = ?');
       const insBp = this.db.prepare(
-        `INSERT INTO battle_players (battle_id, player_id, team, kills, deaths, vehicles, left_battle)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO battle_players (battle_id, player_id, team, kills, deaths, assists, vehicles, left_battle)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       );
 
       for (const p of players) {
@@ -168,6 +174,7 @@ class Db {
           p.team,
           p.kills,
           p.deaths,
+          p.assists || 0,
           JSON.stringify(p.vehicles || []),
           p.status === 'left' ? 1 : 0
         );
@@ -223,6 +230,26 @@ class Db {
       .map((b) => ({ ...b, my_vehicles: JSON.parse(b.my_vehicles || '[]') }));
   }
 
+  /** Состав одного боя — для раскрывающейся строки во вкладке «Бои». */
+  battleDetails(id) {
+    const battle = this.db.prepare('SELECT * FROM battles WHERE id = ?').get(id);
+    if (!battle) return null;
+    const players = this.db
+      .prepare(
+        `SELECT p.nick, bp.team, bp.kills, bp.deaths, bp.assists, bp.vehicles, bp.left_battle
+         FROM battle_players bp JOIN players p ON p.id = bp.player_id
+         WHERE bp.battle_id = ?
+         ORDER BY bp.kills DESC, bp.deaths ASC`
+      )
+      .all(id)
+      .map((r) => ({ ...r, vehicles: JSON.parse(r.vehicles || '[]') }));
+    return {
+      ...battle,
+      my_vehicles: JSON.parse(battle.my_vehicles || '[]'),
+      players,
+    };
+  }
+
   deleteBattle(id) {
     this.db.prepare('DELETE FROM battles WHERE id = ?').run(id);
   }
@@ -236,8 +263,9 @@ class Db {
       .prepare(
         `SELECT p.nick,
                 COUNT(*) AS battles,
-                SUM(bp.kills)  AS kills,
-                SUM(bp.deaths) AS deaths,
+                SUM(bp.kills)   AS kills,
+                SUM(bp.deaths)  AS deaths,
+                SUM(bp.assists) AS assists,
                 MAX(b.started_at) AS last_seen
          FROM battle_players bp
          JOIN players p ON p.id = bp.player_id
@@ -257,7 +285,7 @@ class Db {
     if (!player) return null;
     const rows = this.db
       .prepare(
-        `SELECT b.id, b.started_at, bp.team, bp.kills, bp.deaths, bp.vehicles
+        `SELECT b.id, b.started_at, bp.team, bp.kills, bp.deaths, bp.assists, bp.vehicles
          FROM battle_players bp JOIN battles b ON b.id = bp.battle_id
          WHERE bp.player_id = ? ORDER BY b.started_at DESC LIMIT 200`
       )

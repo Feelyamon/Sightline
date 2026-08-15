@@ -87,6 +87,9 @@ class BattleState {
   reset() {
     /** @type {Map<string, {nick, kills, deaths, vehicles: string[], lastVehicle: string|null, lastSeen: number}>} */
     this.players = new Map();
+    // Кто кого убивал: «убийца\u0000жертва» → сколько раз. Нужно для досье
+    // («против тебя 8/3») — по-другому счёт личных встреч не восстановить.
+    this.duels = new Map();
     this.teams = new ParityUnionFind();
     this.unparsed = [];
     this.events = 0;
@@ -104,6 +107,11 @@ class BattleState {
         nick,
         kills: 0,
         deaths: 0,
+        // Ассистов игра в кил-фиде не публикует — считаем сами: кто повредил
+        // жертву до гибели, но добил не он. Это вывод, а не факт из игры.
+        assists: 0,
+        // Кто успел повредить этого игрока с момента последней гибели.
+        damagers: new Set(),
         // Каждый вылет — отдельная запись: техника, фраги на ней и чем кончился.
         // Респавн на той же технике даёт новую запись, а не продолжает старую.
         sorties: [],
@@ -159,6 +167,13 @@ class BattleState {
     return p;
   }
 
+  addDuel(killer, victim) {
+    // Разделитель — нулевой символ: в никах бывают пробелы и почти любые
+    // печатные символы, а этот появиться не может.
+    const key = `${killer}\u0000${victim}`;
+    this.duels.set(key, (this.duels.get(key) || 0) + 1);
+  }
+
   /** Фраг идёт и в общий счёт, и в счёт текущего вылета. */
   addKill(p) {
     p.kills++;
@@ -166,12 +181,21 @@ class BattleState {
     if (cur) cur.kills++;
   }
 
-  /** Смерть закрывает текущий вылет — следующее появление откроет новый. */
-  addDeath(p) {
+  /**
+   * Смерть закрывает текущий вылет и раздаёт ассисты всем, кто повредил
+   * жертву до этого, кроме самого добившего.
+   */
+  addDeath(p, killerNick = null) {
     p.deaths++;
     const cur = this.currentSortie(p);
     if (cur) cur.destroyed = true;
     if (p.status !== 'left') p.status = 'dead';
+
+    for (const nick of p.damagers) {
+      if (nick === killerNick || nick === p.nick) continue;
+      this.player(nick).assists++;
+    }
+    p.damagers.clear();
   }
 
   /** Скармливает одну запись из /hudmsg (поле damage). */
@@ -197,7 +221,8 @@ class BattleState {
           break;
         }
         this.addKill(killer);
-        this.addDeath(victim);
+        this.addDeath(victim, killer.nick);
+        this.addDuel(killer.nick, victim.nick);
         this.teams.union(killer.nick, victim.nick, 1);
         break;
       }
@@ -205,9 +230,12 @@ class BattleState {
         // Счёт не меняем: важна только засветившаяся техника.
         this.seen(parsed.actor, at);
         if (isEntityTarget(parsed.victim)) break;
-        this.seen(parsed.victim, at);
+        const damaged = this.seen(parsed.victim, at);
         if (parsed.actor?.nick && parsed.victim?.nick && parsed.actor.nick !== parsed.victim.nick) {
           this.teams.union(parsed.actor.nick, parsed.victim.nick, 1);
+          // Запоминаем для ассиста: если жертву добьёт кто-то другой, этот
+          // урон превратится в ассист.
+          if (damaged) damaged.damagers.add(parsed.actor.nick);
         }
         break;
       }
@@ -279,6 +307,7 @@ class BattleState {
         nick: p.nick,
         kills: p.kills,
         deaths: p.deaths,
+        assists: p.assists,
         status: p.status,
         // Техника «сейчас» — только пока игрок жив; иначе он в ангаре и что
         // выкатит дальше, кил-фид ещё не знает.
@@ -311,8 +340,15 @@ class BattleState {
     // Часы боя: время последнего события, к нему считается «видели N назад».
     const clock = rows.reduce((m, r) => Math.max(m, r.lastSeen || 0), 0);
 
+    // Дуэли отдаём разобранными, чтобы база не парсила ключи заново.
+    const duels = [...this.duels].map(([key, count]) => {
+      const [killer, victim] = key.split('\u0000');
+      return { killer, victim, count };
+    });
+
     return {
       players: rows,
+      duels,
       knownPlayers: rows.length,
       alivePlayers: rows.filter((r) => r.status === 'alive').length,
       clock,

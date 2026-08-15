@@ -21,7 +21,6 @@ const HELI_PATTERNS = [
   /\bz-\d{1,2}\b/i,
   /\bwz-?\d{1,2}\b/i,
   /\bcobra\b/i,
-  /\bесо\b/i,
 ];
 
 const PLANE_PATTERNS = [
@@ -61,7 +60,7 @@ const SPAA_PATTERNS = [
   /\bostwind\b/i,
 ];
 
-const DRONE_PATTERNS = [/recon micro/i, /fly-?eye/i, /skylark/i, /\b(?:rq|mq)-\d/i];
+const DRONE_PATTERNS = [/recon micro/i, /fly-?eye/i, /skylark/i, /\b(?:rq|mq)-\d/i, /скаут/i];
 
 const ICONS = {
   tank: '▮',

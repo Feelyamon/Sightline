@@ -61,9 +61,12 @@ function getJson(pathname, { host = BASE_HOST, port = BASE_PORT } = {}) {
  *   'error'   (Error)        — только неожиданные ошибки, не «игра выключена»
  */
 class WtClient extends EventEmitter {
-  constructor({ mock = false, mockFile = null } = {}) {
+  constructor({ mock = false, mockFile = null, host = BASE_HOST, port = BASE_PORT } = {}) {
     super();
     this.mock = mock;
+    // Адрес настраивается только ради тестов с подставным сервером.
+    this.host = host;
+    this.port = port;
     // По умолчанию проигрываем запись реального боя — на ней видно все статусы.
     this.mockFile = mockFile || path.join(__dirname, '..', '..', 'fixtures', 'hudmsg-live.json');
     this.timer = null;
@@ -74,6 +77,8 @@ class WtClient extends EventEmitter {
     this.mockQueue = null;
     this.failures = 0;
     this.mapSignature = null;
+    this.started = false;
+    this.lastTime = -1;
   }
 
   start() {
@@ -93,9 +98,13 @@ class WtClient extends EventEmitter {
     this.emit('status', { status, detail });
   }
 
+  /**
+   * Курсор здесь НЕ обнуляется: id в журнале сквозные по всей сессии игры и в
+   * новом бою не начинаются заново. Обнуление заставило бы перечитать чужие
+   * бои из скользящего окна.
+   */
   beginNewBattle() {
-    this.lastEvt = 0;
-    this.lastDmg = 0;
+    this.lastTime = -1;
     this.emit('reset');
   }
 
@@ -119,7 +128,7 @@ class WtClient extends EventEmitter {
     let valid = false;
     let signature = null;
     try {
-      const info = await getJson('/map_info.json');
+      const info = await getJson('/map_info.json', { host: this.host, port: this.port });
       valid = info?.valid !== false;
       // Отпечаток боя: счётчик генерации карты плюс её геометрия. Только на
       // курсоры hudmsg полагаться нельзя — в новом бою нумерация начинается
@@ -148,9 +157,13 @@ class WtClient extends EventEmitter {
     this.setStatus(valid ? 'battle' : 'idle', valid ? '' : 'В ангаре — ждём начала боя');
     if (!valid) return;
 
+    // Журнал запрашиваем целиком, а не с курсора. Курсорный запрос в новом бою
+    // возвращал пустоту (нумерация начинается заново и оказывается ниже
+    // курсора), и приложение продолжало показывать прошлый бой. Журнал одного
+    // боя — сотни строк, перечитывать его раз в секунду ничего не стоит.
     let hud;
     try {
-      hud = await getJson(`/hudmsg?lastEvt=${this.lastEvt}&lastDmg=${this.lastDmg}`);
+      hud = await getJson('/hudmsg?lastEvt=0&lastDmg=0', { host: this.host, port: this.port });
       this.failures = 0;
     } catch (e) {
       this.noteFailure(e.message);
@@ -160,14 +173,34 @@ class WtClient extends EventEmitter {
     const damage = Array.isArray(hud?.damage) ? hud.damage : [];
     const events = Array.isArray(hud?.events) ? hud.events : [];
 
-    // Курсор поехал назад — игра начала новый бой между тиками.
-    const minId = damage.reduce((m, d) => (typeof d?.id === 'number' ? Math.min(m, d.id) : m), Infinity);
-    if (Number.isFinite(minId) && minId < this.lastDmg) {
-      this.beginNewBattle();
+    // Журнал — скользящее окно на НЕСКОЛЬКО боёв сразу, а id сквозные по всей
+    // сессии игры и в новом бою не обнуляются. Единственный надёжный признак
+    // границы — поле time (секунды с начала боя): внутри боя оно только растёт,
+    // а на стыке падает.
+
+    // Первый тик: приложение могло запуститься посреди сессии. Отматываем
+    // курсор к началу текущего боя, чтобы не втянуть предыдущие.
+    if (!this.started) {
+      this.started = true;
+      let start = 0;
+      for (let i = 1; i < damage.length; i++) {
+        if (typeof damage[i]?.time === 'number' && damage[i].time < damage[i - 1].time) start = i;
+      }
+      const prev = damage[start - 1];
+      if (prev && typeof prev.id === 'number') this.lastDmg = prev.id;
     }
 
     for (const d of damage) {
-      if (typeof d?.id === 'number') this.lastDmg = Math.max(this.lastDmg, d.id);
+      if (typeof d?.id !== 'number') continue;
+      if (d.id <= this.lastDmg) continue; // уже отдавали
+      this.lastDmg = d.id;
+
+      // Время пошло назад — начался следующий бой. Сначала сброс, потом эта
+      // запись уходит уже в новое состояние.
+      if (typeof d.time === 'number') {
+        if (d.time < this.lastTime) this.beginNewBattle();
+        this.lastTime = Math.max(this.lastTime, d.time);
+      }
       this.emit('damage', d);
     }
     for (const e of events) {

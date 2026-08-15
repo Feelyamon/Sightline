@@ -100,6 +100,11 @@ td.num, th.num { text-align: right; width: 30px; white-space: nowrap; }
 td.nick { white-space: nowrap; }
 td.nick.self { text-decoration: underline; font-weight: 600; }
 tr.row-left { opacity: .45; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--panel); }
+tr.detail-row > td { background: var(--panel-2); padding: 10px; }
+tr.detail-row[hidden] { display: none; }
+.roster .side-title.unknown { color: var(--muted); }
 tr.row-dead td.nick { color: var(--muted); }
 
 .empty { color: var(--muted); padding: 12px 4px; }
@@ -114,6 +119,29 @@ details[hidden] { display: none; }
 .icon { flex: none; width: 1em; text-align: center; color: var(--muted); }
 .icon.plane, .icon.heli { color: var(--accent); }
 .icon.spaa { color: #e0b354; }
+
+/* --- Плашка КДА --- */
+.kda {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+.kda b { font-weight: 600; }
+.kda-k { color: var(--ally); }
+.kda-d { color: var(--enemy); }
+.kda-a { color: var(--accent); }
+.kda-sep { color: var(--muted); font-style: normal; }
+.kda-ratio {
+  margin-left: 5px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+}
 
 .chips { display: flex; flex-wrap: wrap; gap: 3px; }
 .chip {
@@ -144,7 +172,12 @@ details[hidden] { display: none; }
   white-space: nowrap;
 }
 .badge.alive { color: #0d1a12; background: var(--ally); }
-.badge.dead { color: #1a0d0d; background: var(--enemy); }
+/* Слева красный (машину сожгли), справа оранжевый (игрок в бою, выбирает
+   следующую) — чистый красный читался как «выбыл из боя навсегда». */
+.badge.dead {
+  color: #1a0d0d;
+  background: linear-gradient(90deg, var(--enemy) 0%, #ff9d4d 100%);
+}
 .badge.left { color: var(--muted); border: 1px solid var(--line); }
 .badge.idle { color: #1a170d; background: #e0b354; }
 
