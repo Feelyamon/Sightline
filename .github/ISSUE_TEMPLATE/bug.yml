@@ -1,0 +1,63 @@
+name: Ошибка
+description: Программа ведёт себя не так, как должна.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Быстрее всего это отправляется прямо из программы — кнопка
+        **«Проблема»** внизу списка разделов: версия программы и версия
+        Windows прикладываются сами.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как повторить
+      description: По шагам. Это самая нужная часть и самая редкая.
+      placeholder: |
+        1. Зашёл в бой на Т-80БВМ
+        2. Сгорел и выбрал другую технику
+        3. Таблица боя опустела
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидали увидеть
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия программы
+      description: «О программе» в самой программе.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: when
+    attributes:
+      label: Когда началось
+      options:
+        - Было всегда
+        - Появилось после обновления программы
+        - Появилось после обновления игры
+        - Не знаю
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: squad
+    attributes:
+      label: Обстоятельства
+      options:
+        - label: Играл в отряде
+        - label: Программа была запущена до входа в бой
+        - label: Был выполнен вход в аккаунт

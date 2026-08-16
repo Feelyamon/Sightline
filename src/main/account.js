@@ -51,7 +51,7 @@ class Account {
    * @param {object} [opts]
    * @param {string} [opts.baseUrl] - адрес сервера
    */
-  constructor(userDataDir, { baseUrl = 'https://sightline.feelyamon.ru/v1' } = {}) {
+  constructor(userDataDir, { baseUrl = require('./config').api } = {}) {
     this.file = path.join(userDataDir, TOKEN_FILE);
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.session = null; // { token, login, role, lang, expiresAt }

@@ -18,7 +18,7 @@ const { protocol, net } = require('electron');
 // проверять его свежесть не нужно.
 
 const SCHEME = 'sightline-avatar';
-const HOST = 'https://sightline.feelyamon.ru';
+const HOST = require('./config').site;
 // Больше мегабайта аватарка быть не может — столько принимает сервер. Предел
 // нужен на случай, если по адресу окажется не то, что мы ждём.
 const MAX_BYTES = 2 * 1024 * 1024;

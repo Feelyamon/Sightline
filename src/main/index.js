@@ -16,6 +16,7 @@ const { Account } = require('./account');
 const { Friends } = require('./friends');
 const { Avatars } = require('./avatars');
 const { Sync, battlePayload } = require('./sync');
+const config = require('./config');
 
 // Схему адресов аватарок объявляем до готовности приложения — позже окно её
 // уже не увидит.
@@ -774,15 +775,15 @@ handle('app:openExternal', (_e, page) => {
   const pages = { terms: '/terms', privacy: '/privacy', rights: '/rights' };
   const route = pages[page];
   if (!route) throw new Error('неизвестная страница');
-  return shell.openExternal('https://sightline.feelyamon.ru' + route);
+  return shell.openExternal(config.site + route);
 });
 
 handle('account:openDownload', () => {
   // Адрес приходит с сервера, поэтому проверяем его тут, а не доверяем на
   // слово: подменённый ответ не должен уметь открыть человеку что угодно.
-  const raw = account.version?.downloadUrl || 'https://sightline.feelyamon.ru/';
+  const raw = account.version?.downloadUrl || config.site;
   const url = new URL(raw);
-  if (url.protocol !== 'https:' || url.hostname !== 'sightline.feelyamon.ru') {
+  if (url.protocol !== 'https:' || url.hostname !== config.host) {
     throw new Error('адрес обновления не с нашего сайта');
   }
   return shell.openExternal(url.href);
