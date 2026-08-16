@@ -515,6 +515,22 @@ handle('account:removeAvatar', async () => {
 
 // --- Сообщение о проблеме ------------------------------------------------
 
+handle('support:reportPlayer', (_e, form = {}) =>
+  // Жалоба на игрока едет тем же методом: разбирает её тот же человек тем же
+  // списком, и заводить рядом второй путь значило бы писать админку дважды.
+  account.request('/bugs', {
+    method: 'POST',
+    body: {
+      kind: 'player',
+      target_nick: String(form.nick || ''),
+      message: String(form.message || ''),
+      app_version: app.getVersion(),
+      os_version: `${process.platform} ${require('node:os').release()}`,
+    },
+    auth: true,
+  })
+);
+
 handle('support:send', (_e, form = {}) =>
   // Версии проставляем здесь, а не спрашиваем у человека: он их не знает и не
   // обязан, а без них половина сообщений неразбираема.
@@ -547,34 +563,50 @@ handle('support:context', () => ({
 handle('admin:findUsers', (_e, query) =>
   account.request(`/admin/users?q=${encodeURIComponent(String(query || ''))}`, { auth: true })
 );
-handle('admin:newRecoveryCode', (_e, accountId) =>
+// Опасные действия подтверждаются паролем самого администратора. Пароль здесь
+// только пересылается — не хранится, не логируется и в состояние не попадает.
+handle('admin:newRecoveryCode', (_e, accountId, confirm) =>
   account.request('/admin/recovery-code', {
     method: 'POST',
-    body: { account_id: accountId },
+    body: { account_id: accountId, confirm_password: confirm || null },
     auth: true,
   })
 );
-handle('admin:setPassword', (_e, accountId, newPassword) =>
+handle('admin:setPassword', (_e, accountId, newPassword, confirm) =>
   account.request('/admin/password', {
     method: 'POST',
-    body: { account_id: accountId, new_password: String(newPassword || '') },
+    body: {
+      account_id: accountId,
+      new_password: String(newPassword || ''),
+      confirm_password: confirm || null,
+    },
     auth: true,
   })
 );
-handle('admin:block', (_e, accountId, blocked, reason) =>
+handle('admin:block', (_e, accountId, blocked, reason, confirm) =>
   account.request('/admin/block', {
     method: 'POST',
-    body: { account_id: accountId, blocked: !!blocked, reason: reason || null },
+    body: {
+      account_id: accountId,
+      blocked: !!blocked,
+      reason: reason || null,
+      confirm_password: confirm || null,
+    },
     auth: true,
   })
 );
-handle('admin:setRole', (_e, accountId, role) =>
+handle('admin:setRole', (_e, accountId, role, confirm) =>
   account.request('/admin/role', {
     method: 'POST',
-    body: { account_id: accountId, role: String(role || 'user') },
+    body: {
+      account_id: accountId,
+      role: String(role || 'user'),
+      confirm_password: confirm || null,
+    },
     auth: true,
   })
 );
+handle('admin:log', () => account.request('/admin/log', { auth: true }));
 handle('admin:clearAvatar', (_e, accountId) =>
   account.request('/admin/avatar/clear', {
     method: 'POST',

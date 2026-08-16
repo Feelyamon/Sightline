@@ -86,6 +86,7 @@ $('tabs').addEventListener('click', (e) => {
   if (tab.dataset.tab === 'admin') {
     refreshAdminUsers();
     refreshAdminReports();
+    refreshAdminLog();
   }
 });
 
@@ -1074,6 +1075,30 @@ function showAuthScreen(id) {
   for (const box of ['siError', 'regError']) $(box).hidden = true;
 }
 
+// --- Жалоба на игрока ----------------------------------------------------
+
+$('cardReportSend').addEventListener('click', async (e) => {
+  const button = e.currentTarget;
+  const message = $('cardReportText').value.trim();
+  if (message.length < 10) {
+    $('cardReportError').textContent = t('report.tooShort');
+    $('cardReportError').hidden = false;
+    return;
+  }
+  setBusy(button, true);
+  try {
+    await window.wt.support.reportPlayer({ nick: cardNick, message });
+    $('cardReport').open = false;
+    $('cardReportText').value = '';
+    showError(t('card.reportSent'));
+  } catch (err) {
+    $('cardReportError').textContent = err?.offline ? t('acc.offline') : err?.message || String(err);
+    $('cardReportError').hidden = false;
+  } finally {
+    setBusy(button, false);
+  }
+});
+
 // --- Сообщение о проблеме ------------------------------------------------
 
 $('reportBtn').addEventListener('click', async () => {
@@ -1144,30 +1169,61 @@ function adminButton(label, run, cls) {
 }
 
 /**
- * Спрашивает строку. prompt() в Electron не работает, а окно ради одной
- * строки — это три элемента разметки на каждое действие. Поэтому одно поле,
- * которое появляется прямо в строке пользователя.
+ * Спрашивает одно или несколько значений прямо в строке пользователя.
+ *
+ * prompt() в Electron не работает, а отдельное окно ради двух полей — это
+ * разметка и обработчики на каждое действие.
+ *
+ * Поле «ваш пароль» у опасных действий — не формальность и не проверка
+ * памяти. Токен даёт доступ к аккаунту, но пароля в нём нет: одна лишняя
+ * строка отделяет «увели сессию» от «сменили пароль всем пользователям».
+ *
+ * @param {HTMLElement} row
+ * @param {Array<{name: string, label: string, placeholder?: string, password?: boolean}>} fields
+ * @param {(values: Record<string, string>) => Promise<void>} onDone
  */
-function askLine(row, { label, placeholder, password = false }, onDone) {
+function askFields(row, fields, onDone) {
+  // Второе нажатие не должно открывать вторую форму поверх первой.
+  row.querySelector('.admin-ask')?.remove();
+
   const form = el('form', 'admin-ask');
-  const input = el('input');
-  input.type = password ? 'password' : 'text';
-  input.placeholder = placeholder || '';
-  form.append(el('span', 'muted', label), input, el('button', 'small', t('admin.apply')));
+  const inputs = {};
+  for (const f of fields) {
+    const input = el('input');
+    input.type = f.password ? 'password' : 'text';
+    input.placeholder = f.placeholder || '';
+    if (f.password) input.autocomplete = 'current-password';
+    inputs[f.name] = input;
+    form.append(el('span', 'muted', f.label), input);
+  }
+  form.append(el('button', 'small', t('admin.apply')));
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const value = input.value.trim();
-    if (!value) return;
+    const values = {};
+    for (const [name, input] of Object.entries(inputs)) {
+      const value = input.value.trim();
+      if (!value) return; // пустое поле — просто не отправляем
+      values[name] = value;
+    }
     form.remove();
     try {
-      await onDone(value);
+      await onDone(values);
     } catch (err) {
       showAdminError(err);
     }
   });
   row.append(form);
-  input.focus();
+  Object.values(inputs)[0]?.focus();
 }
+
+/** Поле «ваш пароль» — одинаковое во всех опасных действиях. */
+const confirmField = () => ({
+  name: 'confirm',
+  label: t('admin.yourPassword'),
+  placeholder: t('admin.yourPasswordHint'),
+  password: true,
+});
 
 function adminUserRow(u) {
   const row = el('div', 'admin-user');
@@ -1182,21 +1238,28 @@ function adminUserRow(u) {
   const actions = el('div', 'admin-actions');
 
   actions.append(
-    adminButton(t('admin.newCode'), async () => {
-      const { recovery_code: code } = await window.wt.admin.newRecoveryCode(u.id);
-      // Код показывается один раз и нигде не хранится — в том числе у нас.
-      // Поэтому не всплывающее сообщение, а строка, которую можно выделить.
-      row.append(el('div', 'admin-result', t('admin.newCodeResult', { code })));
-    })
+    adminButton(t('admin.newCode'), () =>
+      // Новый код восстановления — это ключ от чужого аккаунта, опасно ровно
+      // так же, как смена пароля.
+      askFields(row, [confirmField()], async ({ confirm }) => {
+        const { recovery_code: code } = await window.wt.admin.newRecoveryCode(u.id, confirm);
+        // Код показывается один раз и нигде не хранится — в том числе у нас.
+        // Поэтому не всплывающее сообщение, а строка, которую можно выделить.
+        row.append(el('div', 'admin-result', t('admin.newCodeResult', { code })));
+      })
+    )
   );
 
   actions.append(
     adminButton(t('admin.setPassword'), () =>
-      askLine(
+      askFields(
         row,
-        { label: t('admin.newPassword'), placeholder: t('acc.passwordHint'), password: true },
-        async (value) => {
-          const { recovery_code: code } = await window.wt.admin.setPassword(u.id, value);
+        [
+          { name: 'value', label: t('admin.newPassword'), placeholder: t('acc.passwordHint'), password: true },
+          confirmField(),
+        ],
+        async ({ value, confirm }) => {
+          const { recovery_code: code } = await window.wt.admin.setPassword(u.id, value, confirm);
           row.append(el('div', 'admin-result', t('admin.setPasswordResult', { code })));
         }
       )
@@ -1212,28 +1275,39 @@ function adminUserRow(u) {
 
   actions.append(
     u.blocked
-      ? adminButton(t('admin.unblock'), async () => {
-          await window.wt.admin.block(u.id, false);
-          refreshAdminUsers();
-        })
+      ? adminButton(t('admin.unblock'), () =>
+          askFields(row, [confirmField()], async ({ confirm }) => {
+            await window.wt.admin.block(u.id, false, null, confirm);
+            refreshAdminUsers();
+          })
+        )
       : adminButton(
           t('admin.block'),
           () =>
             // Причина обязательна: молчаливый бан порождает переписку «за что»,
             // на которую через полгода нечем ответить.
-            askLine(row, { label: t('admin.blockReason'), placeholder: t('admin.blockReasonHint') }, async (reason) => {
-              await window.wt.admin.block(u.id, true, reason);
-              refreshAdminUsers();
-            }),
+            askFields(
+              row,
+              [
+                { name: 'reason', label: t('admin.blockReason'), placeholder: t('admin.blockReasonHint') },
+                confirmField(),
+              ],
+              async ({ reason, confirm }) => {
+                await window.wt.admin.block(u.id, true, reason, confirm);
+                refreshAdminUsers();
+              }
+            ),
           'danger'
         )
   );
 
   actions.append(
-    adminButton(u.role === 'admin' ? t('admin.demote') : t('admin.promote'), async () => {
-      await window.wt.admin.setRole(u.id, u.role === 'admin' ? 'user' : 'admin');
-      refreshAdminUsers();
-    })
+    adminButton(u.role === 'admin' ? t('admin.demote') : t('admin.promote'), () =>
+      askFields(row, [confirmField()], async ({ confirm }) => {
+        await window.wt.admin.setRole(u.id, u.role === 'admin' ? 'user' : 'admin', confirm);
+        refreshAdminUsers();
+      })
+    )
   );
 
   row.append(actions);
@@ -1260,6 +1334,15 @@ function adminReportRow(r) {
     el('span', 'admin-login', t(`report.kind.${r.kind}`)),
     el('span', 'muted', `#${r.id} · ${r.login || t('report.noAccount')} · ${dateText(Date.parse(r.created_at))}`)
   );
+  // Жалоба на игрока: на кого и сколько таких всего. Пять жалоб на один ник —
+  // совсем другой разговор, чем одна, и видеть это надо сразу.
+  if (r.target_nick) {
+    const target = el('span', 'trust disputed', r.target_nick);
+    if (r.target_reports > 1) {
+      target.append(document.createTextNode(` · ${t('admin.targetCount', { n: r.target_reports })}`));
+    }
+    head.append(target);
+  }
   if (r.app_version) head.append(el('span', 'muted', `${r.app_version} · ${r.os_version || '—'}`));
   row.append(head);
 
@@ -1276,10 +1359,15 @@ function adminReportRow(r) {
           refreshAdminReports();
         })
       : adminButton(t('admin.resolve'), () =>
-          askLine(row, { label: t('admin.note'), placeholder: t('admin.noteHint') }, async (note) => {
-            await window.wt.admin.resolveReport(r.id, true, note);
-            refreshAdminReports();
-          })
+          // Пометка не опасное действие: пароль тут был бы издевательством.
+          askFields(
+            row,
+            [{ name: 'note', label: t('admin.note'), placeholder: t('admin.noteHint') }],
+            async ({ note }) => {
+              await window.wt.admin.resolveReport(r.id, true, note);
+              refreshAdminReports();
+            }
+          )
         )
   );
   row.append(actions);
@@ -1297,6 +1385,43 @@ async function refreshAdminReports() {
   }
 }
 
+/**
+ * Журнал административных действий.
+ *
+ * Читать может любой администратор — в этом и смысл: журнал ведётся не для
+ * себя, а друг для друга. Записи не удаляются и не правятся, поэтому кнопок
+ * тут нет вовсе, только список.
+ */
+async function refreshAdminLog() {
+  try {
+    const rows = await window.wt.admin.log();
+    $('adminLog').replaceChildren(
+      ...(rows.length
+        ? rows.map((r) => {
+            const row = el('div', 'admin-user');
+            const head = el('div', 'admin-user-head');
+            head.append(
+              el('span', 'admin-login', t(`admin.action.${r.action}`) || r.action),
+              el('span', 'muted', `${r.admin_login} → ${r.target_login || '—'}`),
+              el('span', 'muted', dateText(Date.parse(r.at)))
+            );
+            row.append(head);
+            const details = Object.entries(r.details || {}).filter(([, v]) => v !== null && v !== '');
+            if (details.length) {
+              row.append(
+                el('div', 'admin-result', details.map(([k, v]) => `${k}: ${v}`).join(' · '))
+              );
+            }
+            return row;
+          })
+        : [el('div', 'empty', t('admin.logEmpty'))])
+    );
+  } catch (e) {
+    showAdminError(e);
+  }
+}
+
+$('adminLogRefresh').addEventListener('click', refreshAdminLog);
 $('adminSearch').addEventListener('click', refreshAdminUsers);
 $('adminQuery').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') refreshAdminUsers();
@@ -1873,6 +1998,13 @@ async function openCard(nick) {
   $('cardNick').textContent = nick;
   $('cardSummary').textContent = t('card.loading');
   $('cardBody').replaceChildren();
+  // Форма жалобы каждый раз закрыта и пуста: открытая настежь она
+  // подталкивает жаловаться, а это не то, к чему стоит подталкивать.
+  $('cardReport').open = false;
+  $('cardReportText').value = '';
+  $('cardReportError').hidden = true;
+  // Без аккаунта жалоба невозможна: разбирать «кто-то на кого-то» нельзя.
+  $('cardReport').hidden = !accountLogin;
   $('cardModal').hidden = false;
 
   const [card, dossier] = await Promise.all([

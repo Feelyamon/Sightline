@@ -516,6 +516,13 @@
         <button id="adminReportsRefresh" data-i18n="admin.refresh"></button>
       </div>
       <div id="adminReports"></div>
+
+      <div class="section-title" data-i18n="admin.log"></div>
+      <p class="muted small" data-i18n="admin.logHint"></p>
+      <div class="controls">
+        <button id="adminLogRefresh" data-i18n="admin.refresh"></button>
+      </div>
+      <div id="adminLog"></div>
     </section>
 
     <!-- Инструкция: длинный текст, поэтому разделы генерируются из словаря -->
@@ -673,6 +680,23 @@
         <input type="text" id="cardNote" data-i18n-placeholder="card.notePlaceholder" autocomplete="off" />
       </label>
       <div id="cardBody"></div>
+
+      <!-- Жалоба на игрока — здесь, а не отдельной кнопкой в таблице боя:
+           карточка уже открыта на конкретном человеке, и жаловаться, глядя на
+           его историю, честнее, чем сгоряча из строки таблицы. -->
+      <details id="cardReport">
+        <summary class="section-title" data-i18n="card.report"></summary>
+        <p class="muted small" data-i18n="card.reportHint"></p>
+        <label class="row field">
+          <span class="muted" data-i18n="card.reportText"></span>
+          <textarea id="cardReportText" rows="4" data-i18n-placeholder="card.reportPlaceholder"></textarea>
+        </label>
+        <div class="auth-error" id="cardReportError" hidden></div>
+        <div class="buttons">
+          <button id="cardReportSend" data-i18n="card.reportSend"></button>
+        </div>
+      </details>
+
       <div class="buttons">
         <button id="cardSave" data-i18n="card.save"></button>
         <button id="cardClose" data-i18n="card.close"></button>

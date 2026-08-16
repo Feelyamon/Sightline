@@ -30,15 +30,17 @@ contextBridge.exposeInMainWorld('wt', {
 
   support: {
     send: (form) => invoke('support:send', form),
+    reportPlayer: (form) => invoke('support:reportPlayer', form),
     context: () => invoke('support:context'),
   },
 
   admin: {
     findUsers: (query) => invoke('admin:findUsers', query),
-    newRecoveryCode: (id) => invoke('admin:newRecoveryCode', id),
-    setPassword: (id, password) => invoke('admin:setPassword', id, password),
-    block: (id, blocked, reason) => invoke('admin:block', id, blocked, reason),
-    setRole: (id, role) => invoke('admin:setRole', id, role),
+    newRecoveryCode: (id, confirm) => invoke('admin:newRecoveryCode', id, confirm),
+    setPassword: (id, password, confirm) => invoke('admin:setPassword', id, password, confirm),
+    block: (id, blocked, reason, confirm) => invoke('admin:block', id, blocked, reason, confirm),
+    setRole: (id, role, confirm) => invoke('admin:setRole', id, role, confirm),
+    log: () => invoke('admin:log'),
     clearAvatar: (id) => invoke('admin:clearAvatar', id),
     reports: (scope) => invoke('admin:reports', scope),
     resolveReport: (id, resolved, note) => invoke('admin:resolveReport', id, resolved, note),
