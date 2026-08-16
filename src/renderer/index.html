@@ -484,10 +484,38 @@
         <p class="muted small" data-i18n="acc.avatarHint"></p>
         <div class="auth-error" id="avatarError" hidden></div>
 
+        <div class="section-title" data-i18n="acc.changePassword"></div>
+        <form id="authPassword">
+          <label class="row field">
+            <span class="muted" data-i18n="acc.oldPassword"></span>
+            <input type="password" id="cpOld" autocomplete="current-password" />
+          </label>
+          <label class="row field">
+            <span class="muted" data-i18n="acc.newPassword"></span>
+            <input type="password" id="cpNew" autocomplete="new-password" />
+            <span class="hint muted" data-i18n="acc.passwordHint"></span>
+          </label>
+          <label class="row field">
+            <span class="muted" data-i18n="acc.password2"></span>
+            <input type="password" id="cpNew2" autocomplete="new-password" />
+          </label>
+          <p class="muted small" data-i18n="acc.changePasswordHint"></p>
+          <div class="auth-error" id="cpError" hidden></div>
+          <div class="buttons">
+            <button type="submit" id="cpSubmit" data-i18n="acc.changePasswordGo"></button>
+          </div>
+        </form>
+
         <div class="buttons">
           <button id="authSignOut" data-i18n="acc.signOut"></button>
         </div>
         <p class="muted small" data-i18n="acc.signOutHint"></p>
+
+        <div class="buttons">
+          <button id="authLogoutAll" data-i18n="acc.signOutAll"></button>
+        </div>
+        <p class="muted small" data-i18n="acc.signOutAllHint"></p>
+        <div class="auth-error" id="laError" hidden></div>
       </div>
     </section>
 
@@ -601,6 +629,20 @@
       <div class="buttons">
         <button id="delBattleGo" class="danger" data-i18n="delBattle.go"></button>
         <button id="delBattleCancel" data-i18n="delBattle.cancel"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Выход со всех устройств. Отдельное окно, а не сразу по кнопке: эта
+       кнопка закрывает и текущую сессию, то есть промах по ней стоит
+       повторного входа на всех машинах разом. -->
+  <div class="modal-backdrop" id="logoutAllModal" hidden>
+    <div class="modal">
+      <h2 data-i18n="acc.signOutAll"></h2>
+      <p data-i18n="acc.signOutAllText"></p>
+      <div class="buttons">
+        <button id="logoutAllGo" class="danger" data-i18n="acc.signOutAllGo"></button>
+        <button id="logoutAllCancel" data-i18n="acc.signOutAllCancel"></button>
       </div>
     </div>
   </div>

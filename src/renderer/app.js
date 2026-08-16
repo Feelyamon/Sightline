@@ -1942,6 +1942,66 @@ $('authSignOut').addEventListener('click', async () => {
   await refreshAccount();
 });
 
+// Смена пароля. Новый код восстановления показывается тем же окном, что и при
+// регистрации: старый после смены пароля перестаёт работать, и человек должен
+// узнать об этом не тогда, когда попробует им воспользоваться.
+$('authPassword').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const newPassword = $('cpNew').value;
+  if (newPassword !== $('cpNew2').value) {
+    showAuthError('cpError', { message: t('acc.mismatch') });
+    return;
+  }
+
+  const button = $('cpSubmit');
+  setBusy(button, true);
+  $('cpError').hidden = true;
+  try {
+    const result = await window.wt.account.changePassword({
+      oldPassword: $('cpOld').value,
+      newPassword,
+    });
+    $('cpOld').value = '';
+    $('cpNew').value = '';
+    $('cpNew2').value = '';
+    await refreshAccount();
+    showRecoveryCode(result.recoveryCode);
+  } catch (err) {
+    showAuthError('cpError', err);
+  } finally {
+    setBusy(button, false);
+  }
+});
+
+// Выход со всех устройств закрывает и эту сессию тоже — поэтому подтверждение
+// отдельным окном: нажатие мимо кнопки не должно заканчиваться повторным
+// вводом пароля на всех машинах сразу.
+$('authLogoutAll').addEventListener('click', () => {
+  $('laError').hidden = true;
+  $('logoutAllModal').hidden = false;
+});
+
+$('logoutAllCancel').addEventListener('click', () => {
+  $('logoutAllModal').hidden = true;
+});
+
+$('logoutAllGo').addEventListener('click', async () => {
+  const button = $('logoutAllGo');
+  setBusy(button, true);
+  try {
+    await window.wt.account.logoutAll();
+    $('logoutAllModal').hidden = true;
+    await refreshAccount();
+  } catch (err) {
+    // Сервер не ответил — сессии на других машинах остались живыми, и молча
+    // выйти здесь значило бы соврать, что просьба выполнена.
+    $('logoutAllModal').hidden = true;
+    showAuthError('laError', err);
+  } finally {
+    setBusy(button, false);
+  }
+});
+
 // --- Код восстановления --------------------------------------------------
 
 function showRecoveryCode(code) {

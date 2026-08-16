@@ -207,6 +207,14 @@ window.wt = {
     register: async () => ({ recoveryCode: 'ABCD-EFGH-JKMN-PQRS' }),
     signIn: async () => ({ signedIn: true, login: 'Username' }),
     signOut: async () => ({ signedIn: false }),
+    // Смена пароля в стенде всегда «удаётся»: смотреть тут нечего, кроме окна
+    // с новым кодом восстановления, — а оно и есть самая заметная часть.
+    changePassword: async () => ({
+      signedIn: true,
+      login: 'Username',
+      recoveryCode: 'WXYZ-2345-6789-ABCD',
+    }),
+    logoutAll: async () => ({ signedIn: false, closed: 3 }),
     saveRecoveryCode: async () => null,
   },
 

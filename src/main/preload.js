@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('wt', {
     register: (form) => invoke('account:register', form),
     signIn: (form) => invoke('account:signIn', form),
     signOut: () => invoke('account:signOut'),
+    changePassword: (form) => invoke('account:changePassword', form),
+    logoutAll: () => invoke('account:logoutAll'),
     saveRecoveryCode: (code) => invoke('account:saveRecoveryCode', code),
   },
 

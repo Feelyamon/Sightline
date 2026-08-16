@@ -796,6 +796,14 @@ handle('account:signOut', async () => {
   return state;
 });
 
+handle('account:changePassword', (_e, form = {}) => account.changePassword(form));
+
+handle('account:logoutAll', async () => {
+  const state = await account.logoutAll();
+  await friends.refresh();
+  return state;
+});
+
 handle('db:counters', () => db.counters());
 handle('db:stats', () => db.stats());
 handle('db:recentBattles', (_e, limit) => db.recentBattles(limit));
