@@ -170,8 +170,8 @@ battles in a profile are confirmed.
 | `src/i18n/` | interface strings in three languages; key parity is covered by a test |
 | `src/renderer/i18n.js` | t(key), plural forms, substitution into the markup |
 
-Roadmap: [ROADMAP.txt](ROADMAP.txt). The original plan that got the app this far:
-[docs/PLAN.md](docs/PLAN.md).
+The original plan that got the app this far: [docs/PLAN.md](docs/PLAN.md).
+What comes next is decided in the issues.
 
 `npm run harness` builds the whole interface into a single HTML file backed by stub data —
 handy for working on the layout in a browser without launching Electron.

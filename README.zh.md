@@ -152,7 +152,7 @@ npm test
 | `src/i18n/` | 三种语言的界面文本；键集一致性由测试保证 |
 | `src/renderer/i18n.js` | t(key)、复数形式、写入标记 |
 
-开发计划：[ROADMAP.txt](ROADMAP.txt)。让程序走到今天的最初计划：[docs/PLAN.md](docs/PLAN.md)。
+让程序走到今天的最初计划：[docs/PLAN.md](docs/PLAN.md)。后续计划在 issues 中讨论。
 
 `npm run harness` 会把整个界面连同占位数据打包成单个 HTML 文件：无需启动 Electron，
 即可在浏览器中查看和调整版式。
