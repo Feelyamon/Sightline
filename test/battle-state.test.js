@@ -506,3 +506,32 @@ test('несвязанная группа остаётся неопознанн�
   // Но внутри пары известно, что они друг против друга: стороны разные.
   assert.notEqual(find(snap, 'C1').side, find(snap, 'D1').side);
 });
+
+test('пользователи программы отмечаются и считаются, но команду не меняют', () => {
+  const s = new BattleState('Me');
+  const snap0 = feed(s, ['Me (Т-80) уничтожил Foe (M1A2)', 'Mate (ИС-2) уничтожил Foe2 (Leopard)']);
+  // Пока не спрашивали — счётчика нет, и это не то же самое, что «никого нет».
+  assert.equal(snap0.usersInBattle, 0);
+
+  s.setKnownPlayers({ users: ['Foe', 'Mate'] });
+  const snap = s.snapshot();
+
+  assert.equal(find(snap, 'Foe').isUser, true);
+  assert.equal(find(snap, 'Mate').isUser, true);
+  assert.equal(find(snap, 'Foe2').isUser, false);
+  assert.equal(snap.usersInBattle, 2, 'себя в счёт не берём');
+
+  // Главное: аккаунт в программе не говорит о команде ничего. Foe остаётся
+  // противником, Mate — неопознанным, ровно как было.
+  assert.equal(find(snap, 'Foe').team, 'enemy');
+  assert.equal(find(snap, 'Mate').team, 'unknown');
+});
+
+test('свои в бою узнаются несмотря на значки игры в нике', () => {
+  const s = new BattleState('Me');
+  feed(s, ['Me (Т-80) уничтожил ⋇^ILAZ^ DeathVision (M1A2)']);
+  // Сервер вернул ник в том написании, в каком его прислали, а в таблице он
+  // мог осесть в другом. Свёртка та же, что и везде, — узнаёт.
+  s.setKnownPlayers({ users: ['^ILAZ^ DeathVision'] });
+  assert.equal(find(s.snapshot(), '⋇^ILAZ^ DeathVision').isUser, true);
+});

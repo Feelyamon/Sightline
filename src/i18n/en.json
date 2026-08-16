@@ -407,5 +407,15 @@
   "card.reportText": "What happened",
   "card.reportPlaceholder": "chat abuse, deliberate teamkill, suspected cheating — with details",
   "card.reportSend": "Send report",
-  "card.reportSent": "Report sent. An administrator will review it."
+  "card.reportSent": "Report sent. An administrator will review it.",
+  "player.isUser": "Uses Sightline — there will be someone to confirm this battle",
+  "status.usersInBattle": "{n} using Sightline",
+  "admin.vehicles": "Vehicle names",
+  "admin.vehiclesHint": "The server merges «Т-80БВМ» and «T-80BVM» by itself through transliteration — those are ticked. What needs merging by hand is what was translated as a word: «Пантера» and «Panther». Most-driven first.",
+  "admin.vehiclesEmpty": "No names yet — no battles on the server",
+  "admin.vehicleSorties": "sorties: {n}",
+  "admin.vehicleMerge": "Merge",
+  "admin.vehicleCanonical": "Treat as this vehicle",
+  "admin.vehicleCanonicalHint": "canonical name; empty removes the mapping",
+  "admin.action.vehicle_alias": "vehicle names merged"
 }

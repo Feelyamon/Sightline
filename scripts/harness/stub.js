@@ -258,6 +258,16 @@ window.wt = {
     block: async () => ({ ok: true }),
     setRole: async () => ({ ok: true }),
     clearAvatar: async () => ({ ok: true }),
+    vehicles: async () => [
+      { folded: 't80bvm', spellings: ['Т-80БВМ', 'T-80BVM'], sorties: 214, canonical: null },
+      { folded: 'pantera', spellings: ['Пантера'], sorties: 38, canonical: null },
+      { folded: 'panther', spellings: ['Panther'], sorties: 31, canonical: null },
+    ],
+    setVehicleAlias: async () => ({ ok: true }),
+    log: async () => [
+      { id: 2, admin_login: 'Username', action: 'block', target_login: 'Narushitel', details: { reason: 'оскорбления в чате' }, at: new Date().toISOString() },
+      { id: 1, admin_login: 'Username', action: 'set_password', target_login: 'Zabyvchivyi', details: {}, at: new Date(Date.now() - 36e5).toISOString() },
+    ],
     reports: async () => [
       {
         id: 3,

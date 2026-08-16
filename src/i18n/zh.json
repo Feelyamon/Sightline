@@ -407,5 +407,15 @@
   "card.reportText": "发生了什么",
   "card.reportPlaceholder": "聊天辱骂、故意击杀队友、疑似作弊——请写明细节",
   "card.reportSend": "发送举报",
-  "card.reportSent": "举报已发送，管理员会处理。"
+  "card.reportSent": "举报已发送，管理员会处理。",
+  "player.isUser": "使用 Sightline——这场战斗将有人可以确认",
+  "status.usersInBattle": "使用 Sightline 的有 {n} 人",
+  "admin.vehicles": "载具名称",
+  "admin.vehiclesHint": "服务器会通过音译自动合并「Т-80БВМ」与「T-80BVM」——这类已打勾。需要手动合并的是按词翻译的名称，例如「Пантера」与「Panther」。按出场次数排序。",
+  "admin.vehiclesEmpty": "暂无名称——服务器上还没有战斗",
+  "admin.vehicleSorties": "出场：{n}",
+  "admin.vehicleMerge": "合并",
+  "admin.vehicleCanonical": "视为该载具",
+  "admin.vehicleCanonicalHint": "规范名称；留空则取消映射",
+  "admin.action.vehicle_alias": "合并载具名称"
 }

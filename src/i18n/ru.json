@@ -407,5 +407,15 @@
   "card.reportText": "Что случилось",
   "card.reportPlaceholder": "оскорбления в чате, намеренный тимкилл, подозрение на читы — с подробностями",
   "card.reportSend": "Отправить жалобу",
-  "card.reportSent": "Жалоба отправлена. Её разберёт администратор."
+  "card.reportSent": "Жалоба отправлена. Её разберёт администратор.",
+  "player.isUser": "Пользуется Sightline — этот бой будет кому подтвердить",
+  "status.usersInBattle": "своих в бою: {n}",
+  "admin.vehicles": "Названия техники",
+  "admin.vehiclesHint": "«Т-80БВМ» и «T-80BVM» сервер сводит сам транслитерацией — такие помечены галочкой. Сводить руками надо то, что переведено словом: «Пантера» и «Panther». Сверху то, на чём чаще ездят.",
+  "admin.vehiclesEmpty": "Названий пока нет — боёв на сервере ещё не было",
+  "admin.vehicleSorties": "вылетов: {n}",
+  "admin.vehicleMerge": "Свести",
+  "admin.vehicleCanonical": "Считать этой машиной",
+  "admin.vehicleCanonicalHint": "каноническое название; пусто — снять соответствие",
+  "admin.action.vehicle_alias": "сведение названий"
 }

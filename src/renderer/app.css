@@ -867,3 +867,12 @@ textarea:focus {
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* Ник пользователя программы подчёркнут. Пунктиром и приглушённо: в таблице
+   боя и так есть отметка отряда, метка досье и рамка «Око за око» — четвёртое
+   яркое украшение превратило бы строку в ёлку. */
+.nick-name.is-user {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--accent);
+}

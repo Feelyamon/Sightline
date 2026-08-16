@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld('wt', {
     block: (id, blocked, reason, confirm) => invoke('admin:block', id, blocked, reason, confirm),
     setRole: (id, role, confirm) => invoke('admin:setRole', id, role, confirm),
     log: () => invoke('admin:log'),
+    vehicles: () => invoke('admin:vehicles'),
+    setVehicleAlias: (alias, canonical) => invoke('admin:setVehicleAlias', alias, canonical),
     clearAvatar: (id) => invoke('admin:clearAvatar', id),
     reports: (scope) => invoke('admin:reports', scope),
     resolveReport: (id, resolved, note) => invoke('admin:resolveReport', id, resolved, note),

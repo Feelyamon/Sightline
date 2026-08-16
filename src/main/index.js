@@ -276,6 +276,9 @@ function startClient() {
     // сразу пошёл новый, никогда бы не уехал на сервер.
     persistBattle({ final: true });
     battle.reset();
+    // Состав нового боя другой: спрашивать про него надо заново.
+    peersAsked = new Set();
+    peersFound = new Set();
     battleStartedAt = Date.now();
     battleRowId = null; // следующий бой — новая запись
     battleResult = 'unknown';
@@ -289,6 +292,7 @@ function startClient() {
   client.on('damage', (entry) => {
     battle.ingest(entry);
     schedulePush();
+    schedulePeers();
   });
 
   client.on('chat', (entry) => {
@@ -310,6 +314,46 @@ function startClient() {
  * для графа команд. Поэтому он живёт в main и обновляется независимо от того,
  * открыто ли окно друзей.
  */
+// Кто из участников текущего боя пользуется программой.
+//
+// Спрашиваем не на каждое событие, а когда состав ПОПОЛНИЛСЯ: в начале боя
+// ники прибывают пачками, и запрос на каждого означал бы полсотни обращений
+// за минуту ради одного и того же ответа.
+let peersAsked = new Set();
+let peersFound = new Set();
+let peersTimer = null;
+
+function schedulePeers() {
+  if (!account.isSignedIn || peersTimer) return;
+  peersTimer = setTimeout(async () => {
+    peersTimer = null;
+    const nicks = battle.snapshot().players.map((p) => p.nick);
+    const fresh = nicks.filter((n) => !peersAsked.has(n));
+    if (!fresh.length) return;
+    for (const n of nicks) peersAsked.add(n);
+
+    try {
+      // Спрашиваем про весь состав, а не только про новых: ответ про старых
+      // мог измениться — человек мог заявить свой ник только что.
+      const { users } = await account.request('/battles/peers', {
+        method: 'POST',
+        body: { nicks },
+        auth: true,
+      });
+      peersFound = new Set(users || []);
+      battle.setKnownPlayers({
+        squad: friends.squadNicks(),
+        friends: friends.friendNicks(),
+        users: [...peersFound],
+      });
+      schedulePush();
+    } catch {
+      // Нет сети или сервер отказал — подчёркивания просто не будет.
+      // Разбор боя от этого не зависит вообще.
+    }
+  }, 3000);
+}
+
 function startFriends() {
   friends.onChange = (state) => {
     battle.setKnownPlayers({ squad: friends.squadNicks(), friends: friends.friendNicks() });
@@ -607,6 +651,14 @@ handle('admin:setRole', (_e, accountId, role, confirm) =>
   })
 );
 handle('admin:log', () => account.request('/admin/log', { auth: true }));
+handle('admin:vehicles', () => account.request('/admin/vehicles', { auth: true }));
+handle('admin:setVehicleAlias', (_e, alias, canonical) =>
+  account.request('/admin/vehicles/alias', {
+    method: 'POST',
+    body: { alias: String(alias || ''), canonical: String(canonical || '') },
+    auth: true,
+  })
+);
 handle('admin:clearAvatar', (_e, accountId) =>
   account.request('/admin/avatar/clear', {
     method: 'POST',

@@ -86,6 +86,7 @@ $('tabs').addEventListener('click', (e) => {
   if (tab.dataset.tab === 'admin') {
     refreshAdminUsers();
     refreshAdminReports();
+    refreshAdminVehicles();
     refreshAdminLog();
   }
 });
@@ -220,7 +221,11 @@ function playersTable(players) {
       mark.title = t('player.friend');
       nick.append(mark);
     }
-    const nameEl = el('span', 'nick-name', p.nick);
+    const nameEl = el('span', `nick-name${p.isUser ? ' is-user' : ''}`, p.nick);
+    // Подчёркивание значит одно: у человека есть аккаунт в программе. О его
+    // команде это не говорит ничего, зато говорит другое — этот бой будет
+    // кому подтвердить.
+    if (p.isUser && !p.isSelf) nameEl.title = t('player.isUser');
     nameEl.addEventListener('click', () => openCard(p.nick));
     nick.append(nameEl);
     nick.title = p.nick;
@@ -343,8 +348,13 @@ function renderBattle(state) {
     $('statusText').textContent =
       t(STATUS_KEY[state.status] || 'status.unknown') + (state.detail ? ` · ${state.detail}` : '');
   }
+  // Сколько людей в этом бою смогут подтвердить его запись. Показываем только
+  // когда они есть: «в бою ещё 0 пользователей» — это не сведение, а укор.
+  const peers = state.usersInBattle
+    ? ` · ${t('status.usersInBattle', { n: state.usersInBattle })}`
+    : '';
   $('counter').textContent =
-    `${clockText(state.clock)} · ${t('status.known', { n: state.knownPlayers })}`;
+    `${clockText(state.clock)} · ${t('status.known', { n: state.knownPlayers })}${peers}`;
 
   const byTeam = (team) => state.players.filter((p) => p.team === team);
   const allies = byTeam('ally');
@@ -1421,6 +1431,61 @@ async function refreshAdminLog() {
   }
 }
 
+/**
+ * Названия техники, встреченные в боях.
+ *
+ * Половину работы делает транслитерация на сервере: «Т-80БВМ» и «T-80BVM»
+ * сходятся сами. Сюда попадает то, что механически не сводится, — переведённые
+ * словом названия вроде «Пантера» и «Panther». Сортировка по частоте: сводить
+ * имеет смысл то, на чём реально ездят, а не весь справочник игры.
+ */
+async function refreshAdminVehicles() {
+  try {
+    const rows = await window.wt.admin.vehicles();
+    $('adminVehicles').replaceChildren(
+      ...(rows.length
+        ? rows.map((v) => {
+            const row = el('div', 'admin-user');
+            const head = el('div', 'admin-user-head');
+            head.append(
+              el('span', 'admin-login', v.spellings.join(' · ')),
+              el('span', 'muted', t('admin.vehicleSorties', { n: v.sorties }))
+            );
+            // Несколько написаний под одним ключом — уже сведено само.
+            if (v.spellings.length > 1) head.append(el('span', 'trust confirmed', '✓'));
+            if (v.canonical) head.append(el('span', 'muted', `→ ${v.canonical}`));
+            row.append(head);
+
+            const actions = el('div', 'admin-actions');
+            actions.append(
+              adminButton(t('admin.vehicleMerge'), () =>
+                askFields(
+                  row,
+                  [
+                    {
+                      name: 'canonical',
+                      label: t('admin.vehicleCanonical'),
+                      placeholder: t('admin.vehicleCanonicalHint'),
+                    },
+                  ],
+                  async ({ canonical }) => {
+                    await window.wt.admin.setVehicleAlias(v.spellings[0], canonical);
+                    refreshAdminVehicles();
+                  }
+                )
+              )
+            );
+            row.append(actions);
+            return row;
+          })
+        : [el('div', 'empty', t('admin.vehiclesEmpty'))])
+    );
+  } catch (e) {
+    showAdminError(e);
+  }
+}
+
+$('adminVehiclesRefresh').addEventListener('click', refreshAdminVehicles);
 $('adminLogRefresh').addEventListener('click', refreshAdminLog);
 $('adminSearch').addEventListener('click', refreshAdminUsers);
 $('adminQuery').addEventListener('keydown', (e) => {
