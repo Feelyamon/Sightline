@@ -535,3 +535,39 @@ test('свои в бою узнаются несмотря на значки и�
   s.setKnownPlayers({ users: ['^ILAZ^ DeathVision'] });
   assert.equal(find(s.snapshot(), '⋇^ILAZ^ DeathVision').isUser, true);
 });
+
+test('отряд, которого нет в кил-фиде, отмечается, но бой не трогает', () => {
+  // Просьба владельца была «может, не засчитывать бой вообще». Так делать
+  // нельзя: список отряда человек набирает сам, и отмена боя по нему означала
+  // бы, что любой неудачный бой отменяется добавлением отсутствующего друга.
+  // Это та же лазейка, что закрыта в этапе 10 про удаление боёв.
+  //
+  // Плюс отсутствие в кил-фиде ничего не доказывает: игра показывает только
+  // тех, кто кого-то убил или повредил.
+  const s = new BattleState('Me');
+  s.setKnownPlayers({ squad: ['Buddy', 'Silent'], friends: [] });
+  const snap = feed(s, ['Buddy (T-34) уничтожил Foe (Tiger H1)']);
+
+  assert.deepEqual(snap.squadMissing, ['Silent'], 'молчащий сокомандник назван');
+  // Главное: бой остаётся обычным боем. Ни отмены, ни пометки, ни влияния на
+  // разбор — Buddy по-прежнему якорь, Foe по-прежнему противник.
+  assert.equal(snap.cancelled, undefined, 'бой не отменяется');
+  assert.equal(find(snap, 'Buddy').team, 'ally');
+  assert.equal(find(snap, 'Foe').team, 'enemy');
+});
+
+test('весь отряд на виду — сообщать не о чем', () => {
+  const s = new BattleState('Me');
+  s.setKnownPlayers({ squad: ['Buddy'], friends: [] });
+  const snap = feed(s, ['Buddy (T-34) уничтожил Foe (Tiger H1)']);
+  assert.deepEqual(snap.squadMissing, []);
+});
+
+test('значки игры в нике не делают сокомандника пропавшим', () => {
+  // Иначе строка «из отряда не видно» загоралась бы у всех подряд: игра
+  // подставляет к никам свои значки, и посимвольно они не совпадают.
+  const s = new BattleState('Me');
+  s.setKnownPlayers({ squad: ['^ILAZ^ DeathVision'], friends: [] });
+  const snap = feed(s, ['⋇^ILAZ^ DeathVision (M1A2) уничтожил Foe (Т-80БВМ)']);
+  assert.deepEqual(snap.squadMissing, []);
+});

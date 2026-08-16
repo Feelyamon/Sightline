@@ -725,7 +725,12 @@ label.row.consent input { margin-top: 3px; }
    аватарка, имя, цифры за месяц. Разметка сознательно не завязана на «это я»,
    чтобы ею же рендерить чужой профиль, когда он появится. Владельцу
    достаётся только кнопка редактирования; на чужой карточке её нет. */
-.profile { max-width: 560px; }
+/* Карточка занимает всю ширину раздела. Ограничение в 560 оставляло справа
+   пустое поле шириной с саму карточку — в окне 1000 пикселей это выглядело
+   как незаконченная вёрстка. Формы редактирования при этом узкие: поле ввода
+   пароля во всю ширину окна не нужно никому. */
+.profile { max-width: none; }
+#accEditor { max-width: 460px; }
 
 .profile-card {
   border: 1px solid var(--line);
@@ -771,15 +776,17 @@ label.row.consent input { margin-top: 3px; }
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-2);
-  padding: 10px 6px;
+  padding: 14px 8px;
 }
-.profile-stat-value { font-size: 20px; font-weight: 600; line-height: 1.2; }
-.profile-stat-label { color: var(--muted); font-size: 11px; margin-top: 3px; }
+.profile-stat-value { font-size: 24px; font-weight: 600; line-height: 1.2; }
+.profile-stat-label { color: var(--muted); font-size: 12px; margin-top: 4px; }
 /* Победы и поражения читаются цветом быстрее, чем словом. */
 .profile-stat-value.good { color: var(--ally); }
 .profile-stat-value.bad { color: var(--enemy); }
 
-.profile-note { margin: 0 0 14px; }
+/* Текст объяснения не растягиваем на всю карточку: строка в сто знаков
+   читается хуже, чем в шестьдесят, даже если место есть. */
+.profile-note { margin: 0 auto 14px; max-width: 62ch; }
 .profile-actions { justify-content: center; margin: 0; }
 
 /* Код восстановления: крупно и моноширинно — его переписывают глазами. */

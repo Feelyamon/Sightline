@@ -361,6 +361,15 @@ function renderBattle(state) {
   $('counter').textContent =
     `${clockText(state.clock)} · ${t('status.known', { n: state.knownPlayers })}${peers}`;
 
+  // Отряд, которого в бою не видно. Формулировка нарочно нейтральная: человек
+  // мог ошибиться списком, а мог просто ехать с молчаливым сокомандником,
+  // который ещё никого не тронул, — и различить это нечем.
+  const missing = state.squadMissing || [];
+  $('squadMissing').hidden = missing.length === 0;
+  if (missing.length) {
+    $('squadMissing').textContent = t('battle.squadMissing', { nicks: missing.join(', ') });
+  }
+
   const byTeam = (team) => state.players.filter((p) => p.team === team);
   const allies = byTeam('ally');
   const enemies = byTeam('enemy');
@@ -1768,7 +1777,9 @@ async function renderProfileStats() {
 
 function streakTile(current) {
   if (!current || !current.length || current.type === 'none') {
-    return { value: t('acc.stat.none'), label: t('acc.streak.empty') };
+    // Подпись остаётся названием плитки. «— / нет» читается как поломка:
+    // непонятно, чего именно нет.
+    return { value: t('acc.stat.none'), label: t('acc.stat.streak') };
   }
   const win = current.type === 'win';
   const word = window.i18n.plural(current.length, win ? 'plural.wins' : 'plural.losses');
