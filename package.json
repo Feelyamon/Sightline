@@ -13,6 +13,14 @@
   },
   "author": "",
   "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Solevaral/Sightline.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Solevaral/Sightline/issues"
+  },
+  "homepage": "https://sightline.feelyamon.ru/",
   "devDependencies": {
     "electron": "^43.4.0",
     "electron-builder": "^25.1.8"

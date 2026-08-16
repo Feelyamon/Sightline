@@ -2112,6 +2112,22 @@ async function renderAbout() {
     if (!value) continue;
     facts.append(el('dt', null, t(key)), el('dd', null, String(value)));
   }
+
+  // Исходный код — последней строкой и ссылкой, а не текстом. Программа читает
+  // игровой API и шлёт данные на сервер; первый вопрос всегда «а что оно
+  // отправляет», и на него лучше отвечать ссылкой, чем словами.
+  if (about.repo) {
+    const link = el('a', null, about.repo);
+    link.href = '#';
+    link.title = t('about.sourceOpen');
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.wt.openExternal('repo');
+    });
+    const dd = el('dd');
+    dd.append(link);
+    facts.append(el('dt', null, t('about.source')), dd);
+  }
 }
 
 // --- Карточка игрока ----------------------------------------------------

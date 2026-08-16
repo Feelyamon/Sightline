@@ -223,6 +223,8 @@
   "about.what": "Sightline 读取《战争雷霆》的击杀信息，显示当前谁在使用什么载具，并积累战斗与玩家的历史记录。",
   "about.version": "版本",
   "about.license": "许可证",
+  "about.source": "源代码",
+  "about.sourceOpen": "在 GitHub 上打开",
   "about.runtime": "构建于",
   "about.dataFile": "数据文件",
   "about.disclaimer": "本程序与 Gaijin Entertainment 无关，也未获得其认可。War Thunder 是 Gaijin Entertainment 的商标，此处仅用于说明兼容性。",

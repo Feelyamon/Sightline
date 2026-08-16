@@ -37,3 +37,16 @@ test('в заголовок уходит версия из package.json', () => 
   assert.equal(APP_VERSION, require('../package.json').version);
   assert.ok(parseVersion(APP_VERSION), 'версия приложения должна разбираться');
 });
+
+test('адрес репозитория пригоден для показа и для открытия', () => {
+  // Этот адрес видит человек во вкладке «О программе» и по нему же уходит в
+  // браузер. Проверка не про красоту: main открывает его только если это https
+  // и github.com, поэтому опечатка в package.json превратилась бы в мёртвую
+  // строку в окне, о которой никто бы не узнал до жалобы.
+  const raw = require('../package.json').repository?.url || '';
+  const shown = raw.replace(/^git\+/, '').replace(/\.git$/, '');
+  const url = new URL(shown);
+  assert.equal(url.protocol, 'https:');
+  assert.equal(url.hostname, 'github.com');
+  assert.ok(!shown.endsWith('.git'), 'человеку показываем адрес без .git');
+});

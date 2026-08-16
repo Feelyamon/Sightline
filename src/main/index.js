@@ -476,10 +476,21 @@ handle('app:getState', () => ({
 handle('app:about', () => ({
   version: app.getVersion(),
   license: require('../../package.json').license,
+  repo: repoUrl(),
   electron: process.versions.electron,
   node: process.versions.node,
   dbFile: db.stats().file,
 }));
+
+// Адрес репозитория берём из package.json, а не пишем второй раз строкой:
+// разъехаться два места однажды разъедутся, и в окне окажется адрес, которого
+// больше нет. Форма «git+https://…​.git» — та, что понимает npm; человеку
+// показываем обычную ссылку.
+function repoUrl() {
+  const raw = require('../../package.json').repository?.url || '';
+  const url = raw.replace(/^git\+/, '').replace(/\.git$/, '');
+  return url.startsWith('https://') ? url : '';
+}
 
 handle('app:setLang', (_e, lang) => {
   settings.set('uiLang', locale.normalize(lang));
@@ -774,8 +785,22 @@ handle('app:openExternal', (_e, page) => {
   // произвольный адрес из окна — способ открыть что угодно чужими руками.
   const pages = { terms: '/terms', privacy: '/privacy', rights: '/rights' };
   const route = pages[page];
-  if (!route) throw new Error('неизвестная страница');
-  return shell.openExternal(config.site + route);
+  if (route) return shell.openExternal(config.site + route);
+
+  // Репозиторий живёт на чужом хосте, поэтому идёт отдельной веткой, а не
+  // подклеивается к адресу сайта. Проверяем то же, что и у адреса обновления:
+  // https и заранее известный хост.
+  if (page === 'repo') {
+    const raw = repoUrl();
+    if (!raw) throw new Error('адрес репозитория не задан');
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' || url.hostname !== 'github.com') {
+      throw new Error('адрес репозитория не с github.com');
+    }
+    return shell.openExternal(url.href);
+  }
+
+  throw new Error('неизвестная страница');
 });
 
 handle('account:openDownload', () => {

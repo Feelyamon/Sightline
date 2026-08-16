@@ -103,6 +103,10 @@ window.wt = {
     languages: LANGS,
   }),
   setNick: async () => {},
+  // В приложении это уходит в shell.openExternal. В стенде открывать браузер
+  // незачем — достаточно не падать: без заглушки клик по ссылке на репозиторий
+  // ронял бы обработчик и молча ломал вкладку.
+  openExternal: async (page) => console.log('openExternal:', page),
   setLang: async (lang) => {
     LANG = lang;
     return { lang, dict: DICTS[lang], languages: LANGS };
@@ -112,11 +116,15 @@ window.wt = {
   setWindowFlag: async (n, v) => v,
   onOpenTab: () => () => {},
   about: async () => ({
-    version: '0.1.0',
-    license: 'MIT',
+    version: '0.3.0',
+    license: 'GPL-3.0-or-later',
+    repo: 'https://github.com/Solevaral/Sightline',
     electron: '43.4.0',
     node: '22.0.0',
-    dbFile: 'C:\Users\Username\AppData\Roaming\Sightline\battles.db',
+    // Обратные слэши экранированы. Раньше не были, и строка молча теряла
+    // буквы: «\U» это просто «U», а «\b» — вообще забой. В окне показывался
+    // путь, которого не бывает.
+    dbFile: 'C:\\Users\\Username\\AppData\\Roaming\\Sightline\\battles.db',
   }),
   // В приложении масштаб ставит Electron через setZoomFactor; в браузере
   // ближайший аналог — css zoom, чтобы стенд вёл себя так же.

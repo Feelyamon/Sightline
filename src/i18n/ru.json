@@ -223,6 +223,8 @@
   "about.what": "Sightline читает кил-фид War Thunder, показывает, кто на какой технике воюет прямо сейчас, и копит историю боёв и игроков.",
   "about.version": "Версия",
   "about.license": "Лицензия",
+  "about.source": "Исходный код",
+  "about.sourceOpen": "Открыть на GitHub",
   "about.runtime": "Собрано на",
   "about.dataFile": "Файл данных",
   "about.disclaimer": "Программа не связана с Gaijin Entertainment и не одобрена ею. War Thunder — товарный знак Gaijin Entertainment, название использовано только для указания совместимости.",
