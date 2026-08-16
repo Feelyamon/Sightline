@@ -468,14 +468,29 @@
         </div>
       </form>
 
-      <div class="auth" id="authSignedIn" hidden>
-        <h2 data-i18n="acc.signedInAs"></h2>
-        <p class="account-login" id="accLogin"></p>
-        <p class="muted" id="accRole"></p>
+      <div class="auth profile" id="authSignedIn" hidden>
+        <!-- Карточка профиля. Ровно то, что увидит о вас другой игрок, когда
+             появятся публичные профили: та же разметка, только кнопка
+             редактирования достаётся владельцу. -->
+        <div class="profile-card">
+          <div class="avatar-big profile-avatar" id="accAvatar"></div>
+          <h2 class="profile-name" id="accLogin"></h2>
+          <p class="profile-role" id="accRole"></p>
 
+          <div class="profile-stats" id="accStats"></div>
+          <p class="muted small profile-note" data-i18n="acc.statsLocal"></p>
+
+          <!-- Показывается только владельцу профиля. Чужую карточку эта кнопка
+               не сопровождает никогда. -->
+          <div class="buttons profile-actions" id="accOwnerActions">
+            <button id="profileEdit" data-i18n="acc.edit"></button>
+          </div>
+        </div>
+
+        <div id="accEditor" hidden>
         <div class="section-title" data-i18n="acc.avatar"></div>
         <div class="avatar-editor">
-          <div class="avatar-big" id="accAvatar"></div>
+          <div class="avatar-big" id="accAvatarEdit"></div>
           <div class="buttons">
             <button id="avatarChoose" data-i18n="acc.avatarChoose"></button>
             <button id="avatarRemove" data-i18n="acc.avatarRemove"></button>
@@ -514,8 +529,8 @@
         <div class="buttons">
           <button id="authLogoutAll" data-i18n="acc.signOutAll"></button>
         </div>
-        <p class="muted small" data-i18n="acc.signOutAllHint"></p>
         <div class="auth-error" id="laError" hidden></div>
+        </div>
       </div>
     </section>
 

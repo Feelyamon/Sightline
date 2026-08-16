@@ -717,6 +717,71 @@ label.row.consent input { margin-top: 3px; }
 .note-block p { margin: 6px 0 0; }
 .account-login { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
 
+/* --- Карточка профиля ---------------------------------------------------
+   Раздел «Аккаунт» был бегущим сверху вниз текстом: логин, роль, аватарка,
+   форма смены пароля, кнопки. Человек про себя читал справку.
+
+   Теперь сверху карточка — то же, что однажды увидит о нём другой игрок:
+   аватарка, имя, цифры за месяц. Разметка сознательно не завязана на «это я»,
+   чтобы ею же рендерить чужой профиль, когда он появится. Владельцу
+   достаётся только кнопка редактирования; на чужой карточке её нет. */
+.profile { max-width: 560px; }
+
+.profile-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 20px 18px 16px;
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+/* Аватарка крупная и круглая: в карточке она главная, а квадрат со стороной
+   64 читается как значок в списке, а не как портрет.
+
+   Селектор из двух классов намеренно: .avatar-big объявлен ниже по файлу, и
+   при равной специфичности побеждал бы он — аватарка осталась бы квадратом
+   64×64. Поймано на стенде. */
+.avatar-big.profile-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  font-size: 34px;
+}
+.avatar-big.profile-avatar .avatar-img { border-radius: 50%; }
+
+.profile-name { font-size: 22px; font-weight: 600; margin: 0 0 2px; }
+.profile-role { color: var(--muted); margin: 0 0 16px; font-size: 12px; }
+
+/* Плитки. Четыре колонки заданы явно, а не auto-fit: auto-fit при ширине
+   карточки 560 насчитывал пятую дорожку, схлопывал её в ноль и оставлял перед
+   ней отступ — четыре плитки уезжали от центра на восемь пикселей. Поймано на
+   стенде. В узком окне колонок две, иначе цифры ломаются пополам. */
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+@media (max-width: 700px) {
+  .profile-stats { grid-template-columns: repeat(2, 1fr); }
+}
+.profile-stat {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 10px 6px;
+}
+.profile-stat-value { font-size: 20px; font-weight: 600; line-height: 1.2; }
+.profile-stat-label { color: var(--muted); font-size: 11px; margin-top: 3px; }
+/* Победы и поражения читаются цветом быстрее, чем словом. */
+.profile-stat-value.good { color: var(--ally); }
+.profile-stat-value.bad { color: var(--enemy); }
+
+.profile-note { margin: 0 0 14px; }
+.profile-actions { justify-content: center; margin: 0; }
+
 /* Код восстановления: крупно и моноширинно — его переписывают глазами. */
 .recovery-code {
   margin: 16px 0;

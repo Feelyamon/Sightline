@@ -110,6 +110,11 @@ function clockText(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/** Целое число по языку интерфейса, а не по языку системы. */
+function fmtInt(n) {
+  return Number(n || 0).toLocaleString(window.i18n.locale());
+}
+
 function dateText(ms) {
   if (!ms) return '—';
   const d = new Date(ms);
@@ -1705,8 +1710,73 @@ function renderFriends(state) {
 
 function renderMyAvatar() {
   const mine = friendsState.me || { login: accountLogin, avatar: null };
-  $('accAvatar').replaceChildren(avatarContent(mine.login || accountLogin, mine.avatar));
+  const login = mine.login || accountLogin;
+  // Две картинки: крупная в карточке и обычная рядом с кнопками замены.
+  // Один и тот же узел в двух местах показать нельзя — DOM его переносит.
+  $('accAvatar').replaceChildren(avatarContent(login, mine.avatar));
+  $('accAvatarEdit').replaceChildren(avatarContent(login, mine.avatar));
   $('avatarRemove').disabled = !mine.avatar;
+}
+
+/**
+ * Плитки профиля: бои, победы, КДА и серия за последние 30 дней.
+ *
+ * Считается по местной истории. Серверных публичных профилей ещё нет, и
+ * подписывать эти цифры «так вас видят другие» было бы обещанием того, чего
+ * пока не существует, — поэтому под плитками стоит честная оговорка.
+ */
+async function renderProfileStats() {
+  const МЕСЯЦ = 30 * 24 * 60 * 60 * 1000;
+  const box = $('accStats');
+  try {
+    const [{ summary }, streaks] = await Promise.all([
+      // limit: 1 — сами бои не нужны, нужна только сводка по ним.
+      window.wt.db.searchBattles({ from: Date.now() - МЕСЯЦ, limit: 1 }),
+      window.wt.db.streaks(),
+    ]);
+
+    const плитки = [
+      {
+        value: fmtInt(summary.battles),
+        // Через словарь форм, а не строкой: «1 боёв за месяц» уже чинили
+        // однажды в подписях графиков, второй раз наступать не будем.
+        label: t('acc.stat.battlesPeriod', {
+          word: window.i18n.plural(summary.battles, 'plural.battles'),
+        }),
+      },
+      {
+        value: summary.percent === null ? t('acc.stat.none') : `${summary.percent}%`,
+        label: t('acc.stat.winrate'),
+        tone: summary.percent === null ? '' : summary.percent >= 50 ? 'good' : 'bad',
+      },
+      { value: summary.battles ? summary.kda.toFixed(2) : t('acc.stat.none'), label: t('acc.stat.kda') },
+      streakTile(streaks.current),
+    ];
+
+    box.replaceChildren(...плитки.map((п) => {
+      const tile = el('div', 'profile-stat');
+      const value = el('div', `profile-stat-value${п.tone ? ' ' + п.tone : ''}`, п.value);
+      tile.append(value, el('div', 'profile-stat-label', п.label));
+      return tile;
+    }));
+  } catch {
+    // Профиль без цифр лучше, чем раздел аккаунта, который не открылся из-за
+    // сбоя в базе: войти и сменить пароль человек должен мочь всегда.
+    box.replaceChildren();
+  }
+}
+
+function streakTile(current) {
+  if (!current || !current.length || current.type === 'none') {
+    return { value: t('acc.stat.none'), label: t('acc.streak.empty') };
+  }
+  const win = current.type === 'win';
+  const word = window.i18n.plural(current.length, win ? 'plural.wins' : 'plural.losses');
+  return {
+    value: fmtInt(current.length),
+    label: t('acc.streak.inRow', { word }),
+    tone: win ? 'good' : 'bad',
+  };
 }
 
 /** Обёртка над действиями с аватаркой: одна кнопка, одно место для ошибки. */
@@ -1815,6 +1885,21 @@ async function checkVersion() {
   }
 }
 
+// Редактирование прячется за кнопкой. Карточка — то, что человек пришёл
+// посмотреть; формы смены пароля и выхода нужны раз в полгода и до сих пор
+// занимали весь экран вместо неё.
+function closeProfileEditor() {
+  $('accEditor').hidden = true;
+  $('profileEdit').textContent = t('acc.edit');
+}
+
+$('profileEdit').addEventListener('click', () => {
+  const открыт = !$('accEditor').hidden;
+  $('accEditor').hidden = открыт;
+  $('profileEdit').textContent = открыт ? t('acc.edit') : t('acc.editDone');
+  if (!открыт) $('accEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
 $('outdatedDownload').addEventListener('click', () => window.wt.account.openDownload());
 $('outdatedRetry').addEventListener('click', checkVersion);
 
@@ -1830,6 +1915,10 @@ async function refreshAccount() {
   if (state.signedIn) {
     $('accLogin').textContent = state.login;
     $('accRole').textContent = t(state.isAdmin ? 'acc.role.admin' : 'acc.role.user');
+    // Форма редактирования каждый раз закрыта: раздел открывают, чтобы
+    // посмотреть на себя, а не чтобы сменить пароль.
+    closeProfileEditor();
+    renderProfileStats();
     showAuthScreen('authSignedIn');
   } else {
     showAuthScreen('authGuest');
