@@ -18,6 +18,23 @@
   accent-color: var(--accent);
 }
 
+/* Атрибут hidden обязан прятать. Звучит как трюизм, но по умолчанию это НЕ так:
+   правило [hidden] { display: none } живёт в стилях браузера, а любое наше
+   правило с display перебивает его целиком — стили автора сильнее браузерных
+   независимо от специфичности. То есть .tab { display: flex } делает hidden на
+   кнопке навигации бесполезным, и элемент остаётся на экране.
+
+   Ровно так вкладка «Админка» показывалась всем и с первого запуска: hidden
+   стоял в разметке, код исправно ставил его снова, а видно её было всё равно.
+   Данные при этом не открывались — админские методы закрыты на сервере типом
+   аргумента, — но кнопка сообщала всем, что админка существует.
+
+   Ниже по файлу были пять точечных заплаток от этой же грабли
+   (tr.detail-row[hidden], details[hidden] и другие). Их убрали: одно общее
+   правило закрывает случай целиком, а список исключений пришлось бы дополнять
+   при каждом новом display в вёрстке — и однажды забыть. */
+[hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
 
 body {
@@ -296,14 +313,12 @@ td.cancelled { color: #e0b354; white-space: nowrap; }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: var(--panel); }
 tr.detail-row > td { background: var(--panel-2); padding: 10px; }
-tr.detail-row[hidden] { display: none; }
 .roster .side-title.unknown { color: var(--muted); }
 tr.row-dead td.nick { color: var(--muted); }
 
 .empty { color: var(--muted); padding: 12px 4px; }
 
 details > summary { cursor: pointer; list-style: revert; }
-details[hidden] { display: none; }
 
 /* --- Техника --- */
 .veh { display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -619,7 +634,6 @@ label.field { flex-direction: column; align-items: stretch; max-width: 420px; }
 .filters label.row.grow { flex: 1 1 220px; }
 .filters input[type="search"] { width: 100%; min-width: 140px; }
 .filters .sel { max-width: 190px; }
-label.row[hidden] { display: none; }
 
 #battlesSummary { color: var(--accent); }
 .more { justify-content: center; margin-top: 10px; }
@@ -638,7 +652,6 @@ label.row[hidden] { display: none; }
 }
 /* display в правиле выше перебивает атрибут hidden, поэтому гасим явно —
    иначе модалка висит поверх интерфейса с момента загрузки. */
-.modal-backdrop[hidden] { display: none; }
 /* Блокирующее окно поверх всего, включая другие модалки: пока программа
    устарела, ничего важнее этого сообщения на экране нет. */
 .modal-backdrop.blocking { z-index: 100; background: #000d; }
@@ -688,7 +701,6 @@ label.row[hidden] { display: none; }
   color: #ffb3b3;
   font-size: 14px;
 }
-.auth-error[hidden] { display: none; }
 /* Галочка согласия и текст рядом: без выравнивания по верху длинный текст
    уползает от квадратика. */
 label.row.consent { align-items: flex-start; gap: 10px; margin: 14px 0; }
