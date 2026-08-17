@@ -901,9 +901,19 @@ handle('support:send', async (_e, form = {}) => {
 
 handle('support:mine', () => account.request('/bugs/mine', { auth: true }));
 
-handle('support:context', () => ({
+handle('support:context', async () => ({
   appVersion: app.getVersion(),
   osVersion: `${process.platform} ${require('node:os').release()}`,
+  // Железо и система. Прикладывается ТОЛЬКО к сообщению о проблеме и только
+  // если человек оставил галочку — он видит перед отправкой всё до единого
+  // значения. Постоянного сбора нет и не будет: это разбор поломки, а не
+  // слежение за машиной.
+  //
+  // Зачем так подробно. «Программа тормозит», «окно чёрное», «не видит игру» —
+  // три самых частых жалобы, и все три упираются в железо и драйверы. Без них
+  // разбор превращается в переписку на неделю: сколько памяти, какая видеокарта,
+  // какой драйвер. Один раз спросить у машины дешевле, чем пять раз у человека.
+  system: await systemInfo(),
   signedIn: account.isSignedIn,
   login: account.state().login,
   lang: locale.normalize(settings.get('uiLang')),
@@ -925,6 +935,64 @@ handle('support:context', () => ({
  * другого. Он нужен ровно для двух вещей — не дать одной установке засыпать
  * сервер сообщениями и склеить десять нажатий «отправить» в одно.
  */
+/**
+ * Сведения о машине для сообщения о проблеме.
+ *
+ * Собираются в момент открытия формы, не раньше: держать их наготове значило
+ * бы собирать их всегда, а нужны они только тем, кто жалуется.
+ */
+async function systemInfo() {
+  const os = require('node:os');
+  const cpus = os.cpus() || [];
+  const гб = (b) => Math.round((b / 1024 ** 3) * 10) / 10;
+
+  let gpu = [];
+  try {
+    // basic, а не complete: complete отдаёт километр внутренних флагов
+    // Chromium, из которых человеку не понятно ничего, а нам полезны две
+    // строки — модель и драйвер.
+    const info = await app.getGPUInfo('basic');
+    gpu = (info?.gpuDevice || [])
+      .map((d) =>
+        [d.vendorId ? `vendor ${d.vendorId}` : '', d.deviceId ? `device ${d.deviceId}` : '',
+         d.driverVersion || ''].filter(Boolean).join(' · ')
+      )
+      .filter(Boolean);
+  } catch {
+    // Видеокарта не опозналась — это само по себе полезная примета, но ронять
+    // из-за неё форму нельзя.
+  }
+
+  const экраны = (() => {
+    try {
+      return require('electron').screen.getAllDisplays().map((d) => {
+        const { width, height } = d.size;
+        return `${width}×${height} @ ${d.scaleFactor}x`;
+      });
+    } catch {
+      return [];
+    }
+  })();
+
+  return {
+    os: `${os.type()} ${os.release()} (${os.arch()})`,
+    cpu: cpus[0]?.model?.trim() || '—',
+    cores: cpus.length,
+    ramTotalGb: гб(os.totalmem()),
+    ramFreeGb: гб(os.freemem()),
+    gpu,
+    displays: экраны,
+    // Масштаб интерфейса и «поверх всех» — половина жалоб на вёрстку про них.
+    uiScale: uiScale(),
+    // Сколько программа работает: «зависло через десять часов» и «зависло
+    // сразу» — разные поломки.
+    uptimeMin: Math.round(process.uptime() / 60),
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+  };
+}
+
 function installId() {
   let id = settings.get('installId');
   if (!id) {

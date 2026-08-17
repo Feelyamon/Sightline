@@ -516,5 +516,12 @@
   "report.tag.falseFlag": "误判——申诉标记",
   "report.disputed": "你要申诉哪些战斗",
   "report.disputedHint": "勾选你不认同的战斗。系统会自动附上你的记录：时间、阵容和战绩。只能附上带有分歧标记的、属于你自己的战斗。",
-  "report.disputedNone": "没有争议战斗。当他人的战斗记录与你的不一致时才会出现该标记——你没有。"
+  "report.disputedNone": "没有争议战斗。当他人的战斗记录与你的不一致时才会出现该标记——你没有。",
+  "report.ctx.cpu": "处理器",
+  "report.ctx.ram": "内存，总计 / 可用（GB）",
+  "report.ctx.gpu": "显卡",
+  "report.ctx.displays": "显示器",
+  "report.ctx.uiScale": "界面缩放",
+  "report.ctx.uptime": "程序已运行（分钟）",
+  "report.stepsOptional": "可以留空"
 }

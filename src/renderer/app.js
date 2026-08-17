@@ -1148,12 +1148,25 @@ function renderReportContext() {
     return;
   }
   const c = reportContext;
+  const s = c.system || {};
   const строки = [
     `${t('report.ctx.version')}: ${c.appVersion}`,
-    `${t('report.ctx.os')}: ${c.osVersion}`,
     `${t('report.ctx.lang')}: ${c.lang}`,
     `${t('report.ctx.who')}: ${c.login || t('report.noAccount')}`,
     `${t('report.ctx.game')}: ${t(STATUS_KEY[c.gameStatus] || 'status.unknown')}`,
+    '',
+    // Железо и система. Показываем значениями, а не названиями: «прикладываются
+    // сведения о компьютере» человек прочитает как «что-то техническое», а
+    // «Память: 32 ГБ» — как то, что он может оценить и с чем может не
+    // согласиться.
+    `${t('report.ctx.os')}: ${s.os || c.osVersion}`,
+    `${t('report.ctx.cpu')}: ${s.cpu || '—'}${s.cores ? ` (${s.cores})` : ''}`,
+    `${t('report.ctx.ram')}: ${s.ramTotalGb ?? '—'} / ${s.ramFreeGb ?? '—'}`,
+    `${t('report.ctx.gpu')}: ${(s.gpu || []).join('; ') || '—'}`,
+    `${t('report.ctx.displays')}: ${(s.displays || []).join('; ') || '—'}`,
+    `${t('report.ctx.uiScale')}: ${s.uiScale ?? '—'}`,
+    `${t('report.ctx.uptime')}: ${s.uptimeMin ?? '—'}`,
+    `Electron ${s.electron || '—'} · Chrome ${s.chrome || '—'} · Node ${s.node || '—'}`,
   ];
   if (c.unparsed?.length) {
     строки.push('', `${t('report.ctx.unparsed')}:`, ...c.unparsed.map((l) => `  ${l}`));
@@ -1189,6 +1202,10 @@ $('reportAttach').addEventListener('change', renderReportContext);
 async function renderDisputed() {
   const нужен = $('reportTag').value === 'false-flag';
   $('disputedBox').hidden = !нужен;
+  // «Как повторить» у жалобы на отметку не спрашиваем: повторять нечего, бой
+  // уже сыгран. Поле, которое нечем заполнить, человек воспринимает как
+  // требование и застревает на нём.
+  $('reportSteps').closest('.field').hidden = нужен;
   if (!нужен) return;
 
   let бои = [];

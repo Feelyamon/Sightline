@@ -516,5 +516,12 @@
   "report.tag.falseFlag": "False accusation — dispute a mark",
   "report.disputed": "Which battles are you disputing",
   "report.disputedHint": "Tick the battles you disagree with. Your own record of each — time, roster and score — is attached automatically. Only your own battles carrying a discrepancy mark can be attached.",
-  "report.disputedNone": "No disputed battles. The mark appears when someone else’s record of a battle disagrees with yours — you have none."
+  "report.disputedNone": "No disputed battles. The mark appears when someone else’s record of a battle disagrees with yours — you have none.",
+  "report.ctx.cpu": "Processor",
+  "report.ctx.ram": "Memory, total / free (GB)",
+  "report.ctx.gpu": "Graphics",
+  "report.ctx.displays": "Displays",
+  "report.ctx.uiScale": "Interface scale",
+  "report.ctx.uptime": "App running, min",
+  "report.stepsOptional": "may be left empty"
 }
