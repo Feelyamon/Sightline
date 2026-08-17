@@ -585,16 +585,6 @@ details > summary { cursor: pointer; list-style: revert; }
 .chart .axis { fill: var(--muted); font-size: 12px; }
 .chart .axis.mid { text-anchor: middle; }
 .chart .axis.end { text-anchor: end; }
-/* Повторённый вечерний час: тот же 23, что и справа, поэтому подпись
-   приглушена — это напоминание, а не отдельная точка на оси. */
-.chart .axis.repeated { opacity: .6; }
-/* Граница суток между повтором и настоящим нулём. Пунктиром и приглушённо:
-   это подсказка глазу, а не элемент данных. */
-.chart-daybreak {
-  stroke: var(--line);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-}
 .chart .axis.kda { fill: var(--accent); }
 .chart .axis.wr { fill: var(--ally); }
 

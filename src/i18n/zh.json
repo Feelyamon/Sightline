@@ -532,6 +532,5 @@
   "admin.reportNothing": "未附加内容",
   "acc.privateOn": "资料已设为私密",
   "profile.private": "私密资料",
-  "acc.privacyAdminOnly": "目前仅管理员可用。",
-  "stats.hours.wrap": "左侧重复显示 23 点：23 点开始的战斗会延续到午夜之后，在普通坐标轴上它会被拆到两端。"
+  "acc.privacyAdminOnly": "目前仅管理员可用。"
 }

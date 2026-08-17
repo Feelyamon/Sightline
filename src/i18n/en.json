@@ -532,6 +532,5 @@
   "admin.reportNothing": "nothing attached",
   "acc.privateOn": "Profile is private",
   "profile.private": "Private profile",
-  "acc.privacyAdminOnly": "Available to administrators only for now.",
-  "stats.hours.wrap": "Hour 23 is repeated on the left: a battle started at 23 carries on past midnight, and on a plain axis it would be torn between the two edges."
+  "acc.privacyAdminOnly": "Available to administrators only for now."
 }
