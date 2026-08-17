@@ -278,14 +278,10 @@
   "acc.signOutHint": "the app keeps working, your history stays where it is",
   "acc.signOutAll": "Sign out everywhere",
   "acc.edit": "Edit profile",
-  "acc.editDone": "Done",
   "acc.stat.winrate": "wins",
   "acc.stat.battlesPeriod": "{word} this month",
-  "acc.streak.inRow": "{word} in a row",
   "acc.stat.kda": "KDA",
-  "acc.stat.streak": "streak",
   "acc.stat.none": "—",
-  "acc.statsLocal": "Calculated from your history on this computer. The public profile other players will see arrives together with public profiles.",
   "acc.signOutAllText": "Every sign-in will be closed — on other computers and here as well. You can sign back in with the same login and password.",
   "acc.signOutAllGo": "Close every sign-in",
   "acc.signOutAllCancel": "Cancel",
@@ -474,5 +470,11 @@
   "report.needTag": "Choose what the report is about.",
   "report.sentNumber": "Report sent, number {n}.",
   "report.mine": "Your earlier reports",
-  "report.resolved": "resolved"
+  "report.resolved": "resolved",
+  "acc.stat.bestWin": "wins in a row",
+  "acc.statsVerified": "All recorded battles are counted. A battle confirmed by other players counts as verified — those will be shown separately.",
+  "acc.privacy": "Privacy",
+  "acc.privacyMode": "Private mode",
+  "acc.soon": "Coming soon…",
+  "acc.privacyHint": "Hides your statistics from others. The nickname underline in battle stays: it says a person uses the app, not what their numbers are."
 }

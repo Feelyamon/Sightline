@@ -483,8 +483,11 @@
           <h2 class="profile-name" id="accLogin"></h2>
           <p class="profile-role" id="accRole"></p>
 
+          <!-- Главное число крупно и по центру: за месяц человек смотрит
+               прежде всего сюда. Остальное — строкой под ним. -->
+          <div class="profile-hero" id="accHero"></div>
           <div class="profile-stats" id="accStats"></div>
-          <p class="muted small profile-note" data-i18n="acc.statsLocal"></p>
+          <p class="muted small profile-note" data-i18n="acc.statsVerified"></p>
 
           <!-- Показывается только владельцу профиля. Чужую карточку эта кнопка
                не сопровождает никогда. -->
@@ -493,50 +496,6 @@
           </div>
         </div>
 
-        <div id="accEditor" hidden>
-        <div class="section-title" data-i18n="acc.avatar"></div>
-        <div class="avatar-editor">
-          <div class="avatar-big" id="accAvatarEdit"></div>
-          <div class="buttons">
-            <button id="avatarChoose" data-i18n="acc.avatarChoose"></button>
-            <button id="avatarRemove" data-i18n="acc.avatarRemove"></button>
-          </div>
-        </div>
-        <p class="muted small" data-i18n="acc.avatarHint"></p>
-        <div class="auth-error" id="avatarError" hidden></div>
-
-        <div class="section-title" data-i18n="acc.changePassword"></div>
-        <form id="authPassword">
-          <label class="row field">
-            <span class="muted" data-i18n="acc.oldPassword"></span>
-            <input type="password" id="cpOld" autocomplete="current-password" />
-          </label>
-          <label class="row field">
-            <span class="muted" data-i18n="acc.newPassword"></span>
-            <input type="password" id="cpNew" autocomplete="new-password" />
-            <span class="hint muted" data-i18n="acc.passwordHint"></span>
-          </label>
-          <label class="row field">
-            <span class="muted" data-i18n="acc.password2"></span>
-            <input type="password" id="cpNew2" autocomplete="new-password" />
-          </label>
-          <p class="muted small" data-i18n="acc.changePasswordHint"></p>
-          <div class="auth-error" id="cpError" hidden></div>
-          <div class="buttons">
-            <button type="submit" id="cpSubmit" data-i18n="acc.changePasswordGo"></button>
-          </div>
-        </form>
-
-        <div class="buttons">
-          <button id="authSignOut" data-i18n="acc.signOut"></button>
-        </div>
-        <p class="muted small" data-i18n="acc.signOutHint"></p>
-
-        <div class="buttons">
-          <button id="authLogoutAll" data-i18n="acc.signOutAll"></button>
-        </div>
-        <div class="auth-error" id="laError" hidden></div>
-        </div>
       </div>
     </section>
 
@@ -749,6 +708,87 @@
   <!-- Приглашение в отряд. Отдельное окно, а не строка в списке друзей:
        приглашение живёт минуту, и человек должен увидеть его там, где он
        сейчас смотрит, а не там, куда ещё надо зайти. -->
+  <!-- Редактор профиля. Отдельным окном, а не разворачивающимся куском под
+       карточкой: карточка — то, что человек пришёл посмотреть, и формы смены
+       пароля под ней превращали её в предисловие к анкете. -->
+  <div class="modal-backdrop" id="profileEditModal" hidden>
+    <div class="modal wide profile-editor">
+      <div class="editor-head">
+        <div class="avatar-big profile-avatar" id="accAvatarEdit"></div>
+        <div class="editor-who">
+          <div class="editor-login" id="editorLogin"></div>
+          <div class="muted small" id="editorRole"></div>
+        </div>
+        <button class="editor-close" id="profileEditClose" aria-label="×">&times;</button>
+      </div>
+
+      <div class="editor-grid">
+        <section class="editor-card">
+          <div class="section-title" data-i18n="acc.avatar"></div>
+          <div class="buttons">
+            <button id="avatarChoose" data-i18n="acc.avatarChoose"></button>
+            <button id="avatarRemove" data-i18n="acc.avatarRemove"></button>
+          </div>
+          <p class="muted small" data-i18n="acc.avatarHint"></p>
+          <div class="auth-error" id="avatarError" hidden></div>
+        </section>
+
+        <section class="editor-card">
+          <div class="section-title" data-i18n="acc.privacy"></div>
+          <!-- Переключателя пока нет по существу: приватность исполняет
+               сервер, а публичных профилей ещё нет — прятать нечего.
+               Показываем замок и говорим прямо, а не рисуем работающий на вид
+               переключатель, который ничего не делает. -->
+          <label class="toggle locked" id="privacyToggle" data-i18n-title="acc.soon">
+            <input type="checkbox" id="privacyMode" disabled />
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span class="toggle-label" data-i18n="acc.privacyMode"></span>
+            <span class="lock" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2" />
+                <path d="M8.2 10.5V7.8a3.8 3.8 0 0 1 7.6 0v2.7" /></svg>
+            </span>
+          </label>
+          <p class="muted small" data-i18n="acc.privacyHint"></p>
+        </section>
+
+        <section class="editor-card wide-card">
+          <div class="section-title" data-i18n="acc.changePassword"></div>
+
+          <form id="authPassword">
+            <label class="row field">
+              <span class="muted" data-i18n="acc.oldPassword"></span>
+              <input type="password" id="cpOld" autocomplete="current-password" />
+            </label>
+            <label class="row field">
+              <span class="muted" data-i18n="acc.newPassword"></span>
+              <input type="password" id="cpNew" autocomplete="new-password" />
+              <span class="hint muted" data-i18n="acc.passwordHint"></span>
+            </label>
+            <label class="row field">
+              <span class="muted" data-i18n="acc.password2"></span>
+              <input type="password" id="cpNew2" autocomplete="new-password" />
+            </label>
+            <p class="muted small" data-i18n="acc.changePasswordHint"></p>
+            <div class="auth-error" id="cpError" hidden></div>
+            <div class="buttons">
+              <button type="submit" id="cpSubmit" data-i18n="acc.changePasswordGo"></button>
+            </div>
+          </form>
+
+          <div class="buttons">
+            <button id="authSignOut" data-i18n="acc.signOut"></button>
+          </div>
+          <p class="muted small" data-i18n="acc.signOutHint"></p>
+
+          <div class="buttons">
+            <button id="authLogoutAll" data-i18n="acc.signOutAll"></button>
+          </div>
+          <div class="auth-error" id="laError" hidden></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="squadInviteModal" hidden>
     <div class="modal">
       <h2 data-i18n="squad.inviteTitle"></h2>

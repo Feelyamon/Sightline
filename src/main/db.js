@@ -830,10 +830,22 @@ class Db {
    * @param {object} [opts]
    * @param {number} [opts.recent] - сколько последних боёв вернуть полоской.
    */
-  streaks({ recent = 50 } = {}) {
+  /**
+   * @param {object} [opts]
+   * @param {number} [opts.recent] - сколько последних боёв отдать полоской
+   * @param {number} [opts.from] - считать только с этого момента; 0 — вся история
+   */
+  streaks({ recent = 50, from = 0 } = {}) {
+    // Серия за период считается по боям этого периода, а не обрезается из
+    // общей: серия, начавшаяся до его начала, к вопросу «как я играл в этом
+    // месяце» отношения не имеет.
     const all = this.db
-      .prepare('SELECT id, started_at, result FROM battles WHERE cancelled = 0 ORDER BY started_at, id')
-      .all();
+      .prepare(
+        `SELECT id, started_at, result FROM battles
+          WHERE cancelled = 0 AND started_at >= ?
+          ORDER BY started_at, id`
+      )
+      .all(from || 0);
 
     let current = { type: 'none', length: 0 };
     let bestWin = 0;

@@ -278,14 +278,10 @@
   "acc.signOutHint": "程序会继续运行，历史记录不会丢失",
   "acc.signOutAll": "退出所有设备",
   "acc.edit": "编辑资料",
-  "acc.editDone": "完成",
   "acc.stat.winrate": "胜率",
   "acc.stat.battlesPeriod": "本月{word}",
-  "acc.streak.inRow": "连续{word}",
   "acc.stat.kda": "KDA",
-  "acc.stat.streak": "连胜",
   "acc.stat.none": "—",
-  "acc.statsLocal": "根据本机上的历史记录计算。其他玩家看到的公开资料将随公开资料功能一同推出。",
   "acc.signOutAllText": "所有登录都会被关闭——其他电脑上的，以及这里的。之后可以用同一个用户名和密码重新登录。",
   "acc.signOutAllGo": "关闭所有登录",
   "acc.signOutAllCancel": "取消",
@@ -474,5 +470,11 @@
   "report.needTag": "请选择反馈的类型。",
   "report.sentNumber": "已发送，编号 {n}。",
   "report.mine": "你之前的反馈",
-  "report.resolved": "已解决"
+  "report.resolved": "已解决",
+  "acc.stat.bestWin": "连胜",
+  "acc.statsVerified": "统计包含所有已记录的战斗。当其他玩家确认某场战斗后，它将被视为已验证，并单独显示。",
+  "acc.privacy": "隐私",
+  "acc.privacyMode": "私密模式",
+  "acc.soon": "即将推出…",
+  "acc.privacyHint": "对他人隐藏你的统计数据。战斗中昵称的下划线仍会保留：它表示此人在使用本程序，而不是他的具体数据。"
 }

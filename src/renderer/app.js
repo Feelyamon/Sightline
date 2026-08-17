@@ -1955,25 +1955,41 @@ async function renderProfileStats() {
     const [{ summary }, streaks] = await Promise.all([
       // limit: 1 — сами бои не нужны, нужна только сводка по ним.
       window.wt.db.searchBattles({ from: Date.now() - МЕСЯЦ, limit: 1 }),
-      window.wt.db.streaks(),
+      window.wt.db.streaks({ from: Date.now() - МЕСЯЦ }),
     ]);
 
-    const плитки = [
-      {
-        value: fmtInt(summary.battles),
+    // Главное число — бои за месяц. Крупно и отдельно: остальные три отвечают
+    // на вопрос «как», это отвечает на вопрос «сколько», и смешивать их в один
+    // ряд значит терять и то, и другое.
+    const hero = el('div', 'profile-hero-value', fmtInt(summary.battles));
+    $('accHero').replaceChildren(
+      hero,
+      el(
+        'div',
+        'profile-hero-label',
         // Через словарь форм, а не строкой: «1 боёв за месяц» уже чинили
         // однажды в подписях графиков, второй раз наступать не будем.
-        label: t('acc.stat.battlesPeriod', {
+        t('acc.stat.battlesPeriod', {
           word: window.i18n.plural(summary.battles, 'plural.battles'),
-        }),
-      },
+        })
+      )
+    );
+
+    const плитки = [
       {
         value: summary.percent === null ? t('acc.stat.none') : `${summary.percent}%`,
         label: t('acc.stat.winrate'),
         tone: summary.percent === null ? '' : summary.percent >= 50 ? 'good' : 'bad',
       },
       { value: summary.battles ? summary.kda.toFixed(2) : t('acc.stat.none'), label: t('acc.stat.kda') },
-      streakTile(streaks.current),
+      // Лучшая серия побед, а не текущая серия поражений. Показывать человеку
+      // его худшее — сомнительная услуга; профиль смотрят, чтобы порадоваться,
+      // а не чтобы расстроиться.
+      {
+        value: streaks.bestWin ? fmtInt(streaks.bestWin) : t('acc.stat.none'),
+        label: t('acc.stat.bestWin'),
+        tone: streaks.bestWin ? 'good' : '',
+      },
     ];
 
     box.replaceChildren(...плитки.map((п) => {
@@ -1986,23 +2002,10 @@ async function renderProfileStats() {
     // Профиль без цифр лучше, чем раздел аккаунта, который не открылся из-за
     // сбоя в базе: войти и сменить пароль человек должен мочь всегда.
     box.replaceChildren();
+    $('accHero').replaceChildren();
   }
 }
 
-function streakTile(current) {
-  if (!current || !current.length || current.type === 'none') {
-    // Подпись остаётся названием плитки. «— / нет» читается как поломка:
-    // непонятно, чего именно нет.
-    return { value: t('acc.stat.none'), label: t('acc.stat.streak') };
-  }
-  const win = current.type === 'win';
-  const word = window.i18n.plural(current.length, win ? 'plural.wins' : 'plural.losses');
-  return {
-    value: fmtInt(current.length),
-    label: t('acc.streak.inRow', { word }),
-    tone: win ? 'good' : 'bad',
-  };
-}
 
 /** Обёртка над действиями с аватаркой: одна кнопка, одно место для ошибки. */
 async function avatarAction(button, run) {
@@ -2110,19 +2113,31 @@ async function checkVersion() {
   }
 }
 
-// Редактирование прячется за кнопкой. Карточка — то, что человек пришёл
-// посмотреть; формы смены пароля и выхода нужны раз в полгода и до сих пор
-// занимали весь экран вместо неё.
+// Редактор — отдельное окно. Карточка это то, что человек пришёл посмотреть, и
+// формы смены пароля под ней превращали её в предисловие к анкете.
 function closeProfileEditor() {
-  $('accEditor').hidden = true;
-  $('profileEdit').textContent = t('acc.edit');
+  $('profileEditModal').hidden = true;
 }
 
 $('profileEdit').addEventListener('click', () => {
-  const открыт = !$('accEditor').hidden;
-  $('accEditor').hidden = открыт;
-  $('profileEdit').textContent = открыт ? t('acc.edit') : t('acc.editDone');
-  if (!открыт) $('accEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('profileEditModal').hidden = false;
+  // Шапка редактора повторяет карточку: человек должен видеть, что правит
+  // именно то, на что только что смотрел.
+  $('editorLogin').textContent = $('accLogin').textContent;
+  $('editorRole').textContent = $('accRole').textContent;
+  renderMyAvatar();
+  // Поля паролей каждый раз пустые: оставлять введённое в закрытом окне —
+  // способ однажды сменить пароль случайно.
+  for (const id of ['cpOld', 'cpNew', 'cpNew2']) $(id).value = '';
+  $('cpError').hidden = true;
+  $('avatarError').hidden = true;
+  $('laError').hidden = true;
+});
+
+$('profileEditClose').addEventListener('click', closeProfileEditor);
+// Клик по затемнению закрывает — как у остальных окон.
+$('profileEditModal').addEventListener('click', (e) => {
+  if (e.target === $('profileEditModal')) closeProfileEditor();
 });
 
 $('outdatedDownload').addEventListener('click', () => window.wt.account.openDownload());
@@ -2695,6 +2710,9 @@ window.wt.onSettingsChanged(async ({ keys = [], locale } = {}) => {
 function applyLocale(locale) {
   window.i18n.setLocale(locale);
   window.i18n.apply();
+  // Подпись у замка рисуется псевдоэлементом, а он читает только атрибут —
+  // перевести его иначе нечем.
+  document.querySelector('#privacyToggle .lock')?.setAttribute('data-soon', t('acc.soon'));
 
   const select = $('uiLang');
   if (locale.languages) {

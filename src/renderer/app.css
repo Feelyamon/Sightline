@@ -782,13 +782,19 @@ label.row.consent input { margin-top: 3px; }
 .profile-name { font-size: 22px; font-weight: 600; margin: 0 0 2px; }
 .profile-role { color: var(--muted); margin: 0 0 16px; font-size: 12px; }
 
-/* Плитки. Четыре колонки заданы явно, а не auto-fit: auto-fit при ширине
+/* Главное число. Крупно, по центру, без рамки: рамка вокруг него превратила
+   бы его в такую же плитку, как остальные три, — а он не такой. */
+.profile-hero { margin-bottom: 14px; }
+.profile-hero-value { font-size: 44px; font-weight: 600; line-height: 1; }
+.profile-hero-label { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+/* Плитки. Три колонки заданы явно, а не auto-fit: auto-fit при ширине
    карточки 560 насчитывал пятую дорожку, схлопывал её в ноль и оставлял перед
    ней отступ — четыре плитки уезжали от центра на восемь пикселей. Поймано на
    стенде. В узком окне колонок две, иначе цифры ломаются пополам. */
 .profile-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -810,6 +816,134 @@ label.row.consent input { margin-top: 3px; }
 /* Текст объяснения не растягиваем на всю карточку: строка в сто знаков
    читается хуже, чем в шестьдесят, даже если место есть. */
 .profile-note { margin: 0 auto 14px; max-width: 62ch; }
+
+/* --- Редактор профиля ---------------------------------------------------- */
+
+/* Два класса, потому что .modal.wide объявлен двумя и при одном перебивал бы
+   это правило — ширина окна выходила случайной. */
+.modal.profile-editor { max-width: 820px; }
+
+/* Шапка редактора повторяет карточку: та же аватарка, тот же логин. Человек
+   должен видеть, что правит именно то, на что только что смотрел. */
+.editor-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.editor-head .profile-avatar { width: 56px; height: 56px; margin: 0; font-size: 20px; }
+.editor-who { flex: 1; min-width: 0; }
+.editor-login { font-size: 18px; font-weight: 600; }
+
+.editor-close {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  padding: 2px 9px 5px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.editor-close:hover { color: var(--text); background: #202836; }
+
+/* Две колонки: мелкое рядом, длинная форма пароля — во всю ширину. В узком
+   окне всё в одну колонку, иначе поля становятся уже подписей. */
+.editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.editor-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  padding: 14px;
+}
+.editor-card .section-title { margin-top: 0; }
+.wide-card { grid-column: 1 / -1; }
+@media (max-width: 760px) {
+  .editor-grid { grid-template-columns: 1fr; }
+}
+
+/* --- Переключатель ------------------------------------------------------- */
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin: 4px 0 8px;
+}
+/* Сам чекбокс не показываем, но и не выбрасываем из разметки: он остаётся
+   тем, что читает программа чтения с экрана и что ловит клавиатура. */
+.toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  width: 38px;
+  height: 21px;
+  border-radius: 11px;
+  background: #2a3140;
+  border: 1px solid var(--line);
+  flex: none;
+  position: relative;
+  transition: background 140ms ease;
+}
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 140ms ease, background 140ms ease;
+}
+.toggle input:checked + .toggle-track { background: #24405e; }
+.toggle input:checked + .toggle-track .toggle-knob {
+  transform: translateX(17px);
+  background: var(--accent);
+}
+.toggle input:focus-visible + .toggle-track { border-color: var(--accent); }
+.toggle-label { color: var(--text); }
+
+/* Заперто: переключатель не работает и не притворяется работающим. Курсор
+   обычный, а не «нельзя», — «нельзя» читается как «сломано». */
+.toggle.locked { cursor: default; }
+.toggle.locked .toggle-label { color: var(--muted); }
+.toggle.locked .toggle-track { opacity: .55; }
+
+.lock { display: inline-flex; color: var(--muted); position: relative; }
+.lock svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Подпись у замка появляется по наведению. Своя, а не системная подсказка:
+   системная всплывает через полторы секунды, и до неё не доживают. */
+.lock::after {
+  content: attr(data-soon);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  transform: translate(-50%, 3px);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.toggle.locked:hover .lock::after,
+.lock:hover::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
 .profile-actions { justify-content: center; margin: 0; }
 
 /* Код восстановления: крупно и моноширинно — его переписывают глазами. */
