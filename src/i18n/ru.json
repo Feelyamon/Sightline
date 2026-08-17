@@ -523,5 +523,15 @@
   "report.ctx.displays": "Экраны",
   "report.ctx.uiScale": "Масштаб интерфейса",
   "report.ctx.uptime": "Программа работает, мин",
-  "report.stepsOptional": "можно оставить пустым"
+  "report.stepsOptional": "можно оставить пустым",
+  "admin.anyTag": "любой тег",
+  "admin.tag.player": "Жалоба на игрока",
+  "admin.reportTitle": "Коротко",
+  "admin.reportSteps": "Как повторить",
+  "admin.reportAttached": "Приложено программой",
+  "admin.reportNothing": "ничего не приложено",
+  "acc.privateOn": "Профиль закрыт",
+  "profile.private": "Приватный профиль",
+  "acc.privacyAdminOnly": "Пока доступно только администратору.",
+  "stats.hours.wrap": "Слева повторён вечерний час 23 — катка, начатая в 23, продолжается после полуночи, и на обычной оси она была бы разорвана по разным краям."
 }

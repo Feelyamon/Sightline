@@ -234,6 +234,8 @@ window.wt = {
       { id: 1, kind: 'friend_request', payload: { login: 'Bravo' }, created_at: Date.now() - 86400000, read: true, blocking: false },
     ] }),
     readNotifications: async () => ({ ok: true }),
+    setPrivacy: async (v) => ({ ok: true, private: v }),
+    me: async () => ({ login: 'Feelyamon', role: 'admin', is_admin: true, lang: 'ru', private_profile: false }),
     forcedPassword: async () => ({ recoveryCode: 'AAAA-BBBB-CCCC-DDDD' }),
     openDownload: async () => {},
     // В браузере файл выбрать некуда и загружать некуда: стенд показывает

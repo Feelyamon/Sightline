@@ -523,5 +523,15 @@
   "report.ctx.displays": "显示器",
   "report.ctx.uiScale": "界面缩放",
   "report.ctx.uptime": "程序已运行（分钟）",
-  "report.stepsOptional": "可以留空"
+  "report.stepsOptional": "可以留空",
+  "admin.anyTag": "任意标签",
+  "admin.tag.player": "举报玩家",
+  "admin.reportTitle": "简述",
+  "admin.reportSteps": "如何复现",
+  "admin.reportAttached": "程序附加内容",
+  "admin.reportNothing": "未附加内容",
+  "acc.privateOn": "资料已设为私密",
+  "profile.private": "私密资料",
+  "acc.privacyAdminOnly": "目前仅管理员可用。",
+  "stats.hours.wrap": "左侧重复显示 23 点：23 点开始的战斗会延续到午夜之后，在普通坐标轴上它会被拆到两端。"
 }

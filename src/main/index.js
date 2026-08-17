@@ -1114,9 +1114,13 @@ handle('admin:clearAvatar', (_e, accountId) =>
     auth: true,
   })
 );
-handle('admin:reports', (_e, scope) =>
-  account.request(`/admin/bugs?scope=${scope === 'all' ? 'all' : 'open'}`, { auth: true })
-);
+handle('admin:reports', (_e, scope, tag) => {
+  const params = new URLSearchParams();
+  if (scope) params.set('scope', String(scope));
+  // Пустой тег означает «все»: отдельного значения для этого не нужно.
+  if (tag) params.set('tag', String(tag));
+  return account.request(`/admin/bugs?${params}`, { auth: true });
+});
 handle('admin:resolveReport', (_e, id, resolved, note) =>
   account.request('/admin/bugs/resolve', {
     method: 'POST',
@@ -1271,6 +1275,13 @@ handle('account:forcedPassword', (_e, form = {}) =>
     newPassword: String(form.newPassword || ''),
   })
 );
+
+// Приватность профиля. Пока доступна только администратору — это проверяет
+// сервер типом аргумента, а не окно: спрятанная кнопка защитой не является.
+handle('account:setPrivacy', (_e, value) =>
+  account.request('/auth/privacy', { method: 'POST', body: { private: !!value }, auth: true })
+);
+handle('account:me', () => account.request('/auth/me', { auth: true }));
 
 handle('account:notifications', () => account.request('/notifications', { auth: true }));
 

@@ -523,5 +523,15 @@
   "report.ctx.displays": "Displays",
   "report.ctx.uiScale": "Interface scale",
   "report.ctx.uptime": "App running, min",
-  "report.stepsOptional": "may be left empty"
+  "report.stepsOptional": "may be left empty",
+  "admin.anyTag": "any tag",
+  "admin.tag.player": "Report about a player",
+  "admin.reportTitle": "In short",
+  "admin.reportSteps": "How to repeat",
+  "admin.reportAttached": "Attached by the app",
+  "admin.reportNothing": "nothing attached",
+  "acc.privateOn": "Profile is private",
+  "profile.private": "Private profile",
+  "acc.privacyAdminOnly": "Available to administrators only for now.",
+  "stats.hours.wrap": "Hour 23 is repeated on the left: a battle started at 23 carries on past midnight, and on a plain axis it would be torn between the two edges."
 }

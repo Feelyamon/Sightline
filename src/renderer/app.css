@@ -588,6 +588,13 @@ details > summary { cursor: pointer; list-style: revert; }
 /* Повторённый вечерний час: тот же 23, что и справа, поэтому подпись
    приглушена — это напоминание, а не отдельная точка на оси. */
 .chart .axis.repeated { opacity: .6; }
+/* Граница суток между повтором и настоящим нулём. Пунктиром и приглушённо:
+   это подсказка глазу, а не элемент данных. */
+.chart-daybreak {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
 .chart .axis.kda { fill: var(--accent); }
 .chart .axis.wr { fill: var(--ally); }
 
@@ -1210,3 +1217,24 @@ textarea:focus {
 /* Прежние сообщения не должны отжимать форму вниз: их читают изредка, а
    писать новое нужно сейчас. Список прокручивается внутри себя. */
 #reportMine { max-height: 180px; overflow-y: auto; }
+
+/* Профиль закрыт. Отметка приглушённая: это выбор человека, а не поломка и не
+   предупреждение. */
+.private-badge {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Чужой закрытый профиль: одна надпись и ничего больше. Крупная, но не
+   кричащая — это не отказ и не ошибка, человек просто закрылся. */
+.private-wall {
+  text-align: center;
+  color: var(--muted);
+  font-size: 20px;
+  padding: 28px 12px;
+}

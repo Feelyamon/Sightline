@@ -211,6 +211,10 @@
           <div class="card-title" data-i18n="stats.hours.title"></div>
           <div class="card-hint muted">
             <span data-i18n="stats.hours.hint"></span>
+            <!-- Объяснение повторённого часа стоит ДО графика: увидев «23»
+                 слева от «00», человек сначала решает, что это ошибка, и
+                 подпись под картинкой он к тому моменту уже не читает. -->
+            <span data-i18n="stats.hours.wrap"></span>
           </div>
           <div id="chartHours"></div>
           <div class="card-note muted" id="hoursNote"></div>
@@ -508,6 +512,10 @@
           <div class="avatar-big profile-avatar" id="accAvatar"></div>
           <h2 class="profile-name" id="accLogin"></h2>
           <p class="profile-role" id="accRole"></p>
+          <!-- Профиль закрыт. Человек должен видеть состояние, а не помнить
+               его: закрыл месяц назад и забыл — потом удивляется, почему его
+               никто не находит. -->
+          <p class="private-badge" id="accPrivate" hidden data-i18n="acc.privateOn"></p>
 
           <!-- Главное число крупно и по центру: за месяц человек смотрит
                прежде всего сюда. Остальное — строкой под ним. -->
@@ -542,6 +550,22 @@
       <div class="controls">
         <label class="row">
           <span class="muted" data-i18n="admin.reportsScope"></span>
+          <span class="sel"><select id="adminReportTag">
+            <option value="" data-i18n="admin.anyTag"></option>
+            <option value="killfeed" data-i18n="report.tag.killfeed"></option>
+            <option value="teams" data-i18n="report.tag.teams"></option>
+            <option value="kda" data-i18n="report.tag.kda"></option>
+            <option value="crash" data-i18n="report.tag.crash"></option>
+            <option value="no-game" data-i18n="report.tag.noGame"></option>
+            <option value="stats" data-i18n="report.tag.stats"></option>
+            <option value="ui" data-i18n="report.tag.ui"></option>
+            <option value="account" data-i18n="report.tag.account"></option>
+            <option value="sync" data-i18n="report.tag.sync"></option>
+            <option value="idea" data-i18n="report.tag.idea"></option>
+            <option value="false-flag" data-i18n="report.tag.falseFlag"></option>
+            <option value="player" data-i18n="admin.tag.player"></option>
+            <option value="other" data-i18n="report.tag.other"></option>
+          </select></span>
           <span class="sel"><select id="adminReportScope">
             <option value="open" data-i18n="admin.reportsOpen"></option>
             <option value="all" data-i18n="admin.reportsAll"></option>

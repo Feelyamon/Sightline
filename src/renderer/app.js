@@ -1412,7 +1412,10 @@ const confirmField = () => ({
 function adminUserRow(u) {
   const row = el('div', 'admin-user');
   const head = el('div', 'admin-user-head');
+  const лицо = el('span', 'friend-avatar');
+  лицо.append(avatarContent(u.login, u.avatar));
   head.append(
+    лицо,
     el('span', 'admin-login', u.login),
     el('span', 'muted', `#${u.id} · ${t(`acc.role.${u.role === 'admin' ? 'admin' : 'user'}`)}`)
   );
@@ -1519,11 +1522,22 @@ async function refreshAdminUsers() {
   }
 }
 
+/** Ключ строки для тега: у жалобы на игрока свой, остальные общие с формой. */
+function tagKey(tag) {
+  return tag === 'player' ? 'admin.tag.player'.slice(6) : tag === 'no-game' ? 'noGame'
+    : tag === 'false-flag' ? 'falseFlag' : tag || 'other';
+}
+
 function adminReportRow(r) {
   const row = el('div', `admin-user${r.resolved ? ' resolved' : ''}`);
   const head = el('div', 'admin-user-head');
+  const лицо = el('span', 'friend-avatar');
+  лицо.append(avatarContent(r.login || '?', r.avatar));
   head.append(
-    el('span', 'admin-login', t(`report.kind.${r.kind}`)),
+    лицо,
+    // Тег, а не kind: тег человек выбирал сам, и именно по нему сообщения
+    // сортируются. kind остался служебным и в глаза лезть не должен.
+    el('span', 'admin-login', t(`report.tag.${tagKey(r.tag)}`) || r.tag),
     el('span', 'muted', `#${r.id} · ${r.login || t('report.noAccount')} · ${dateText(Date.parse(r.created_at))}`)
   );
   // Жалоба на игрока: на кого и сколько таких всего. Пять жалоб на один ник —
@@ -1538,9 +1552,28 @@ function adminReportRow(r) {
   if (r.app_version) head.append(el('span', 'muted', `${r.app_version} · ${r.os_version || '—'}`));
   row.append(head);
 
+  // Полная форма, а не одно описание. Спросить у человека заголовок и шаги и не
+  // показать их тому, кто разбирает, — хуже, чем не спрашивать вовсе: человек
+  // потратил время, а разбирающий всё равно ничего не увидел.
+  if (r.title) row.append(el('div', 'admin-report-title', r.title));
+
   // Текст сообщения как есть, с переносами: люди присылают шаги
   // воспроизведения списком, и склеивать их в абзац — терять смысл.
   row.append(el('pre', 'admin-report-text', r.message));
+
+  if (r.steps) {
+    row.append(el('div', 'section-title', t('admin.reportSteps')));
+    row.append(el('pre', 'admin-report-text', r.steps));
+  }
+
+  // Приложенное программой прячем под раскрывающийся блок: оно нужно, когда
+  // дошло до разбора, а в списке из сорока сообщений заняло бы весь экран.
+  if (r.context && Object.keys(r.context).length) {
+    const box = el('details', 'admin-report-context');
+    box.append(el('summary', 'section-title', t('admin.reportAttached')));
+    box.append(el('pre', 'log', JSON.stringify(r.context, null, 2)));
+    row.append(box);
+  }
   if (r.admin_note) row.append(el('div', 'admin-result', r.admin_note));
 
   const actions = el('div', 'admin-actions');
@@ -1568,7 +1601,10 @@ function adminReportRow(r) {
 
 async function refreshAdminReports() {
   try {
-    const reports = await window.wt.admin.reports($('adminReportScope').value);
+    const reports = await window.wt.admin.reports(
+      $('adminReportScope').value,
+      $('adminReportTag').value
+    );
     $('adminReports').replaceChildren(
       ...(reports.length ? reports.map(adminReportRow) : [el('div', 'empty', t('admin.noReports'))])
     );
@@ -1673,7 +1709,11 @@ $('adminSearch').addEventListener('click', refreshAdminUsers);
 $('adminQuery').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') refreshAdminUsers();
 });
+// Оба отбора применяются сразу по выбору. Заставлять человека выбрать тег и
+// потом отдельно нажать «Обновить» — это два действия там, где смысл ровно
+// один: показать другое.
 $('adminReportScope').addEventListener('change', refreshAdminReports);
+$('adminReportTag').addEventListener('change', refreshAdminReports);
 $('adminReportsRefresh').addEventListener('click', refreshAdminReports);
 
 // --- Друзья и отряд ------------------------------------------------------
@@ -2248,6 +2288,50 @@ async function checkVersion() {
 
 // Редактор — отдельное окно. Карточка это то, что человек пришёл посмотреть, и
 // формы смены пароля под ней превращали её в предисловие к анкете.
+/**
+ * Приватность профиля. Пока только администратору — решение владельца.
+ *
+ * Замок и «скоро» остаются для всех остальных: переключатель, который выглядит
+ * рабочим и молча ничего не делает, хуже запертого.
+ */
+async function renderPrivacy(state) {
+  const toggle = $('privacyToggle');
+  const input = $('privacyMode');
+  const можно = !!state?.isAdmin;
+
+  toggle.classList.toggle('locked', !можно);
+  input.disabled = !можно;
+  if (!можно) {
+    $('accPrivate').hidden = true;
+    return;
+  }
+
+  try {
+    const me = await window.wt.account.me();
+    input.checked = !!me?.private_profile;
+    // Отметка в своей карточке: человек должен видеть состояние, а не помнить
+    // его. Закрыл месяц назад и забыл — потом удивляется, что его не находят.
+    $('accPrivate').hidden = !me?.private_profile;
+  } catch {
+    // Сервера нет — состояние неизвестно, и врать о нём нельзя.
+    $('accPrivate').hidden = true;
+  }
+}
+
+$('privacyMode').addEventListener('change', async (e) => {
+  const value = e.target.checked;
+  e.target.disabled = true;
+  try {
+    await window.wt.account.setPrivacy(value);
+    $('accPrivate').hidden = !value;
+  } catch (err) {
+    e.target.checked = !value;
+    showError(err?.message || String(err));
+  } finally {
+    e.target.disabled = false;
+  }
+});
+
 function closeProfileEditor() {
   $('profileEditModal').hidden = true;
 }
@@ -2357,6 +2441,7 @@ async function refreshAccount() {
     // посмотреть на себя, а не чтобы сменить пароль.
     closeProfileEditor();
     renderProfileStats();
+    renderPrivacy(state);
     showAuthScreen('authSignedIn');
   } else {
     showAuthScreen('authGuest');
@@ -2843,6 +2928,21 @@ async function loadProfile(who) {
 function renderProfile(p) {
   const box = $('profileBody');
   const card = el('div', 'profile-card');
+
+  // Закрытый профиль: имя, лицо и одна надпись. Ни цифр, ни календаря, ни
+  // техники — иначе «закрыто» было бы словом, а не делом. Сам факт закрытости
+  // не прячем: спрятать его нельзя, не спрятав человека целиком, а
+  // подчёркивание ника в бою остаётся в любом случае.
+  if (p.private) {
+    const avatar = el('div', 'avatar-big profile-avatar');
+    avatar.append(avatarContent(p.login, p.avatar));
+    card.append(avatar);
+    card.append(el('h2', 'profile-name', p.game_nick || p.login));
+    card.append(el('div', 'private-wall', t('profile.private')));
+    box.replaceChildren(card);
+    box.hidden = false;
+    return;
+  }
 
   const avatar = el('div', 'avatar-big profile-avatar');
   avatar.append(avatarContent(p.login, p.avatar));

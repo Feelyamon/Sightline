@@ -62,6 +62,8 @@ contextBridge.exposeInMainWorld('wt', {
     changePassword: (form) => invoke('account:changePassword', form),
     logoutAll: () => invoke('account:logoutAll'),
     forcedPassword: (form) => invoke('account:forcedPassword', form),
+    setPrivacy: (value) => invoke('account:setPrivacy', value),
+    me: () => invoke('account:me'),
     notifications: () => invoke('account:notifications'),
     readNotifications: (id) => invoke('account:readNotifications', id),
     saveRecoveryCode: (code) => invoke('account:saveRecoveryCode', code),
@@ -89,7 +91,7 @@ contextBridge.exposeInMainWorld('wt', {
     vehicles: () => invoke('admin:vehicles'),
     setVehicleAlias: (alias, canonical) => invoke('admin:setVehicleAlias', alias, canonical),
     clearAvatar: (id) => invoke('admin:clearAvatar', id),
-    reports: (scope) => invoke('admin:reports', scope),
+    reports: (scope, tag) => invoke('admin:reports', scope, tag),
     resolveReport: (id, resolved, note) => invoke('admin:resolveReport', id, resolved, note),
   },
 
