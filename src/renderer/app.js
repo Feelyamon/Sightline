@@ -1457,7 +1457,14 @@ function adminUserRow(u) {
   actions.append(
     adminButton(t('admin.clearAvatar'), async () => {
       await window.wt.admin.clearAvatar(u.id);
-      row.append(el('div', 'admin-result', t('admin.clearAvatarDone')));
+      // Перерисовываем список и свою карточку: аватарка держится в нескольких
+      // местах сразу, и оставшаяся на экране картинка читается как «не
+      // сработало».
+      friendsState = await window.wt.friends.state();
+      renderSquad();
+      renderMyAvatar();
+      await refreshAccount();
+      refreshAdminUsers();
     })
   );
 
@@ -1488,6 +1495,17 @@ function adminUserRow(u) {
           'danger'
         )
   );
+
+  // Запрет на аватарки снимается только руками: сам он не проходит никогда, и
+  // без этой кнопки он был бы вечным. Показывается, только когда запрет есть.
+  if (u.avatar_banned) {
+    actions.append(
+      adminButton(t('admin.unbanAvatar'), async () => {
+        await window.wt.admin.unbanAvatar(u.id);
+        refreshAdminUsers();
+      })
+    );
+  }
 
   // Права заблокированному не выдаются, и кнопки для этого нет: предлагать
   // действие, которое сервер всё равно отклонит, — обман интерфейса. Снять
@@ -2817,6 +2835,11 @@ async function refreshNotices() {
   const срочное = notices.find((n) => n.blocking && !n.read);
   if (срочное?.kind === 'password_reset') openForcedPassword(accountLogin || '');
 }
+
+// Проверяем сами, а не только при заходе в раздел аккаунта. Уведомление,
+// которое человек видит, потому что случайно открыл нужную вкладку, — это не
+// уведомление, а находка.
+setInterval(refreshNotices, 30_000);
 
 $('bellBtn').addEventListener('click', () => {
   $('notifyModal').hidden = false;

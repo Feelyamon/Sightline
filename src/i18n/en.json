@@ -532,5 +532,6 @@
   "admin.reportNothing": "nothing attached",
   "acc.privateOn": "Profile is private",
   "profile.private": "Private profile",
-  "acc.privacyAdminOnly": "Available to administrators only for now."
+  "acc.privacyAdminOnly": "Available to administrators only for now.",
+  "admin.unbanAvatar": "Allow avatars again"
 }

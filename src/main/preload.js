@@ -91,6 +91,7 @@ contextBridge.exposeInMainWorld('wt', {
     vehicles: () => invoke('admin:vehicles'),
     setVehicleAlias: (alias, canonical) => invoke('admin:setVehicleAlias', alias, canonical),
     clearAvatar: (id) => invoke('admin:clearAvatar', id),
+    unbanAvatar: (id) => invoke('admin:unbanAvatar', id),
     reports: (scope, tag) => invoke('admin:reports', scope, tag),
     resolveReport: (id, resolved, note) => invoke('admin:resolveReport', id, resolved, note),
   },

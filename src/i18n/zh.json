@@ -532,5 +532,6 @@
   "admin.reportNothing": "未附加内容",
   "acc.privateOn": "资料已设为私密",
   "profile.private": "私密资料",
-  "acc.privacyAdminOnly": "目前仅管理员可用。"
+  "acc.privacyAdminOnly": "目前仅管理员可用。",
+  "admin.unbanAvatar": "恢复头像权限"
 }

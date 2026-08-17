@@ -1107,8 +1107,20 @@ handle('admin:setVehicleAlias', (_e, alias, canonical) =>
     auth: true,
   })
 );
-handle('admin:clearAvatar', (_e, accountId) =>
-  account.request('/admin/avatar/clear', {
+handle('admin:clearAvatar', async (_e, accountId) => {
+  const ответ = await account.request('/admin/avatar/clear', {
+    method: 'POST',
+    body: { account_id: accountId },
+    auth: true,
+  });
+  // Список друзей и своя карточка держат аватарку у себя. Без обновления она
+  // остаётся на экране, и выглядит это так, будто снятие не сработало.
+  await friends.refresh();
+  return ответ;
+});
+
+handle('admin:unbanAvatar', (_e, accountId) =>
+  account.request('/admin/avatar/unban', {
     method: 'POST',
     body: { account_id: accountId },
     auth: true,

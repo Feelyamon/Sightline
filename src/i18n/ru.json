@@ -532,5 +532,6 @@
   "admin.reportNothing": "ничего не приложено",
   "acc.privateOn": "Профиль закрыт",
   "profile.private": "Приватный профиль",
-  "acc.privacyAdminOnly": "Пока доступно только администратору."
+  "acc.privacyAdminOnly": "Пока доступно только администратору.",
+  "admin.unbanAvatar": "Вернуть аватарки"
 }
