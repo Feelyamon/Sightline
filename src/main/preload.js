@@ -61,6 +61,9 @@ contextBridge.exposeInMainWorld('wt', {
     signOut: () => invoke('account:signOut'),
     changePassword: (form) => invoke('account:changePassword', form),
     logoutAll: () => invoke('account:logoutAll'),
+    forcedPassword: (form) => invoke('account:forcedPassword', form),
+    notifications: () => invoke('account:notifications'),
+    readNotifications: (id) => invoke('account:readNotifications', id),
     saveRecoveryCode: (code) => invoke('account:saveRecoveryCode', code),
   },
 

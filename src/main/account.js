@@ -404,6 +404,29 @@ class Account {
     return this.request('/settings', { method: 'POST', body: { items }, auth: true });
   }
 
+  /**
+   * Задать пароль после того, как администратор объявил прежний негодным.
+   *
+   * Сессию выдаёт сервер сразу же: человек только что доказал, что аккаунт
+   * его, кодом восстановления, — заставлять его после этого ещё и входить
+   * значило бы спросить пароль, который он ввёл секунду назад.
+   */
+  async forcedPassword({ login, recoveryCode, newPassword }) {
+    const data = await this.request('/auth/forced-password', {
+      method: 'POST',
+      body: { login, recovery_code: recoveryCode, new_password: newPassword },
+    });
+    this.session = {
+      token: data.token,
+      login,
+      role: 'user',
+      lang: null,
+      expiresAt: data.expires_at,
+    };
+    this.save();
+    return { recoveryCode: data.recovery_code, state: this.state() };
+  }
+
   async logoutAll() {
     const data = await this.request('/auth/logout-all', { method: 'POST', auth: true });
     this.signOutLocally();

@@ -381,9 +381,6 @@
   "admin.blocked": "blocked",
   "admin.newCode": "New recovery code",
   "admin.newCodeResult": "Recovery code: {code} — pass it to the player, we do not keep it anywhere else",
-  "admin.setPassword": "Change password",
-  "admin.newPassword": "New password",
-  "admin.setPasswordResult": "Password changed, all sessions closed. New recovery code: {code}. Tell the player to change the password — a password you also know has stopped being a password.",
   "admin.clearAvatar": "Take down avatar",
   "admin.clearAvatarDone": "Avatar taken down",
   "admin.block": "Block",
@@ -479,5 +476,15 @@
   "acc.privacyHint": "Hides your statistics from others. The nickname underline in battle stays: it says a person uses the app, not what their numbers are.",
   "update.available": "Update {version} is available",
   "update.later": "Later",
-  "update.nothingToSay": "See the site for what changed."
+  "update.nothingToSay": "See the site for what changed.",
+  "forced.title": "Set a new password",
+  "forced.lead": "An administrator declared your previous password invalid. You set the new one yourself — nobody else will know it. You will need the recovery code issued when you registered.",
+  "forced.code": "Recovery code",
+  "forced.codeHint": "sixteen characters; dashes and case do not matter",
+  "forced.submit": "Set password",
+  "forced.done": "Password set. Save the new recovery code — the previous one no longer works.",
+  "admin.resetPassword": "Reset password",
+  "admin.resetPasswordDone": "The password is now invalid. The player sets a new one themselves using their recovery code — it is not shown to you. Sessions closed.",
+  "admin.bans": "bans: {n}",
+  "admin.avatarBanned": "avatars blocked"
 }

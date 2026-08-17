@@ -381,9 +381,6 @@
   "admin.blocked": "已封禁",
   "admin.newCode": "新的恢复码",
   "admin.newCodeResult": "恢复码：{code}——请转交给玩家，我们不会在别处保存它",
-  "admin.setPassword": "修改密码",
-  "admin.newPassword": "新密码",
-  "admin.setPasswordResult": "密码已修改，所有会话已关闭。新的恢复码：{code}。请让玩家自行更换密码——你也知道的密码已经不再是密码。",
   "admin.clearAvatar": "撤下头像",
   "admin.clearAvatarDone": "头像已撤下",
   "admin.block": "封禁",
@@ -479,5 +476,15 @@
   "acc.privacyHint": "对他人隐藏你的统计数据。战斗中昵称的下划线仍会保留：它表示此人在使用本程序，而不是他的具体数据。",
   "update.available": "有新版本 {version}",
   "update.later": "稍后",
-  "update.nothingToSay": "更新内容见网站。"
+  "update.nothingToSay": "更新内容见网站。",
+  "forced.title": "请设置新密码",
+  "forced.lead": "管理员已将你原来的密码作废。新密码由你自己设置，其他人无法得知。需要注册时发放的恢复码。",
+  "forced.code": "恢复码",
+  "forced.codeHint": "十六位字符，连字符和大小写无关",
+  "forced.submit": "设置密码",
+  "forced.done": "密码已设置。请保存新的恢复码，旧的已失效。",
+  "admin.resetPassword": "重置密码",
+  "admin.resetPasswordDone": "密码已作废。玩家将使用自己的恢复码设置新密码，不会向你显示。会话已关闭。",
+  "admin.bans": "封禁次数：{n}",
+  "admin.avatarBanned": "禁止使用头像"
 }

@@ -820,6 +820,38 @@
     </div>
   </div>
 
+  <!-- Пароль сброшен администратором. Закрыть мимо нельзя намеренно: другого
+       пути в аккаунт у человека нет, сессии закрыты, старый пароль не
+       работает. Окно, которое можно закрыть, здесь означало бы тупик. -->
+  <div class="modal-backdrop blocking" id="forcedPasswordModal" hidden>
+    <div class="modal">
+      <h2 data-i18n="forced.title"></h2>
+      <p class="muted" data-i18n="forced.lead"></p>
+      <label class="row field">
+        <span class="muted" data-i18n="acc.login"></span>
+        <input type="text" id="fpLogin" autocomplete="username" />
+      </label>
+      <label class="row field">
+        <span class="muted" data-i18n="forced.code"></span>
+        <input type="text" id="fpCode" autocomplete="off" />
+        <span class="hint muted" data-i18n="forced.codeHint"></span>
+      </label>
+      <label class="row field">
+        <span class="muted" data-i18n="acc.newPassword"></span>
+        <input type="password" id="fpNew" autocomplete="new-password" />
+        <span class="hint muted" data-i18n="acc.passwordHint"></span>
+      </label>
+      <label class="row field">
+        <span class="muted" data-i18n="acc.password2"></span>
+        <input type="password" id="fpNew2" autocomplete="new-password" />
+      </label>
+      <div class="auth-error" id="fpError" hidden></div>
+      <div class="buttons">
+        <button id="fpSubmit" data-i18n="forced.submit"></button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop blocking" id="outdatedModal" hidden>
     <div class="modal">
       <h2 data-i18n="update.title"></h2>

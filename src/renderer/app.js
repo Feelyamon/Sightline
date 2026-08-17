@@ -1336,6 +1336,11 @@ function adminUserRow(u) {
     el('span', 'muted', `#${u.id} · ${t(`acc.role.${u.role === 'admin' ? 'admin' : 'user'}`)}`)
   );
   if (u.blocked) head.append(el('span', 'trust disputed', t('admin.blocked')));
+  // Сколько раз этого человека блокировали. Первый случай и пятый — разные
+  // разговоры, и знать это надо до того, как принимаешь решение, а не после
+  // раскопок в журнале.
+  if (u.bans > 0) head.append(el('span', 'muted small', t('admin.bans', { n: u.bans })));
+  if (u.avatar_banned) head.append(el('span', 'muted small', t('admin.avatarBanned')));
   row.append(head);
 
   const actions = el('div', 'admin-actions');
@@ -1353,19 +1358,15 @@ function adminUserRow(u) {
     )
   );
 
+  // Пароль администратор не назначает, а объявляет негодным: назначить — значит
+  // знать пароль от чужого аккаунта и мочь войти под ним. Новый задаёт сам
+  // игрок по своему коду восстановления, и код администратору не показывается.
   actions.append(
-    adminButton(t('admin.setPassword'), () =>
-      askFields(
-        row,
-        [
-          { name: 'value', label: t('admin.newPassword'), placeholder: t('acc.passwordHint'), password: true },
-          confirmField(),
-        ],
-        async ({ value, confirm }) => {
-          const { recovery_code: code } = await window.wt.admin.setPassword(u.id, value, confirm);
-          row.append(el('div', 'admin-result', t('admin.setPasswordResult', { code })));
-        }
-      )
+    adminButton(t('admin.resetPassword'), () =>
+      askFields(row, [confirmField()], async ({ confirm }) => {
+        await window.wt.admin.setPassword(u.id, '', confirm);
+        row.append(el('div', 'admin-result', t('admin.resetPasswordDone')));
+      })
     )
   );
 
@@ -1404,14 +1405,21 @@ function adminUserRow(u) {
         )
   );
 
-  actions.append(
-    adminButton(u.role === 'admin' ? t('admin.demote') : t('admin.promote'), () =>
-      askFields(row, [confirmField()], async ({ confirm }) => {
-        await window.wt.admin.setRole(u.id, u.role === 'admin' ? 'user' : 'admin', confirm);
-        refreshAdminUsers();
-      })
-    )
-  );
+  // Права заблокированному не выдаются, и кнопки для этого нет: предлагать
+  // действие, которое сервер всё равно отклонит, — обман интерфейса. Снять
+  // права заблокированному по-прежнему можно: иначе администратора, который
+  // натворил дел и потому заблокирован, нельзя было бы разжаловать.
+  const можноМенятьРоль = u.role === 'admin' || !u.blocked;
+  if (можноМенятьРоль) {
+    actions.append(
+      adminButton(u.role === 'admin' ? t('admin.demote') : t('admin.promote'), () =>
+        askFields(row, [confirmField()], async ({ confirm }) => {
+          await window.wt.admin.setRole(u.id, u.role === 'admin' ? 'user' : 'admin', confirm);
+          refreshAdminUsers();
+        })
+      )
+    );
+  }
 
   row.append(actions);
   return row;
@@ -2177,6 +2185,45 @@ $('profileEditModal').addEventListener('click', (e) => {
   if (e.target === $('profileEditModal')) closeProfileEditor();
 });
 
+// --- Пароль сброшен администратором ---------------------------------------
+
+function openForcedPassword(login) {
+  $('fpLogin').value = login || '';
+  for (const id of ['fpCode', 'fpNew', 'fpNew2']) $(id).value = '';
+  $('fpError').hidden = true;
+  $('forcedPasswordModal').hidden = false;
+  $('fpCode').focus();
+}
+
+$('fpSubmit').addEventListener('click', async (e) => {
+  const button = e.currentTarget;
+  const пароль = $('fpNew').value;
+  if (пароль.length < 8) {
+    return showAuthError('fpError', { message: t('acc.passwordHint') });
+  }
+  if (пароль !== $('fpNew2').value) {
+    return showAuthError('fpError', { message: t('acc.mismatch') });
+  }
+
+  setBusy(button, true);
+  try {
+    const { recoveryCode } = await window.wt.account.forcedPassword({
+      login: $('fpLogin').value.trim(),
+      recoveryCode: $('fpCode').value,
+      newPassword: пароль,
+    });
+    $('forcedPasswordModal').hidden = true;
+    // Новый код показывается тем же окном, что и при регистрации: он такой же
+    // единственный ключ, и закрыть окно, не подтвердив сохранение, нельзя.
+    showRecoveryCode(recoveryCode);
+    await refreshAccount();
+  } catch (err) {
+    showAuthError('fpError', err);
+  } finally {
+    setBusy(button, false);
+  }
+});
+
 $('outdatedDownload').addEventListener('click', () => window.wt.account.openDownload());
 $('outdatedRetry').addEventListener('click', checkVersion);
 
@@ -2273,6 +2320,13 @@ $('authSignIn').addEventListener('submit', async (e) => {
     $('siPassword').value = '';
     await refreshAccount();
   } catch (err) {
+    // Пароль сброшен администратором. Это единственный момент, когда человеку
+    // можно об этом сказать: сессии закрыты, уведомления ему недоступны, и без
+    // этой ветки он бесконечно пробовал бы свой старый пароль.
+    if (err?.code === 'password_reset_required') {
+      openForcedPassword($('siLogin').value.trim());
+      return;
+    }
     showAuthError('siError', err);
   } finally {
     setBusy(button, false);

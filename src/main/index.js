@@ -956,6 +956,22 @@ handle('account:openDownload', () => {
   return shell.openExternal(url.href);
 });
 
+// Задать пароль после админского сброса. Без входа: войти человек как раз и
+// не может — подходящего пароля не существует, а сессии закрыты. Единственный
+// ключ здесь — код восстановления, который у него есть с регистрации.
+handle('account:forcedPassword', (_e, form = {}) =>
+  account.forcedPassword({
+    login: String(form.login || ''),
+    recoveryCode: String(form.recoveryCode || ''),
+    newPassword: String(form.newPassword || ''),
+  })
+);
+
+handle('account:notifications', () => account.request('/notifications', { auth: true }));
+handle('account:readNotifications', (_e, id) =>
+  account.request('/notifications/read', { method: 'POST', body: { id: id ?? null }, auth: true })
+);
+
 handle('account:signOut', async () => {
   const state = await account.signOut();
   // Список друзей чужой памяти не оставляет: вышел — и в окне пусто.
