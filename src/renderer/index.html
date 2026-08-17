@@ -605,23 +605,61 @@
     <div class="modal">
       <h2 data-i18n="report.title"></h2>
       <p class="muted" data-i18n="report.lead"></p>
+      <!-- Тег обязателен и берётся из закрытого списка. Свободный ввод
+           превращается в двадцать написаний одного и того же, и фильтровать
+           по нему нельзя. -->
       <label class="row field">
-        <span class="muted" data-i18n="report.kind"></span>
-        <span class="sel"><select id="reportKind">
-          <option value="bug" data-i18n="report.kind.bug"></option>
-          <option value="idea" data-i18n="report.kind.idea"></option>
-          <option value="other" data-i18n="report.kind.other"></option>
+        <span class="muted" data-i18n="report.tag"></span>
+        <span class="sel"><select id="reportTag">
+          <option value="" data-i18n="report.tag.pick"></option>
+          <option value="killfeed" data-i18n="report.tag.killfeed"></option>
+          <option value="teams" data-i18n="report.tag.teams"></option>
+          <option value="kda" data-i18n="report.tag.kda"></option>
+          <option value="crash" data-i18n="report.tag.crash"></option>
+          <option value="no-game" data-i18n="report.tag.noGame"></option>
+          <option value="stats" data-i18n="report.tag.stats"></option>
+          <option value="ui" data-i18n="report.tag.ui"></option>
+          <option value="account" data-i18n="report.tag.account"></option>
+          <option value="sync" data-i18n="report.tag.sync"></option>
+          <option value="idea" data-i18n="report.tag.idea"></option>
+          <option value="other" data-i18n="report.tag.other"></option>
         </select></span>
       </label>
       <label class="row field">
-        <span class="muted" data-i18n="report.text"></span>
-        <textarea id="reportText" rows="7" data-i18n-placeholder="report.placeholder"></textarea>
+        <span class="muted" data-i18n="report.titleField"></span>
+        <input type="text" id="reportTitle" maxlength="120"
+               data-i18n-placeholder="report.titlePlaceholder" autocomplete="off" />
       </label>
-      <p class="muted small" id="reportMeta"></p>
+      <label class="row field">
+        <span class="muted" data-i18n="report.text"></span>
+        <textarea id="reportText" rows="6" data-i18n-placeholder="report.placeholder"></textarea>
+      </label>
+      <label class="row field">
+        <span class="muted" data-i18n="report.steps"></span>
+        <textarea id="reportSteps" rows="3" data-i18n-placeholder="report.stepsPlaceholder"></textarea>
+      </label>
+
+      <!-- Ничего не уходит молча. Человек видит ровно то, что приложено, и
+           может отказаться — тогда разбирать будет сложнее, но это его выбор,
+           а не наш за него. -->
+      <div class="section-title" data-i18n="report.attached"></div>
+      <label class="row consent">
+        <input type="checkbox" id="reportAttach" checked />
+        <span data-i18n="report.attachToggle"></span>
+      </label>
+      <pre class="log" id="reportMeta"></pre>
       <div class="auth-error" id="reportError" hidden></div>
       <div class="buttons">
         <button id="reportSend" data-i18n="report.send"></button>
         <button id="reportCancel" data-i18n="report.cancel"></button>
+      </div>
+
+      <!-- Что стало с прежними сообщениями. Отчёт, на который никогда не
+           отвечают, перестают присылать — а вместе с ним пропадает
+           единственный канал, по которому о поломках вообще узнают. -->
+      <div id="reportMineBox" hidden>
+        <div class="section-title" data-i18n="report.mine"></div>
+        <div id="reportMine"></div>
       </div>
     </div>
   </div>

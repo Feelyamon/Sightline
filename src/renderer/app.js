@@ -1125,20 +1125,82 @@ $('cardReportSend').addEventListener('click', async (e) => {
 
 // --- Сообщение о проблеме ------------------------------------------------
 
+/** Сведения, которые программа прикладывает к сообщению. */
+let reportContext = null;
+
+/**
+ * Показывает ровно то, что уйдёт вместе с текстом.
+ *
+ * Не список названий, а сами значения: «прикладываются версия и язык» человек
+ * прочитает как «что-то техническое», а «uiLang: ru» — как то, что он может
+ * оценить и с чем может не согласиться.
+ */
+function renderReportContext() {
+  const box = $('reportMeta');
+  if (!reportContext || !$('reportAttach').checked) {
+    box.textContent = t('report.attachedNone');
+    return;
+  }
+  const c = reportContext;
+  const строки = [
+    `${t('report.ctx.version')}: ${c.appVersion}`,
+    `${t('report.ctx.os')}: ${c.osVersion}`,
+    `${t('report.ctx.lang')}: ${c.lang}`,
+    `${t('report.ctx.who')}: ${c.login || t('report.noAccount')}`,
+    `${t('report.ctx.game')}: ${t(STATUS_KEY[c.gameStatus] || 'status.unknown')}`,
+  ];
+  if (c.unparsed?.length) {
+    строки.push('', `${t('report.ctx.unparsed')}:`, ...c.unparsed.map((l) => `  ${l}`));
+  }
+  box.textContent = строки.join('\n');
+}
+
 $('reportBtn').addEventListener('click', async () => {
   $('reportError').hidden = true;
-  $('reportText').value = '';
+  for (const id of ['reportTitle', 'reportText', 'reportSteps']) $(id).value = '';
+  $('reportTag').value = '';
+  $('reportAttach').checked = true;
   $('reportModal').hidden = false;
-  // Версии показываем прямо в окне: человек должен видеть, что уходит вместе
-  // с текстом, а не догадываться.
-  const ctx = await window.wt.support.context();
-  $('reportMeta').textContent = t('report.meta', {
-    version: ctx.appVersion,
-    os: ctx.osVersion,
-    who: ctx.login || t('report.noAccount'),
-  });
-  $('reportText').focus();
+  reportContext = await window.wt.support.context();
+  renderReportContext();
+  renderMyReports();
+  $('reportTag').focus();
 });
+
+$('reportAttach').addEventListener('change', renderReportContext);
+
+/** Прежние сообщения и что с ними стало. Только для тех, кто вошёл. */
+async function renderMyReports() {
+  const box = $('reportMineBox');
+  box.hidden = true;
+  if (!reportContext?.signedIn) return;
+  let items;
+  try {
+    items = (await window.wt.support.mine())?.items || [];
+  } catch {
+    // Сервера нет — молчим. Список прежних сообщений не то, ради чего стоит
+    // показывать ошибку поверх формы, которую человек как раз заполняет.
+    return;
+  }
+  if (!items.length) return;
+
+  $('reportMine').replaceChildren(
+    ...items.slice(0, 10).map((r) => {
+      const row = el('div', 'friend-row');
+      const name = el('div', 'friend-name');
+      name.append(el('div', null, `#${r.id} · ${r.title || t(`report.tag.${r.tag}`) || r.tag}`));
+      name.append(
+        el('div', 'friend-status', t(r.status === 'resolved' ? 'report.resolved' : 'report.open'))
+      );
+      // Ответ администратора виден автору. Ответ, который человек не может
+      // прочитать, ответом не является.
+      if (r.answer) name.append(el('div', 'friend-status', r.answer));
+      row.append(name);
+      return row;
+    })
+  );
+  box.hidden = false;
+}
 
 $('reportCancel').addEventListener('click', () => {
   $('reportModal').hidden = true;
@@ -1147,6 +1209,14 @@ $('reportCancel').addEventListener('click', () => {
 $('reportSend').addEventListener('click', async (e) => {
   const button = e.currentTarget;
   const message = $('reportText').value.trim();
+  // Тег обязателен. Проверяем до текста: без тега сообщение попадёт в общую
+  // кучу, и тогда неважно, насколько хорошо оно написано.
+  if (!$('reportTag').value) {
+    $('reportError').textContent = t('report.needTag');
+    $('reportError').hidden = false;
+    $('reportTag').focus();
+    return;
+  }
   if (message.length < 10) {
     $('reportError').textContent = t('report.tooShort');
     $('reportError').hidden = false;
@@ -1154,11 +1224,20 @@ $('reportSend').addEventListener('click', async (e) => {
   }
   setBusy(button, true);
   try {
-    await window.wt.support.send({ message, kind: $('reportKind').value });
+    const answer = await window.wt.support.send({
+      message,
+      tag: $('reportTag').value,
+      title: $('reportTitle').value.trim(),
+      steps: $('reportSteps').value.trim(),
+      // Отказался прикладывать — уходит пусто. Тихо приложить всё равно
+      // означало бы, что галочка ничего не решает.
+      context: $('reportAttach').checked ? reportContext : null,
+    });
     $('reportModal').hidden = true;
     // Подтверждение — в строке состояния: отдельная «спасибо»-модалка поверх
     // только что закрытой это ещё одно окно, которое надо закрывать.
-    showError(t('report.sent'));
+    // Номер обязателен: по нему человек потом спросит, что решили.
+    showError(t('report.sentNumber', { n: answer?.id ?? '—' }));
   } catch (err) {
     $('reportError').textContent = err?.offline ? t('acc.offline') : err?.message || String(err);
     $('reportError').hidden = false;

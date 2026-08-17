@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('wt', {
     send: (form) => invoke('support:send', form),
     reportPlayer: (form) => invoke('support:reportPlayer', form),
     context: () => invoke('support:context'),
+    mine: () => invoke('support:mine'),
   },
 
   admin: {

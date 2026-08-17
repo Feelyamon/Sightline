@@ -667,6 +667,13 @@ handle('support:send', (_e, form = {}) =>
     body: {
       message: String(form.message || ''),
       kind: form.kind || 'bug',
+      tag: String(form.tag || 'other'),
+      title: form.title ? String(form.title) : undefined,
+      steps: form.steps ? String(form.steps) : undefined,
+      // Приложенные сведения уходят только если человек их оставил. Отказался —
+      // приходит пустое поле, а не тихо всё то же самое.
+      context: form.context || null,
+      install_id: installId(),
       app_version: app.getVersion(),
       os_version: `${process.platform} ${require('node:os').release()}`,
     },
@@ -676,12 +683,40 @@ handle('support:send', (_e, form = {}) =>
   })
 );
 
+handle('support:mine', () => account.request('/bugs/mine', { auth: true }));
+
 handle('support:context', () => ({
   appVersion: app.getVersion(),
   osVersion: `${process.platform} ${require('node:os').release()}`,
   signedIn: account.isSignedIn,
   login: account.state().login,
+  lang: locale.normalize(settings.get('uiLang')),
+  // Состояние игры на момент жалобы: половина сообщений про «не видит игру»
+  // разбирается одной этой строкой.
+  gameStatus: status.status,
+  // Строки кил-фида, которые разобрать не удалось. Это самый полезный
+  // приложенный материал: по ним чинится парсер, и присылать их иначе неоткуда.
+  unparsed: battle ? battle.snapshot().unparsed.slice(-10) : [],
+  // Анонимный идентификатор установки: по нему считается лимит сообщений в
+  // сутки и отсекаются дубли. С человеком не связан и в разборе не виден.
+  installId: installId(),
 }));
+
+/**
+ * Идентификатор установки. Случайный, заводится один раз и живёт в настройках.
+ *
+ * Он не про человека и не про машину: по нему нельзя узнать ни того, ни
+ * другого. Он нужен ровно для двух вещей — не дать одной установке засыпать
+ * сервер сообщениями и склеить десять нажатий «отправить» в одно.
+ */
+function installId() {
+  let id = settings.get('installId');
+  if (!id) {
+    id = require('node:crypto').randomUUID();
+    settings.set('installId', id);
+  }
+  return id;
+}
 
 // --- Администрирование ----------------------------------------------------
 //

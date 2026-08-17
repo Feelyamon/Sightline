@@ -267,8 +267,20 @@ window.wt = {
   })(),
 
   support: {
-    send: async () => ({ id: 1 }),
-    context: async () => ({ appVersion: '0.3.0', osVersion: 'win32 10.0.26200', signedIn: true, login: 'Username' }),
+    send: async () => ({ id: 42 }),
+    mine: async () => ({ items: [] }),
+    context: async () => ({
+      appVersion: '0.3.0',
+      osVersion: 'win32 10.0.26200',
+      signedIn: true,
+      login: 'Username',
+      lang: 'ru',
+      gameStatus: 'idle',
+      // Пара нераспознанных строк: без них не видно, как выглядит самое
+      // полезное из приложенного.
+      unparsed: ['[CLNZ] Кто-то сделал что-то непонятное', 'непонятная строка кил-фида'],
+      installId: 'harness',
+    }),
   },
 
   admin: {
