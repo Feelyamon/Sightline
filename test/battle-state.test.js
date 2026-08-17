@@ -571,3 +571,55 @@ test('значки игры в нике не делают сокомандник
   const snap = feed(s, ['⋇^ILAZ^ DeathVision (M1A2) уничтожил Foe (Т-80БВМ)']);
   assert.deepEqual(snap.squadMissing, []);
 });
+
+test('чужой якорь достраивает команды, не зная стороны соседа', () => {
+  // Ради этого весь этап 12 и затевался. Сосед прислал две свои группы; какая
+  // из них «его союзники», для нас неважно и знать этого мы не можем — важно
+  // лишь, что внутри группы люди между собой союзники, а между группами
+  // противники. Куда конструкция повернётся относительно меня, граф разберётся
+  // сам, как только хоть один ник окажется связан с моей стороной.
+  const s = new BattleState('Me');
+  // Я убил Foe — значит Foe мой противник, а моя сторона известна.
+  const snap0 = feed(s, ['Me (Т-80БВМ) уничтожил Foe (Leopard 2A4)']);
+  assert.equal(find(snap0, 'Foe').team, 'enemy');
+
+  // Эти двое в бою есть, но кто они — неизвестно: они ещё никого не тронули.
+  feed(s, ['Alice (ИС-2) поджёг Bob (Tiger H1)']);
+
+  // Сосед сообщает: у него Foe и Alice в одной группе, Bob — в другой.
+  s.applyPeerAnchor({ allies: ['Foe', 'Alice'], enemies: ['Bob'] });
+  const snap = s.snapshot();
+
+  // Foe мой противник, Alice с ним заодно — значит тоже противник. Bob против
+  // них — значит мой союзник. Всё это выведено, а не сообщено.
+  assert.equal(find(snap, 'Alice').team, 'enemy');
+  assert.equal(find(snap, 'Bob').team, 'ally');
+});
+
+test('якорь соседа из чужого боя ничего не портит', () => {
+  // Ников соседа в нашем бою нет вовсе. Раскрашивать по ним нечего, и главное
+  // — ничего не должно окраситься наугад.
+  const s = new BattleState('Me');
+  feed(s, ['Alice (ИС-2) поджёг Bob (Tiger H1)']);
+  s.applyPeerAnchor({ allies: ['ИзДругогоБоя'], enemies: ['ТожеЧужой'] });
+
+  const snap = s.snapshot();
+  assert.equal(find(snap, 'Alice').team, 'unknown');
+  assert.equal(find(snap, 'Bob').team, 'unknown');
+});
+
+test('якорь соседа, не связанный со мной, остаётся отдельной парой', () => {
+  // Сосед сказал, кто против кого, но ни один из них со мной ещё не пересекся.
+  // Это не «не знаю» и не «ошибка»: пара «эти против тех» — полезное знание,
+  // и в таблице она так и показывается, отдельной группой.
+  const s = new BattleState('Me');
+  feed(s, ['Alice (ИС-2) поджёг Bob (Tiger H1)']);
+  s.applyPeerAnchor({ allies: ['Alice'], enemies: ['Bob'] });
+
+  const snap = s.snapshot();
+  // Стороны относительно меня по-прежнему неизвестны — и это честно.
+  assert.equal(find(snap, 'Alice').team, 'unknown');
+  assert.equal(find(snap, 'Bob').team, 'unknown');
+  // Но противоречий в графе нет: сосед сказал то же, что видели мы сами.
+  assert.equal(snap.teamConflicts, 0);
+});

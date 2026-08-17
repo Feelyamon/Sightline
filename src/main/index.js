@@ -250,6 +250,11 @@ function startClient() {
     // Ушли в ангар — бой закончился, самое время его записать и отправить.
     if (s.status !== 'battle') persistBattle({ final: true });
 
+    // Живой обмен идёт только в бою: в ангаре делиться нечем, а держать
+    // запись о себе означало бы показывать соседям бой, которого уже нет.
+    if (s.status === 'battle') startLive();
+    else stopLive();
+
     // Игра поднялась или закрылась — окно реагирует по настройкам. Отдельного
     // слежения за процессом игры не нужно: статус клиента и есть ответ на
     // вопрос «запущена ли игра». Подробности — в window-rules.js.
@@ -280,6 +285,9 @@ function startClient() {
     // Состав нового боя другой: спрашивать про него надо заново.
     peersAsked = new Set();
     peersFound = new Set();
+    // И запись о живом бое тоже: у нового боя другой состав, и старая мешала
+    // бы соседям находить друг друга.
+    liveActive = false;
     battleStartedAt = Date.now();
     battleRowId = null; // следующий бой — новая запись
     battleResult = 'unknown';
@@ -323,6 +331,73 @@ function startClient() {
 let peersAsked = new Set();
 let peersFound = new Set();
 let peersTimer = null;
+
+// --- Живой обмен во время боя (этап 12) ------------------------------------
+//
+// Кил-фид у всех в бою одинаковый, различается только якорь: каждый клиент
+// знает лишь то, в какой команде он сам. Второй пользователь в том же бою даёт
+// вторую точку отсчёта, и висящая группа определяется сразу, а не через
+// полторы минуты.
+//
+// Пять секунд — по решению владельца. Чаще незачем: команды важны в первые
+// полторы минуты, а не мгновенно. В ангаре обмена нет вовсе.
+const LIVE_MS = 5_000;
+let liveTimer = null;
+let liveActive = false;
+
+function startLive() {
+  if (liveTimer || !account.isSignedIn) return;
+  liveTimer = setInterval(pushLive, LIVE_MS);
+  pushLive();
+}
+
+function stopLive() {
+  if (liveTimer) clearInterval(liveTimer);
+  liveTimer = null;
+  if (!liveActive) return;
+  liveActive = false;
+  // Убираем запись сразу, а не ждём, пока она протухнет: иначе сосед ещё
+  // несколько минут видел бы «в бою есть второй» после того, как второй вышел.
+  account.request('/battles/live/leave', { method: 'POST', body: {}, auth: true }).catch(() => {});
+}
+
+async function pushLive() {
+  if (!account.isSignedIn || status.status !== 'battle') return;
+  const snap = battle.snapshot();
+  if (!snap.players.length) return;
+
+  try {
+    const answer = await account.request('/battles/live', {
+      method: 'POST',
+      body: {
+        nicks: snap.players.map((p) => p.nick),
+        // Мой якорь: кого я уже определил. Это и есть то, что помогает соседу.
+        allies: snap.players.filter((p) => p.team === 'ally').map((p) => p.nick),
+        enemies: snap.players.filter((p) => p.team === 'enemy').map((p) => p.nick),
+        // Строки уходят, но обратно пока не применяются — см. ниже.
+        lines: [],
+      },
+      auth: true,
+    });
+    liveActive = true;
+
+    // Чужой якорь вливаем в граф. Стороны сосед не переворачивал и не мог:
+    // свою знает только он сам. Разбирается граф — см. applyPeerAnchor.
+    if (answer?.allies?.length || answer?.enemies?.length) {
+      battle.applyPeerAnchor(answer);
+      schedulePush();
+    }
+
+    // ЧЕГО ЗДЕСЬ ПОКА НЕТ И ПОЧЕМУ. Чужие строки кил-фида сервер уже отдаёт, но
+    // вливать их в разбор нельзя без защиты от двойного счёта: одно и то же
+    // событие видят оба клиента, а различить «он убил его дважды» и «одна и та
+    // же строка от двоих» по тексту невозможно — время игра держит отдельно от
+    // текста. Посчитать фраг дважды хуже, чем не дозаполнить пропуск.
+  } catch {
+    // Сервера нет — обмена нет. Разбор боя от этого не страдает: он работает
+    // на своих данных и без сети вообще.
+  }
+}
 
 function schedulePeers() {
   if (!account.isSignedIn || peersTimer) return;
