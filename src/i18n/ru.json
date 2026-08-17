@@ -447,5 +447,7 @@
   "squad.invite": "Пригласить",
   "squad.inviteSent": "Отправлено · {n} с",
   "squad.inviteCooldown": "Этот игрок отказался несколько раз подряд. Позвать снова можно через {n} мин.",
-  "squad.seconds": "{n} с"
+  "squad.seconds": "{n} с",
+  "who.guest": "Гость",
+  "who.signedIn": "Вошли как {login}"
 }

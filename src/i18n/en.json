@@ -447,5 +447,7 @@
   "squad.invite": "Invite",
   "squad.inviteSent": "Sent · {n}s",
   "squad.inviteCooldown": "This player declined several times in a row. You can invite them again in {n} min.",
-  "squad.seconds": "{n}s"
+  "squad.seconds": "{n}s",
+  "who.guest": "Guest",
+  "who.signedIn": "Signed in as {login}"
 }

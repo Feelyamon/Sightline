@@ -389,6 +389,16 @@ class Account {
    * сессии остались бы живыми, и тихий выход у себя выглядел бы как
    * выполненная просьба. Ошибку показываем.
    */
+  /**
+   * Настройки в учётной записи: прислать свои, забрать итог слияния.
+   *
+   * Один запрос вместо двух намеренно: между «отправить» и «получить»
+   * оставалось бы окно, в котором две машины успевают разойтись.
+   */
+  async syncSettings(items) {
+    return this.request('/settings', { method: 'POST', body: { items }, auth: true });
+  }
+
   async logoutAll() {
     const data = await this.request('/auth/logout-all', { method: 'POST', auth: true });
     this.signOutLocally();

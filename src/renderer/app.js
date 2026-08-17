@@ -2049,8 +2049,30 @@ $('profileEdit').addEventListener('click', () => {
 $('outdatedDownload').addEventListener('click', () => window.wt.account.openDownload());
 $('outdatedRetry').addEventListener('click', checkVersion);
 
+/**
+ * «Гость» или «Вошли как X» в шапке.
+ *
+ * Отдельной функцией, потому что состояние аккаунта меняется в трёх местах:
+ * вход, выход и проверка при запуске. Показывать это только во вкладке
+ * «Аккаунт» бесполезно — туда и заходят раз в месяц, а вопрос «идёт ли
+ * синхронизация» возникает не там.
+ */
+function renderWhoAmI(state) {
+  const кнопка = $('whoAmI');
+  const вошли = !!state?.signedIn;
+  кнопка.textContent = вошли ? t('who.signedIn', { login: state.login }) : t('who.guest');
+  кнопка.classList.toggle('guest', !вошли);
+}
+
+// Нажатие ведёт в «Аккаунт»: там и вход, и выход. Тем же способом, что и
+// внешняя команда открыть вкладку, — щелчком по самой кнопке раздела.
+$('whoAmI').addEventListener('click', () => {
+  document.querySelector('.tab[data-tab="account"]')?.click();
+});
+
 async function refreshAccount() {
   const state = await window.wt.account.state();
+  renderWhoAmI(state);
   applyVersion(state.version);
   accountLogin = state.login;
   // Раздел администратора показывается по роли из сессии. Роль приезжает с
@@ -2570,6 +2592,21 @@ function showError(message) {
 }
 
 window.wt.onError(showError);
+
+// Настройки приехали из учётной записи: значения уже применены в main, окну
+// осталось показать их. Перерисовываем ровно то, что от них зависит, — целиком
+// вкладку настроек, а при смене языка ещё и весь интерфейс.
+window.wt.onSettingsChanged(async ({ keys = [], locale } = {}) => {
+  if (keys.includes('uiLang') && locale) {
+    applyLocale(locale);
+    rerenderAll();
+  }
+  const state = await window.wt.getState();
+  if (keys.includes('selfNick')) $('nick').value = state.selfNick || '';
+  if (state.uiScale) $('uiScale').value = String(state.uiScale);
+  $('onTop').checked = !!state.alwaysOnTop;
+  refreshWindowFlags();
+});
 
 /**
  * Раскладывает язык по интерфейсу: словарь в i18n, статические подписи в

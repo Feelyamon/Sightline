@@ -447,5 +447,7 @@
   "squad.invite": "邀请",
   "squad.inviteSent": "已发送 · {n} 秒",
   "squad.inviteCooldown": "该玩家已连续多次拒绝。{n} 分钟后可再次邀请。",
-  "squad.seconds": "{n} 秒"
+  "squad.seconds": "{n} 秒",
+  "who.guest": "访客",
+  "who.signedIn": "已登录：{login}"
 }

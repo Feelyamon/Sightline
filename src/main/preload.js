@@ -102,6 +102,13 @@ contextBridge.exposeInMainWorld('wt', {
     ipcRenderer.on('app:openTab', handler);
     return () => ipcRenderer.off('app:openTab', handler);
   },
+  // Настройки приехали из учётной записи и уже применены в main. Окну надо
+  // перерисовать то, что построено из них: переключатели, масштаб, язык.
+  onSettingsChanged: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('settings:changed', handler);
+    return () => ipcRenderer.off('settings:changed', handler);
+  },
   onSquadInvites: (cb) => {
     const handler = (_e, invites) => cb(invites);
     ipcRenderer.on('friends:invites', handler);

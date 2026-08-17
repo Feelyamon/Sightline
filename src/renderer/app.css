@@ -202,6 +202,29 @@ body {
 .friend-dot.battle { background: var(--ally); }
 .friend-dot.hangar { background: #e0b354; }
 
+/* Кто ты сейчас. Кнопка, а не подпись: нажатие ведёт в «Аккаунт» — там же и
+   вход. Приглушённая намеренно: это справка, а не то, на что надо смотреть во
+   время боя. */
+.who {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  cursor: pointer;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 130ms ease, border-color 130ms ease;
+}
+.who:hover { color: var(--text); border-color: var(--accent); }
+/* Гость — тем же приглушённым: это не ошибка и не предупреждение, программа
+   без аккаунта полноценна. Красный тут читался бы как «что-то не так». */
+.who.guest { font-style: italic; }
+
 .status { display: flex; align-items: center; gap: 8px; }
 /* Ошибку в строке состояния видно сразу: без выделения она теряется среди
    обычных сообщений вроде «В ангаре». */

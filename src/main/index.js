@@ -355,6 +355,63 @@ function schedulePeers() {
   }, 3000);
 }
 
+/**
+ * Применяет настройку к окну и системе.
+ *
+ * Отдельной функцией, потому что теперь у настройки два источника: человек
+ * нажал в окне и настройка приехала с сервера. Раньше применение жило внутри
+ * обработчиков IPC, и приехавшее с сервера значение записалось бы в файл, не
+ * включив ничего.
+ */
+function applySetting(key) {
+  if (key === 'uiScale' && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.setZoomFactor(uiScale());
+  }
+  if (key === 'alwaysOnTop' && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setAlwaysOnTop(!!settings.get('alwaysOnTop'));
+  }
+  if (key === 'launchWithSystem') applyLaunchWithSystem();
+  if (key === 'selfNick' && battle) {
+    battle.setSelfNick(settings.get('selfNick'));
+    schedulePush();
+  }
+  if (key === 'uiLang') {
+    send('app:localeChanged', currentLocale());
+    if (tray) tray.refresh();
+  }
+}
+
+/** Отправка настроек: не чаще раза в две секунды и только когда есть вход. */
+let settingsTimer = null;
+let settingsDirty = false;
+
+function scheduleSettingsSync() {
+  settingsDirty = true;
+  if (settingsTimer) return;
+  settingsTimer = setTimeout(() => {
+    settingsTimer = null;
+    syncSettings();
+  }, 2000);
+}
+
+async function syncSettings() {
+  if (!account.isSignedIn) return;
+  settingsDirty = false;
+  try {
+    const answer = await account.syncSettings(settings.syncPayload());
+    const применились = settings.applyRemote(answer?.items);
+    for (const key of применились) applySetting(key);
+    if (применились.length) {
+      send('settings:changed', { keys: применились, locale: currentLocale() });
+    }
+  } catch {
+    // Сервера нет — работаем на своих. Настройки применяются мгновенно и без
+    // сети; несделанная отправка не должна ничего ломать и ни о чём
+    // сообщать. Отправим при следующей правке или при следующем входе.
+    settingsDirty = true;
+  }
+}
+
 function startFriends() {
   friends.onChange = (state) => {
     battle.setKnownPlayers({ squad: friends.squadNicks(), friends: friends.friendNicks() });
@@ -413,6 +470,11 @@ app.whenReady().then(() => {
   // появится только после переключения вкладки.
   sync.onTrustChanged = () => send('db:changed');
   sync.start();
+  // Настройка поменялась в окне — уедет в учётную запись. Применение при этом
+  // мгновенное и не ждёт сети: программа обязана слушаться сразу.
+  settings.onChanged = () => scheduleSettingsSync();
+  // При старте забираем то, что могло измениться на другой машине.
+  syncSettings();
   db.startSession(); // «бои с запуска» считаются от старта приложения
   startClient();
   startFriends();
@@ -792,6 +854,11 @@ async function afterSignIn() {
     }
   }
   await friends.refresh();
+  // Настройки: гостевые поднимаются в аккаунт как есть, а то, что человек
+  // менял на другой машине и что свежее, приезжает сюда. Настройки — не
+  // статистика, подделывать в них нечего, и запрет на загрузку накопленной до
+  // регистрации истории сюда не относится.
+  await syncSettings();
   // Бои, накопившиеся в очереди до входа, ждали именно этого момента.
   sync.start();
 }
