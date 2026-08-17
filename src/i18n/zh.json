@@ -476,5 +476,8 @@
   "acc.privacy": "隐私",
   "acc.privacyMode": "私密模式",
   "acc.soon": "即将推出…",
-  "acc.privacyHint": "对他人隐藏你的统计数据。战斗中昵称的下划线仍会保留：它表示此人在使用本程序，而不是他的具体数据。"
+  "acc.privacyHint": "对他人隐藏你的统计数据。战斗中昵称的下划线仍会保留：它表示此人在使用本程序，而不是他的具体数据。",
+  "update.available": "有新版本 {version}",
+  "update.later": "稍后",
+  "update.nothingToSay": "更新内容见网站。"
 }

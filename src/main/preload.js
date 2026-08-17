@@ -2,7 +2,41 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
+const ERR_MARK = 'SIGHTLINE_ERR:';
+
+/**
+ * Возвращает ошибке её поля.
+ *
+ * Electron отдаёт в окно только текст, завёрнутый в своё сообщение. Всё, что
+ * окну нужно для осмысленного ответа человеку — «нет связи», код ошибки,
+ * сколько ждать до повтора, — по дороге терялось. Здесь оно собирается назад.
+ */
+function unwrap(error) {
+  const raw = String(error?.message || '');
+  const at = raw.indexOf(ERR_MARK);
+  if (at === -1) return error;
+  try {
+    const data = JSON.parse(raw.slice(at + ERR_MARK.length));
+    const restored = new Error(data.message || raw);
+    if (data.offline) restored.offline = true;
+    if (data.code) restored.code = data.code;
+    if (data.status) restored.status = data.status;
+    if (typeof data.retryAfter === 'number') restored.retryAfter = data.retryAfter;
+    return restored;
+  } catch {
+    // Метка есть, а разобрать не вышло — отдаём как есть. Потерять текст
+    // ошибки хуже, чем потерять её поля.
+    return error;
+  }
+}
+
+const invoke = async (channel, ...args) => {
+  try {
+    return await ipcRenderer.invoke(channel, ...args);
+  } catch (e) {
+    throw unwrap(e);
+  }
+};
 
 contextBridge.exposeInMainWorld('wt', {
   getState: () => invoke('app:getState'),

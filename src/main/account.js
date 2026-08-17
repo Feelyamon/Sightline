@@ -56,7 +56,8 @@ class Account {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.session = null; // { token, login, role, lang, expiresAt }
     // Что сервер думает о нашей версии. null — ещё не спрашивали.
-    // { ok, appVersion, minClient, latestClient, downloadUrl, updateAvailable }
+    // { ok, appVersion, minClient, latestClient, downloadUrl, updateAvailable,
+    //   latestNotes }
     this.version = null;
     this.load();
   }
@@ -234,6 +235,10 @@ class Account {
         latestClient: data?.latest_client || null,
         downloadUrl: data?.download_url || null,
         updateAvailable: !!(latest && mine && compareVersions(mine, latest) < 0),
+        // Что человек получит, обновившись. Приходит с сервера, потому что
+        // старая сборка не может знать, что появилось после неё. Пусто —
+        // значит сказать нечего, и обещать мы ничего не будем.
+        latestNotes: String(data?.latest_notes || '').trim(),
       };
     } catch (e) {
       // 426 уже записан в request(); остальное — «сервера сейчас нет».

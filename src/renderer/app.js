@@ -1734,15 +1734,21 @@ function inviteLabel(login) {
 
 /** Зовёт друга и ведёт обратный отсчёт прямо на кнопке. */
 async function inviteToSquad(login, button) {
-  // Ожидаемый отказ приходит ответом, а не исключением: через IPC у ошибки
-  // переживает только текст, и число секунд до повтора по нему не восстановить.
-  const answer = await window.wt.friends.invite(login);
-
-  if (answer && answer.ok === false) {
-    const секунд = Number(answer.retryAfter) || 0;
-    showFriendsError({ message: t('squad.inviteCooldown', { n: Math.max(1, Math.ceil(секунд / 60)) }) });
-    countdown(button, секунд, login);
-    return;
+  let answer;
+  try {
+    answer = await window.wt.friends.invite(login);
+  } catch (e) {
+    // Задержка после отказов приходит отдельным числом секунд. Разбирать текст
+    // ошибки нельзя: формулировку однажды поправят, и разбор молча перестанет
+    // работать.
+    if (typeof e?.retryAfter === 'number') {
+      showFriendsError({
+        message: t('squad.inviteCooldown', { n: Math.max(1, Math.ceil(e.retryAfter / 60)) }),
+      });
+      countdown(button, e.retryAfter, login);
+      return;
+    }
+    throw e;
   }
   countdown(button, Number(answer?.cooldown) || 10, login);
 }
@@ -2094,15 +2100,46 @@ window.wt.onFriendsUpdate((state) => renderFriends(state));
  * и графики работают без сети вообще, и выключать их из-за пропавшего
  * интернета было бы издевательством — в этом случае недоступен только аккаунт.
  */
+/**
+ * Какую версию человек уже попросил не напоминать.
+ *
+ * В памяти окна, а не в настройках: «позже» значит «не сейчас», а не «никогда
+ * больше». Перезапуск программы — как раз тот момент, когда напомнить уместно.
+ */
+let updateDismissed = null;
+
 function applyVersion(version) {
   const outdated = version && version.ok === false;
   $('outdatedModal').hidden = !outdated;
-  if (!outdated) return;
-  $('outdatedVersions').textContent = t('update.versions', {
-    mine: version.appVersion || '—',
-    min: version.minClient || '—',
-  });
+  if (outdated) {
+    // Сборка не годится вовсе — полоса про мягкое обновление тут лишняя, поверх
+    // неё уже висит окно, которое нельзя закрыть.
+    $('updateBar').hidden = true;
+    $('outdatedVersions').textContent = t('update.versions', {
+      mine: version.appVersion || '—',
+      min: version.minClient || '—',
+    });
+    return;
+  }
+
+  const надо = !!version?.updateAvailable && version.latestClient !== updateDismissed;
+  $('updateBar').hidden = !надо;
+  if (!надо) return;
+
+  $('updateTitle').textContent = t('update.available', { version: version.latestClient });
+  // Что человек получит, обновившись. Приходит с сервера: старая сборка не
+  // может знать, что появилось после неё. Голое «есть обновление» не отвечает
+  // на единственный вопрос, который у человека возникает, — а зачем мне это
+  // сейчас, — и потому его закрывают не читая.
+  $('updateNotes').textContent = version.latestNotes || t('update.nothingToSay');
 }
+
+$('updateGo').addEventListener('click', () => window.wt.account.openDownload());
+$('updateLater').addEventListener('click', async () => {
+  const version = await window.wt.account.state();
+  updateDismissed = version?.version?.latestClient || null;
+  $('updateBar').hidden = true;
+});
 
 async function checkVersion() {
   try {

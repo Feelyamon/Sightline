@@ -476,5 +476,8 @@
   "acc.privacy": "Privacy",
   "acc.privacyMode": "Private mode",
   "acc.soon": "Coming soon…",
-  "acc.privacyHint": "Hides your statistics from others. The nickname underline in battle stays: it says a person uses the app, not what their numbers are."
+  "acc.privacyHint": "Hides your statistics from others. The nickname underline in battle stays: it says a person uses the app, not what their numbers are.",
+  "update.available": "Update {version} is available",
+  "update.later": "Later",
+  "update.nothingToSay": "See the site for what changed."
 }

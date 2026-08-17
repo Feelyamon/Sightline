@@ -83,6 +83,29 @@ body {
 .brand-name { font-weight: 600; letter-spacing: .02em; color: var(--text); }
 .brand-name span { color: #d8b46b; }
 
+/* Полоса «есть обновление». Приглушённая: это не ошибка и не предупреждение,
+   программа работает как работала. Красный или жёлтый читались бы как «что-то
+   сломалось». */
+.update-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #16202e;
+  border-bottom: 1px solid #2f4a6d;
+  flex: none;
+}
+.update-text { flex: 1; min-width: 0; font-size: 12px; }
+.update-text b { color: #cfe2ff; margin-right: 8px; }
+.update-bar button { flex: none; }
+/* «Позже» — второстепенное действие, и выглядит второстепенным. */
+.update-bar .ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.update-bar .ghost:hover { color: var(--text); }
+
 /* Окно: разделы слева, содержимое справа. */
 .shell { flex: 1; display: flex; min-height: 0; }
 

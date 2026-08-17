@@ -90,6 +90,18 @@ function search(o = {}) {
   };
 }
 
+// Стенд показывает полосу «есть обновление»: иначе её негде посмотреть, пока
+// выпущенная версия одна.
+const ВЕРСИЯ = {
+  ok: true,
+  appVersion: '0.3.0',
+  minClient: '0.3.0',
+  latestClient: '0.4.0',
+  downloadUrl: 'https://sightline.feelyamon.ru/',
+  updateAvailable: true,
+  latestNotes: 'Приглашения в отряд, настройки переносятся между компьютерами.',
+};
+
 window.wt = {
   getState: async () => ({
     status: 'idle',
@@ -206,9 +218,14 @@ window.wt = {
       role: 'admin',
       isAdmin: true,
       expiresAt: null,
-      version: null,
+      // Та же версия, что отдаёт checkVersion. В программе это одно и то же
+      // поле; расходясь здесь, стенд гасил полосу обновления сразу после того,
+      // как проверка её показала.
+      version: ВЕРСИЯ,
     }),
-    checkVersion: async () => null,
+    // Стенд показывает полосу «есть обновление»: иначе её негде посмотреть,
+    // пока выпущенная версия одна.
+    checkVersion: async () => ВЕРСИЯ,
     openDownload: async () => {},
     // В браузере файл выбрать некуда и загружать некуда: стенд показывает
     // только вёрстку с буквой вместо картинки.

@@ -83,6 +83,18 @@
     </div>
   </header>
 
+  <!-- Есть обновление. Полоса, а не окно: окно требует ответа сейчас, а
+       обновление не срочное — программа продолжает работать. Закрывается и
+       больше не показывается для этой же версии. -->
+  <div class="update-bar" id="updateBar" hidden>
+    <div class="update-text">
+      <b id="updateTitle"></b>
+      <span class="muted" id="updateNotes"></span>
+    </div>
+    <button id="updateGo" data-i18n="update.download"></button>
+    <button class="ghost" id="updateLater" data-i18n="update.later"></button>
+  </div>
+
   <div class="shell">
     <!-- Разделы сбоку, а не строкой сверху. Причина не в моде: их девять, в
          строку они не помещались и переносились на вторую, отъедая у окна

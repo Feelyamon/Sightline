@@ -515,13 +515,37 @@ app.on('window-all-closed', () => {
  * рендерере отклонялось, никто его не ловил, и вкладка просто переставала
  * обновляться — молча, без единого следа для пользователя.
  */
+/**
+ * Метка, по которой окно узнаёт свою же ошибку в чужой обёртке.
+ *
+ * ЗАЧЕМ ЭТО ВООБЩЕ НУЖНО. Через ipcMain.handle наружу переживает только текст:
+ * Electron заворачивает исключение в собственную ошибку с сообщением вида
+ * «Error invoking remote method 'x': Error: …», а свои поля выбрасывает. Из-за
+ * этого проверки e.offline в окне не срабатывали ни разу за всё время, и
+ * человек вместо «нет связи с сервером» читал строчку про remote method.
+ *
+ * Поэтому поля едут внутри текста, а preload собирает ошибку обратно.
+ * Некрасиво, но альтернатива — возвращать объект вместо исключения из каждого
+ * обработчика, то есть переписать способ сообщать об ошибках целиком.
+ */
+const ERR_MARK = 'SIGHTLINE_ERR:';
+
 function handle(channel, fn) {
   ipcMain.handle(channel, async (...args) => {
     try {
       return await fn(...args);
     } catch (e) {
       send('app:error', `${channel}: ${e.message}`);
-      throw e;
+      throw new Error(
+        ERR_MARK +
+          JSON.stringify({
+            message: e.message,
+            offline: !!e.offline,
+            code: e.code,
+            status: e.status,
+            retryAfter: e.retryAfter,
+          })
+      );
     }
   });
 }
@@ -816,21 +840,7 @@ handle('friends:removeFromSquad', (_e, login) => {
 
 // Приглашения в отряд. Позвать может только тот, кто уже друг, — это проверяет
 // сервер, а не окно: спрятанная кнопка защитой не является.
-// Отдаём результат объектом, а не исключением, и вот почему: через IPC у
-// ошибки переживает только текст. Электрон заворачивает её в свою, а свои поля
-// теряются — окно получило бы «Error invoking remote method …» и не узнало бы,
-// сколько ждать. Ожидаемый отказ здесь не исключение, а ответ: «нельзя, ещё
-// столько-то секунд».
-handle('friends:invite', async (_e, login) => {
-  try {
-    return { ok: true, ...(await friends.invite(String(login || ''))) };
-  } catch (e) {
-    if (typeof e.retryAfter === 'number') {
-      return { ok: false, retryAfter: e.retryAfter, message: e.message };
-    }
-    throw e;
-  }
-});
+handle('friends:invite', (_e, login) => friends.invite(String(login || '')));
 handle('friends:acceptInvite', (_e, id) => friends.accept(Number(id)));
 handle('friends:declineInvite', (_e, id) => friends.decline(Number(id)));
 
