@@ -106,6 +106,30 @@ body {
 }
 .update-bar .ghost:hover { color: var(--text); }
 
+/* Полоса ошибок. Отдельно от строки состояния игры: та отвечает на вопрос
+   «что сейчас в бою», и подменять её сообщением о неудавшемся действии значит
+   отнимать у человека главное ради второстепенного. */
+.error-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #2a1b1e;
+  border-bottom: 1px solid #46282c;
+  color: #ffb3b3;
+  font-size: 12px;
+  flex: none;
+}
+.error-bar span { flex: 1; min-width: 0; }
+.error-bar .ghost {
+  background: transparent;
+  border-color: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 6px 3px;
+}
+
 /* Окно: разделы слева, содержимое справа. */
 .shell { flex: 1; display: flex; min-height: 0; }
 
@@ -269,9 +293,6 @@ body {
 .notice-when { color: var(--muted); font-size: 11px; margin-top: 4px; }
 
 .status { display: flex; align-items: center; gap: 8px; }
-/* Ошибку в строке состояния видно сразу: без выделения она теряется среди
-   обычных сообщений вроде «В ангаре». */
-#statusText.error { color: var(--enemy); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
 
 /* Связь с сервером. Отделена чертой: рядом стоят два состояния разной природы,

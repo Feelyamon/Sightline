@@ -618,7 +618,11 @@ function handle(channel, fn) {
     try {
       return await fn(...args);
     } catch (e) {
-      send('app:error', `${channel}: ${e.message}`);
+      // Имя канала — в журнал, не человеку. «account:chooseAvatar: доступ
+      // запрещён» сообщает ему про внутренности программы и ничего про то,
+      // что случилось.
+      console.error(`${channel}: ${e.message}`);
+      send('app:error', e.message);
       throw new Error(
         ERR_MARK +
           JSON.stringify({

@@ -353,12 +353,11 @@ function renderBattle(state) {
   ensureDossier(state.players.map((p) => p.nick));
 
   $('dot').className = `dot ${state.status || 'offline'}`;
-  // Снапшот боя приходит четыре раза в секунду и затирал бы сообщение об
-  // ошибке быстрее, чем человек успевал его прочитать.
-  if (!$('statusText').classList.contains('error')) {
-    $('statusText').textContent =
-      t(STATUS_KEY[state.status] || 'status.unknown') + (state.detail ? ` · ${state.detail}` : '');
-  }
+  // Строка состояния теперь всегда про игру и только про игру. Прежняя
+  // оговорка «не затирать сообщение об ошибке» больше не нужна: ошибки живут
+  // своей полосой и с этой строкой не пересекаются.
+  $('statusText').textContent =
+    t(STATUS_KEY[state.status] || 'status.unknown') + (state.detail ? ` · ${state.detail}` : '');
   // Сколько людей в этом бою смогут подтвердить его запись. Показываем только
   // когда они есть: «в бою ещё 0 пользователей» — это не сведение, а укор.
   const peers = state.usersInBattle
@@ -3286,15 +3285,30 @@ window.addEventListener('unhandledrejection', (e) => {
   showError(message.replace(/^Error invoking remote method '[^']+':\s*/, ''));
 });
 
+/**
+ * Ошибка или короткое подтверждение — своей полосой под шапкой.
+ *
+ * Раньше это писалось в строку состояния игры, поверх «В бою» и «В ангаре».
+ * Во время боя человек смотрит именно туда, и подменять главное сообщением о
+ * том, что не удалось поставить аватарку, — значит отнимать у него то, ради
+ * чего программа открыта.
+ *
+ * Полоса гаснет сама через полминуты: висящая старая ошибка мешает видеть, что
+ * происходит сейчас. Закрыть можно и раньше.
+ */
 function showError(message) {
-  const box = $('statusText');
-  box.textContent = message;
-  box.classList.add('error');
+  $('errorText').textContent = message;
+  $('errorBar').hidden = false;
   clearTimeout(showError.timer);
-  // Через полминуты строка вернётся к обычному состоянию: постоянно висящая
-  // старая ошибка мешает видеть, что происходит сейчас.
-  showError.timer = setTimeout(() => box.classList.remove('error'), 30000);
+  showError.timer = setTimeout(() => {
+    $('errorBar').hidden = true;
+  }, 30000);
 }
+
+$('errorClose').addEventListener('click', () => {
+  clearTimeout(showError.timer);
+  $('errorBar').hidden = true;
+});
 
 // --- Связь с сервером -----------------------------------------------------
 

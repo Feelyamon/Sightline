@@ -109,6 +109,14 @@
     <button class="ghost" id="updateLater" data-i18n="update.later"></button>
   </div>
 
+  <!-- Ошибки. Своя полоса, а не строка состояния игры: во время боя человек
+       смотрит именно туда, и «В бою» не должно подменяться сообщением о том,
+       что не удалось сохранить аватарку. -->
+  <div class="error-bar" id="errorBar" hidden>
+    <span id="errorText"></span>
+    <button class="ghost" id="errorClose" aria-label="×">&times;</button>
+  </div>
+
   <div class="shell">
     <!-- Разделы сбоку, а не строкой сверху. Причина не в моде: их девять, в
          строку они не помещались и переносились на вторую, отъедая у окна
