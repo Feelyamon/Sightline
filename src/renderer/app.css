@@ -217,6 +217,10 @@ body {
 }
 .friend-row:last-child { border-bottom: none; }
 .friend-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* По имени можно нажать: откроется профиль. Подчёркивание появляется только по
+   наведению — постоянное превратило бы список в частокол ссылок. */
+.friend-name.clickable { cursor: pointer; }
+.friend-name.clickable:hover > div:first-child { text-decoration: underline; }
 /* Не в сети — приглушённым: список читается сверху вниз, и внизу должно быть
    видно, что там уже никого нет. */
 .friend-row.offline .friend-name { color: var(--muted); }

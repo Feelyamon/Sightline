@@ -2090,6 +2090,13 @@ $('friendSearch').addEventListener('input', (e) => {
               if (p.relation !== 'none') {
                 row.append(el('span', 'friend-status', t(`friends.relation.${p.relation}`)));
               }
+              // По нажатию на самого человека открывается его профиль: решать,
+              // звать ли в друзья, удобнее посмотрев, кто это, а не по логину.
+              const name = row.querySelector('.friend-name');
+              if (name) {
+                name.classList.add('clickable');
+                name.addEventListener('click', () => openProfile(p.login));
+              }
               return row;
             })
           : [el('div', 'empty', t('friends.notFound'))])
@@ -2735,6 +2742,30 @@ function renderProfile(p) {
     document.createTextNode(' ' + t('profile.confirmedHint'))
   );
   card.append(trust);
+
+  // Позвать в друзья прямо отсюда. Кнопка появляется, только когда это
+  // осмысленно: со своим профилем и с уже отправленной заявкой делать нечего.
+  const мой = p.login === accountLogin;
+  const уже = (friendsState.friends || []).some((f) => f.login === p.login)
+    || (friendsState.outgoing || []).some((f) => f.login === p.login);
+  if (!мой && !уже) {
+    const buttons = el('div', 'buttons profile-actions');
+    const add = el('button', null, t('friends.add'));
+    add.addEventListener('click', async () => {
+      add.disabled = true;
+      try {
+        await window.wt.friends.request(p.login);
+        friendsState = await window.wt.friends.state();
+        renderFriends();
+        add.textContent = t('friends.relation.outgoing');
+      } catch (err) {
+        showProfileError(err);
+        add.disabled = false;
+      }
+    });
+    buttons.append(add);
+    card.append(buttons);
+  }
 
   box.replaceChildren(card);
 
