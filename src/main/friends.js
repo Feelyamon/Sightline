@@ -21,6 +21,13 @@ const PING_MS = 30_000;
 // Как часто перечитываем список друзей, пока открыто окно. Полминуты — тот же
 // порядок; realtime тут не нужен, а держать соединение ради статусов дорого.
 const REFRESH_MS = 30_000;
+// Пока в воздухе висит приглашение, пингуем чаще: обычные полминуты означали бы,
+// что окно у второго игрока всплывает спустя полминуты после нажатия, и он
+// успевает решить, что ничего не пришло. Ускорение живёт минуту и само гаснет —
+// держать частый опрос постоянно ради события, которое случается раз в вечер,
+// незачем.
+const FAST_PING_MS = 3_000;
+const FAST_PING_WINDOW_MS = 60_000;
 
 class Friends {
   /**
@@ -35,8 +42,17 @@ class Friends {
     this.timer = null;
     this.pingTimer = null;
     this.lastError = null;
+    /** Приглашения в отряд, пришедшие мне. Живут только в памяти. */
+    this.invites = [];
+    /** До какого момента опрашиваем часто. */
+    this.fastUntil = 0;
+    this.fastTimer = null;
+    /** @type {() => object} */
+    this.snapshot = () => ({ status: 'hangar', kills: 0, deaths: 0, assists: 0 });
     /** @type {(payload: object) => void} */
     this.onChange = () => {};
+    /** Позвать, когда список приглашений изменился. */
+    this.onInvites = () => {};
   }
 
   /** Логины тех, кого человек считает своим отрядом в этой сессии игры. */
@@ -67,6 +83,7 @@ class Friends {
   state() {
     return {
       ...this.data,
+      invites: this.invites,
       squad: this.squad,
       error: this.lastError,
       signedIn: this.account.isSignedIn,
@@ -119,7 +136,12 @@ class Friends {
     if (!this.account.isSignedIn) return;
     if (presence.status !== 'battle' && presence.status !== 'hangar') return;
     try {
-      await this.account.request('/presence', { method: 'POST', body: presence, auth: true });
+      const answer = await this.account.request('/presence', {
+        method: 'POST',
+        body: presence,
+        auth: true,
+      });
+      this.takeInvites(Array.isArray(answer?.invites) ? answer.invites : []);
     } catch {
       // Пинг — не то, ради чего стоит беспокоить человека сообщением об
       // ошибке. Не дошёл — друзья увидят «не в сети», и это честно.
@@ -127,10 +149,95 @@ class Friends {
   }
 
   /**
+   * Приглашения из ответа сервера.
+   *
+   * Сообщаем наверх только когда набор изменился: пинг приходит раз в
+   * несколько секунд, и дёргать окно на каждом значило бы пересобирать его
+   * под пальцами у человека, который как раз тянется к кнопке.
+   */
+  takeInvites(list) {
+    const было = this.invites.map((i) => i.id).join(',');
+    const стало = list.map((i) => i.id).join(',');
+    this.invites = list;
+    if (было !== стало) {
+      // Пока приглашение висит, держим частый опрос: ответ второго игрока
+      // должен доехать до пригласившего примерно тогда же, когда он его дал.
+      if (list.length) this.hurry();
+      this.onInvites(list);
+      this.onChange(this.state());
+    }
+  }
+
+  /** Перейти на частый опрос на ближайшую минуту. */
+  hurry() {
+    this.fastUntil = Date.now() + FAST_PING_WINDOW_MS;
+    if (this.fastTimer) return;
+    this.fastTimer = setInterval(() => {
+      if (Date.now() > this.fastUntil) {
+        clearInterval(this.fastTimer);
+        this.fastTimer = null;
+        return;
+      }
+      this.ping(this.snapshot());
+    }, FAST_PING_MS);
+  }
+
+  // --- Приглашения в отряд ------------------------------------------------
+
+  /**
+   * Позвать друга. Возвращает то, что сказал сервер: сколько держать кнопку
+   * серой и сколько живёт приглашение. Оба числа приходят с сервера, а не
+   * зашиты здесь, — подобрать их можно будет, не выпуская новую сборку.
+   */
+  async invite(login) {
+    const answer = await this.account.request('/squad/invite', {
+      method: 'POST',
+      body: { login },
+      auth: true,
+    });
+    // Ответ второго игрока ждём частым опросом: минуту, ровно пока живёт
+    // приглашение.
+    this.hurry();
+    return answer;
+  }
+
+  /**
+   * Принять приглашение. Отряд взаимный: приняли — значит и позвавший
+   * оказывается в моём отряде, иначе «мы вместе» знал бы только один из двоих.
+   */
+  async accept(id) {
+    const answer = await this.account.request('/squad/accept', {
+      method: 'POST',
+      body: { id },
+      auth: true,
+    });
+    this.invites = this.invites.filter((i) => i.id !== id);
+    await this.refresh();
+    if (answer?.login) {
+      try {
+        this.addToSquad(answer.login);
+      } catch {
+        // Мест нет или он уже там — приглашение всё равно принято. Ронять
+        // из-за этого согласие нельзя: человек уже нажал «Принять».
+      }
+    }
+    this.onChange(this.state());
+    return this.state();
+  }
+
+  async decline(id) {
+    await this.account.request('/squad/decline', { method: 'POST', body: { id }, auth: true });
+    this.invites = this.invites.filter((i) => i.id !== id);
+    this.onChange(this.state());
+    return this.state();
+  }
+
+  /**
    * @param {() => ({status: string, kills: number, deaths: number, assists: number})} snapshot
    */
   start(snapshot) {
     this.stop();
+    this.snapshot = snapshot;
     this.pingTimer = setInterval(() => this.ping(snapshot()), PING_MS);
     this.timer = setInterval(() => this.refresh(), REFRESH_MS);
     this.refresh();
@@ -140,8 +247,10 @@ class Friends {
   stop() {
     if (this.timer) clearInterval(this.timer);
     if (this.pingTimer) clearInterval(this.pingTimer);
+    if (this.fastTimer) clearInterval(this.fastTimer);
     this.timer = null;
     this.pingTimer = null;
+    this.fastTimer = null;
   }
 
   // --- Отряд --------------------------------------------------------------

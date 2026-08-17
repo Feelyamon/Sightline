@@ -438,5 +438,14 @@
   "admin.vehicleMerge": "合并",
   "admin.vehicleCanonical": "视为该载具",
   "admin.vehicleCanonicalHint": "规范名称；留空则取消映射",
-  "admin.action.vehicle_alias": "合并载具名称"
+  "admin.action.vehicle_alias": "合并载具名称",
+  "squad.inviteTitle": "小队邀请",
+  "squad.inviteText": "邀请你加入小队",
+  "squad.inviteExpires": "剩余",
+  "squad.accept": "接受",
+  "squad.decline": "拒绝",
+  "squad.invite": "邀请",
+  "squad.inviteSent": "已发送 · {n} 秒",
+  "squad.inviteCooldown": "该玩家已连续多次拒绝。{n} 分钟后可再次邀请。",
+  "squad.seconds": "{n} 秒"
 }

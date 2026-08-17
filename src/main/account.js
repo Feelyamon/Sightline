@@ -199,6 +199,11 @@ class Account {
       const err = new Error(data?.message || `ошибка сервера (${response.status})`);
       err.code = data?.error;
       err.status = response.status;
+      // Через сколько секунд можно повторить — отдельным полем, а не разбором
+      // текста: формулировку однажды поправят, и разбор молча перестанет
+      // работать. Окно показывает по нему обратный отсчёт вместо глухого
+      // «попробуйте позже».
+      if (typeof data?.retry_after === 'number') err.retryAfter = data.retry_after;
       throw err;
     }
 

@@ -59,6 +59,9 @@ contextBridge.exposeInMainWorld('wt', {
     remove: (login) => invoke('friends:remove', login),
     addToSquad: (login) => invoke('friends:addToSquad', login),
     removeFromSquad: (login) => invoke('friends:removeFromSquad', login),
+    invite: (login) => invoke('friends:invite', login),
+    acceptInvite: (id) => invoke('friends:acceptInvite', id),
+    declineInvite: (id) => invoke('friends:declineInvite', id),
   },
 
   db: {
@@ -98,6 +101,11 @@ contextBridge.exposeInMainWorld('wt', {
     const handler = (_e, tab) => cb(tab);
     ipcRenderer.on('app:openTab', handler);
     return () => ipcRenderer.off('app:openTab', handler);
+  },
+  onSquadInvites: (cb) => {
+    const handler = (_e, invites) => cb(invites);
+    ipcRenderer.on('friends:invites', handler);
+    return () => ipcRenderer.off('friends:invites', handler);
   },
   onFriendsUpdate: (cb) => {
     const handler = (_e, payload) => cb(payload);

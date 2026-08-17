@@ -362,6 +362,16 @@ function startFriends() {
     schedulePush();
   };
 
+  // Пришло приглашение — окно должно показаться человеку, даже если программа
+  // свёрнута в трей. Иначе приглашение протухнет за минуту, и позвавший решит,
+  // что его игнорируют.
+  friends.onInvites = (invites) => {
+    send('friends:invites', invites);
+    if (invites.length && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  };
+
   friends.start(() => {
     const snap = battle.snapshot();
     const me = snap.players.find((p) => p.isSelf);
@@ -706,6 +716,26 @@ handle('friends:removeFromSquad', (_e, login) => {
   friends.onChange(friends.state());
   return friends.state();
 });
+
+// Приглашения в отряд. Позвать может только тот, кто уже друг, — это проверяет
+// сервер, а не окно: спрятанная кнопка защитой не является.
+// Отдаём результат объектом, а не исключением, и вот почему: через IPC у
+// ошибки переживает только текст. Электрон заворачивает её в свою, а свои поля
+// теряются — окно получило бы «Error invoking remote method …» и не узнало бы,
+// сколько ждать. Ожидаемый отказ здесь не исключение, а ответ: «нельзя, ещё
+// столько-то секунд».
+handle('friends:invite', async (_e, login) => {
+  try {
+    return { ok: true, ...(await friends.invite(String(login || ''))) };
+  } catch (e) {
+    if (typeof e.retryAfter === 'number') {
+      return { ok: false, retryAfter: e.retryAfter, message: e.message };
+    }
+    throw e;
+  }
+});
+handle('friends:acceptInvite', (_e, id) => friends.accept(Number(id)));
+handle('friends:declineInvite', (_e, id) => friends.decline(Number(id)));
 
 handle('app:setAlwaysOnTop', (_e, value) => {
   const on = !!value;

@@ -705,6 +705,28 @@
   <!-- Устаревшая сборка. Закрыть нельзя намеренно: сервер с такой версией
        разговаривать отказался, и всё, что программа может показать дальше, —
        это неправда разной степени свежести. -->
+  <!-- Приглашение в отряд. Отдельное окно, а не строка в списке друзей:
+       приглашение живёт минуту, и человек должен увидеть его там, где он
+       сейчас смотрит, а не там, куда ещё надо зайти. -->
+  <div class="modal-backdrop" id="squadInviteModal" hidden>
+    <div class="modal">
+      <h2 data-i18n="squad.inviteTitle"></h2>
+      <div class="invite-who">
+        <div class="avatar-big" id="inviteAvatar"></div>
+        <div>
+          <div class="invite-login" id="inviteLogin"></div>
+          <div class="muted small" data-i18n="squad.inviteText"></div>
+        </div>
+      </div>
+      <p class="muted small"><span data-i18n="squad.inviteExpires"></span> <b id="inviteLeft"></b></p>
+      <div class="buttons">
+        <button id="inviteAccept" data-i18n="squad.accept"></button>
+        <button id="inviteDecline" data-i18n="squad.decline"></button>
+      </div>
+      <div class="auth-error" id="inviteError" hidden></div>
+    </div>
+  </div>
+
   <div class="modal-backdrop blocking" id="outdatedModal" hidden>
     <div class="modal">
       <h2 data-i18n="update.title"></h2>

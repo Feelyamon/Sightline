@@ -1608,22 +1608,155 @@ function friendRow(friend, actions) {
   }
   row.append(name);
 
-  for (const [label, handler, cls] of actions) {
+  for (const [label, handler, cls, disabled] of actions) {
     const button = el('button', `small ${cls || ''}`, label);
+    // Кнопка может приехать уже погашенной: приглашение этому человеку сейчас
+    // на задержке, и включать её, чтобы тут же ответить отказом, — обман.
+    if (disabled) button.disabled = true;
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
-        await handler();
+        // Обработчику отдаём саму кнопку: отсчёт идёт на ней, а не в отдельном
+        // месте — человек смотрит туда, куда только что нажал.
+        await handler(button);
       } catch (e) {
         showFriendsError(e);
       } finally {
-        button.disabled = false;
+        if (!button.dataset.counting) button.disabled = false;
       }
     });
     row.append(button);
   }
   return row;
 }
+
+// --- Приглашения в отряд --------------------------------------------------
+
+/**
+ * Когда можно снова звать этого человека. Ключ — логин в нижнем регистре,
+ * значение — момент времени.
+ *
+ * Живёт в памяти окна намеренно: это подсказка, а не правило. Правило на
+ * сервере, и оно переживает перезапуск программы, а эта карта — нет.
+ * Перезапуск не должен выглядеть способом обойти задержку, поэтому сервер
+ * всё равно ответит отказом, и мы покажем его ответ.
+ */
+const inviteCooldowns = new Map();
+
+function inviteCooldownLeft(login) {
+  const until = inviteCooldowns.get(String(login).toLowerCase()) || 0;
+  return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+}
+
+function inviteLabel(login) {
+  const left = inviteCooldownLeft(login);
+  return left ? t('squad.inviteSent', { n: left }) : t('squad.invite');
+}
+
+/** Зовёт друга и ведёт обратный отсчёт прямо на кнопке. */
+async function inviteToSquad(login, button) {
+  // Ожидаемый отказ приходит ответом, а не исключением: через IPC у ошибки
+  // переживает только текст, и число секунд до повтора по нему не восстановить.
+  const answer = await window.wt.friends.invite(login);
+
+  if (answer && answer.ok === false) {
+    const секунд = Number(answer.retryAfter) || 0;
+    showFriendsError({ message: t('squad.inviteCooldown', { n: Math.max(1, Math.ceil(секунд / 60)) }) });
+    countdown(button, секунд, login);
+    return;
+  }
+  countdown(button, Number(answer?.cooldown) || 10, login);
+}
+
+/**
+ * Гасит кнопку на n секунд и показывает, сколько осталось.
+ *
+ * Без отсчёта серая кнопка выглядит поломкой: человек нажал, ничего не
+ * произошло, нажать снова нельзя и непонятно почему.
+ */
+function countdown(button, seconds, login) {
+  inviteCooldowns.set(String(login).toLowerCase(), Date.now() + seconds * 1000);
+  button.dataset.counting = '1';
+  button.disabled = true;
+
+  const tick = () => {
+    const left = inviteCooldownLeft(login);
+    if (left <= 0) {
+      clearInterval(timer);
+      delete button.dataset.counting;
+      button.disabled = false;
+      button.textContent = t('squad.invite');
+      return;
+    }
+    button.textContent = t('squad.inviteSent', { n: left });
+  };
+  const timer = setInterval(tick, 500);
+  tick();
+}
+
+// --- Окно приглашения -----------------------------------------------------
+
+let inviteShown = null;
+let inviteTimer = null;
+
+/**
+ * Показывает первое приглашение из очереди. Именно первое, а не все сразу:
+ * два окна поверх друг друга человек закрывает не глядя.
+ */
+function renderInvites(invites) {
+  const list = Array.isArray(invites) ? invites : [];
+  const next = list[0];
+
+  if (!next) {
+    closeInvite();
+    return;
+  }
+  if (inviteShown && inviteShown.id === next.id) return;
+
+  inviteShown = { ...next, until: Date.now() + next.expires_in * 1000 };
+  $('inviteLogin').textContent = next.from_login;
+  $('inviteAvatar').replaceChildren(avatarContent(next.from_login, next.from_avatar));
+  $('inviteError').hidden = true;
+  $('squadInviteModal').hidden = false;
+
+  clearInterval(inviteTimer);
+  const tick = () => {
+    const left = Math.max(0, Math.ceil((inviteShown.until - Date.now()) / 1000));
+    $('inviteLeft').textContent = t('squad.seconds', { n: left });
+    // Протухло — закрываем сами. Окно, которое нельзя ни принять, ни
+    // отклонить, только злит.
+    if (left <= 0) closeInvite();
+  };
+  inviteTimer = setInterval(tick, 500);
+  tick();
+}
+
+function closeInvite() {
+  clearInterval(inviteTimer);
+  inviteTimer = null;
+  inviteShown = null;
+  $('squadInviteModal').hidden = true;
+}
+
+async function answerInvite(accept) {
+  if (!inviteShown) return;
+  const id = inviteShown.id;
+  try {
+    friendsState = accept
+      ? await window.wt.friends.acceptInvite(id)
+      : await window.wt.friends.declineInvite(id);
+    closeInvite();
+    renderFriends();
+    renderSquad();
+  } catch (e) {
+    $('inviteError').textContent = e?.offline ? t('acc.offline') : e?.message || String(e);
+    $('inviteError').hidden = false;
+  }
+}
+
+$('inviteAccept').addEventListener('click', () => answerInvite(true));
+$('inviteDecline').addEventListener('click', () => answerInvite(false));
+window.wt.onSquadInvites(renderInvites);
 
 function showFriendsError(error) {
   const box = $('friendsError');
@@ -1696,12 +1829,14 @@ function renderFriends(state) {
               },
             ]);
           } else if (!full) {
+            // Именно «Пригласить», а не «В отряд»: программа больше не
+            // добавляет человека молча, она его зовёт. Слово должно совпадать
+            // с тем, что произойдёт, иначе оно врёт.
             actions.push([
-              t('friends.toSquad'),
-              async () => {
-                friendsState = await window.wt.friends.addToSquad(f.login);
-                renderFriends();
-              },
+              inviteLabel(f.login),
+              (button) => inviteToSquad(f.login, button),
+              '',
+              inviteCooldownLeft(f.login) > 0,
             ]);
           }
           actions.push([

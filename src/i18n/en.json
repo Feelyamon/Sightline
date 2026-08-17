@@ -438,5 +438,14 @@
   "admin.vehicleMerge": "Merge",
   "admin.vehicleCanonical": "Treat as this vehicle",
   "admin.vehicleCanonicalHint": "canonical name; empty removes the mapping",
-  "admin.action.vehicle_alias": "vehicle names merged"
+  "admin.action.vehicle_alias": "vehicle names merged",
+  "squad.inviteTitle": "Squad invitation",
+  "squad.inviteText": "invites you to their squad",
+  "squad.inviteExpires": "Expires in",
+  "squad.accept": "Accept",
+  "squad.decline": "Decline",
+  "squad.invite": "Invite",
+  "squad.inviteSent": "Sent · {n}s",
+  "squad.inviteCooldown": "This player declined several times in a row. You can invite them again in {n} min.",
+  "squad.seconds": "{n}s"
 }

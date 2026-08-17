@@ -103,6 +103,9 @@ window.wt = {
     languages: LANGS,
   }),
   setNick: async () => {},
+  // Приглашения в отряд: стенд умеет их показать по window.demoInvite(), чтобы
+  // окно можно было посмотреть, не поднимая двух аккаунтов и сервер.
+  onSquadInvites: (cb) => { window.__invites = cb; return () => {}; },
   // В приложении это уходит в shell.openExternal. В стенде открывать браузер
   // незачем — достаточно не падать: без заглушки клик по ссылке на репозиторий
   // ронял бы обработчик и молча ломал вкладку.
@@ -252,6 +255,9 @@ window.wt = {
         if (!state.squad.includes(login) && state.squad.length < 3) state.squad.push(login);
         return copy();
       },
+      invite: async () => ({ ok: true, cooldown: 10, expires_in: 60 }),
+      acceptInvite: async () => copy(),
+      declineInvite: async () => copy(),
       removeFromSquad: async (login) => {
         state.squad = state.squad.filter((l) => l !== login);
         return copy();

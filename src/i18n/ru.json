@@ -438,5 +438,14 @@
   "admin.vehicleMerge": "Свести",
   "admin.vehicleCanonical": "Считать этой машиной",
   "admin.vehicleCanonicalHint": "каноническое название; пусто — снять соответствие",
-  "admin.action.vehicle_alias": "сведение названий"
+  "admin.action.vehicle_alias": "сведение названий",
+  "squad.inviteTitle": "Приглашение в отряд",
+  "squad.inviteText": "зовёт вас в отряд",
+  "squad.inviteExpires": "Пропадёт через",
+  "squad.accept": "Принять",
+  "squad.decline": "Отказаться",
+  "squad.invite": "Пригласить",
+  "squad.inviteSent": "Отправлено · {n} с",
+  "squad.inviteCooldown": "Этот игрок отказался несколько раз подряд. Позвать снова можно через {n} мин.",
+  "squad.seconds": "{n} с"
 }
