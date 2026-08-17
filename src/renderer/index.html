@@ -75,6 +75,12 @@
     <button class="help-btn" id="helpBtn" data-i18n-title="help.open">?</button>
     <!-- Гость или вошли. Без этого человек не понимает, идёт ли синхронизация:
          состояние видно только если зайти в «Аккаунт», а туда не заходят. -->
+    <!-- Уведомления. Кнопка появляется, только когда есть что показать:
+         вечно висящий пустой колокольчик — это предмет, который ничего не
+         сообщает и всё равно занимает место. -->
+    <button class="who bell" id="bellBtn" hidden data-i18n-title="notify.title">
+      <span id="bellCount"></span>
+    </button>
     <button class="who" id="whoAmI" data-i18n-title="tab.account"></button>
     <div class="status" id="status">
       <span class="dot" id="dot"></span>
@@ -601,6 +607,7 @@
           <option value="account" data-i18n="report.tag.account"></option>
           <option value="sync" data-i18n="report.tag.sync"></option>
           <option value="idea" data-i18n="report.tag.idea"></option>
+          <option value="false-flag" data-i18n="report.tag.falseFlag"></option>
           <option value="other" data-i18n="report.tag.other"></option>
         </select></span>
       </label>
@@ -613,6 +620,14 @@
         <span class="muted" data-i18n="report.text"></span>
         <textarea id="reportText" rows="6" data-i18n-placeholder="report.placeholder"></textarea>
       </label>
+      <!-- Спорные бои. Появляется только у тега «ложное обвинение»: в
+           остальных случаях этот список ни при чём и только мешает. -->
+      <div id="disputedBox" hidden>
+        <div class="section-title" data-i18n="report.disputed"></div>
+        <p class="muted small" data-i18n="report.disputedHint"></p>
+        <div id="disputedList"></div>
+      </div>
+
       <label class="row field">
         <span class="muted" data-i18n="report.steps"></span>
         <textarea id="reportSteps" rows="3" data-i18n-placeholder="report.stepsPlaceholder"></textarea>
@@ -811,6 +826,19 @@
 
   <!-- Профиль игрока. Та же разметка, что и у своей карточки в «Аккаунте», —
        она с самого начала писалась так, чтобы подставлялись чужие данные. -->
+  <div class="modal-backdrop" id="notifyModal" hidden>
+    <div class="modal">
+      <div class="editor-head">
+        <h2 style="flex:1" data-i18n="notify.title"></h2>
+        <button class="editor-close" id="notifyClose" aria-label="×">&times;</button>
+      </div>
+      <div id="notifyList"></div>
+      <div class="buttons">
+        <button id="notifyReadAll" data-i18n="notify.readAll"></button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="profileModal" hidden>
     <div class="modal wide">
       <div class="editor-head">

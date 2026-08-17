@@ -122,6 +122,7 @@ contextBridge.exposeInMainWorld('wt', {
     activityByHour: (opts) => invoke('db:activityByHour', opts),
     dailyStats: (opts) => invoke('db:dailyStats', opts),
     streaks: (opts) => invoke('db:streaks', opts),
+    disputedBattles: () => invoke('db:disputedBattles'),
     setNote: (nick, note) => invoke('db:setNote', nick, note),
     resetCounter: (name) => invoke('db:resetCounter', name),
     deleteBattle: (id) => invoke('db:deleteBattle', id),

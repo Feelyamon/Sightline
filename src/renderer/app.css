@@ -252,6 +252,22 @@ body {
    без аккаунта полноценна. Красный тут читался бы как «что-то не так». */
 .who.guest { font-style: italic; }
 
+/* Колокольчик. Число, а не значок: значок пришлось бы рисовать, а число сразу
+   отвечает на вопрос «сколько». Подсвечен, потому что это единственное место в
+   шапке, которое просит внимания. */
+.bell { border-color: #2f4a6d; color: #cfe2ff; }
+.bell:hover { border-color: var(--accent); }
+
+.notice {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.notice.unread { border-color: #2f4a6d; }
+.notice-when { color: var(--muted); font-size: 11px; margin-top: 4px; }
+
 .status { display: flex; align-items: center; gap: 8px; }
 /* Ошибку в строке состояния видно сразу: без выделения она теряется среди
    обычных сообщений вроде «В ангаре». */

@@ -504,5 +504,17 @@
   "profile.confirmed": "Confirmed by other players: {n} of {total}.",
   "profile.confirmedHint": "A battle counts as confirmed when its record matches another user’s. Few confirmed battles is not a reproach: most often there simply was no second user around.",
   "profile.totalBattles": "battles in total",
-  "profile.open": "Open profile"
+  "profile.open": "Open profile",
+  "notify.title": "Notifications",
+  "notify.readAll": "Mark as read",
+  "notify.avatarRemoved": "Your avatar was removed from your profile for a violation.",
+  "notify.avatarBanned": "Your avatar was removed from your profile for a violation. You can no longer set an avatar.",
+  "notify.friendRequest": "{login} wants to add you as a friend.",
+  "notify.passwordReset": "An administrator declared your password invalid. Set a new one.",
+  "notify.adminNote": "Message from an administrator: {text}",
+  "report.queued": "No connection to the server. The report is saved and will be sent as soon as the connection is back.",
+  "report.tag.falseFlag": "False accusation — dispute a mark",
+  "report.disputed": "Which battles are you disputing",
+  "report.disputedHint": "Tick the battles you disagree with. Your own record of each — time, roster and score — is attached automatically. Only your own battles carrying a discrepancy mark can be attached.",
+  "report.disputedNone": "No disputed battles. The mark appears when someone else’s record of a battle disagrees with yours — you have none."
 }

@@ -552,6 +552,10 @@ app.whenReady().then(() => {
   // Настройка поменялась в окне — уедет в учётную запись. Применение при этом
   // мгновенное и не ждёт сети: программа обязана слушаться сразу.
   settings.onChanged = () => scheduleSettingsSync();
+  // Сообщения о проблемах, не ушедшие раньше. Пробуем при старте и дальше раз
+  // в минуту: сервер лежит ровно тогда, когда о нём хотят пожаловаться.
+  flushReports();
+  setInterval(flushReports, REPORTS_RETRY_MS);
   // При старте забираем то, что могло измениться на другой машине.
   syncSettings();
   db.startSession(); // «бои с запуска» считаются от старта приложения
@@ -762,29 +766,138 @@ handle('support:reportPlayer', (_e, form = {}) =>
   })
 );
 
-handle('support:send', (_e, form = {}) =>
-  // Версии проставляем здесь, а не спрашиваем у человека: он их не знает и не
-  // обязан, а без них половина сообщений неразбираема.
-  account.request('/bugs', {
-    method: 'POST',
-    body: {
-      message: String(form.message || ''),
-      kind: form.kind || 'bug',
-      tag: String(form.tag || 'other'),
-      title: form.title ? String(form.title) : undefined,
-      steps: form.steps ? String(form.steps) : undefined,
-      // Приложенные сведения уходят только если человек их оставил. Отказался —
-      // приходит пустое поле, а не тихо всё то же самое.
-      context: form.context || null,
-      install_id: installId(),
-      app_version: app.getVersion(),
-      os_version: `${process.platform} ${require('node:os').release()}`,
-    },
-    // Вход необязателен: у кого не работает именно вход, тот иначе не сможет
-    // пожаловаться ровно на это.
-    auth: account.isSignedIn,
-  })
-);
+/**
+ * Очередь неотправленных сообщений о проблемах.
+ *
+ * Сервер лежит ровно тогда, когда о нём хотят пожаловаться, — и терять в этот
+ * момент написанный человеком текст нельзя: второй раз он его писать не станет,
+ * и мы просто не узнаем о поломке.
+ *
+ * Файл рядом с очередью боёв, устройство то же и по той же причине: программу
+ * могут закрыть в любой момент, и очередь в памяти пережила бы это ровно один
+ * раз — никогда.
+ */
+const REPORTS_FILE = 'reports-outbox.json';
+const REPORTS_RETRY_MS = 60_000;
+// Потолок: если сервера нет неделю, очередь не должна расти без конца.
+const REPORTS_MAX = 50;
+
+function reportsPath() {
+  return path.join(app.getPath('userData'), REPORTS_FILE);
+}
+
+function loadReports() {
+  try {
+    const raw = JSON.parse(require('node:fs').readFileSync(reportsPath(), 'utf8'));
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    // Файла нет или он испорчен — начинаем с пустой очереди. Ронять из-за
+    // этого программу нельзя.
+    return [];
+  }
+}
+
+function saveReports(queue) {
+  try {
+    require('node:fs').writeFileSync(reportsPath(), JSON.stringify(queue, null, 2), 'utf8');
+  } catch (e) {
+    console.error('не удалось сохранить очередь сообщений:', e.message);
+  }
+}
+
+/**
+ * Добавляет к приложенному выбранные спорные бои.
+ *
+ * Номера, присланные окном, служат только фильтром: сами данные берутся из
+ * базы тем же запросом, что рисует список. Присланное окном могло бы содержать
+ * любой номер, в том числе чужого или обычного боя.
+ */
+function withDisputedBattles(form) {
+  const ids = Array.isArray(form.battles) ? form.battles.map(Number) : [];
+  if (!ids.length) return form.context || null;
+
+  const выбранные = db
+    .disputedBattles()
+    .filter((b) => ids.includes(b.id))
+    .map((b) => ({
+      // Ключ на сервере — то, по чему администратор найдёт чужую запись о том
+      // же бое и увидит, где именно разошлись.
+      key: b.server_key,
+      at: b.started_at,
+      result: b.result,
+      kda: [b.my_kills, b.my_deaths, b.my_assists],
+      vehicles: b.my_vehicles,
+      players: db.battleDetails(b.id)?.players || [],
+    }));
+
+  return { ...(form.context || {}), disputed: выбранные };
+}
+
+function reportBody(form) {
+  return {
+    message: String(form.message || ''),
+    kind: form.kind || 'bug',
+    tag: String(form.tag || 'other'),
+    title: form.title ? String(form.title) : undefined,
+    steps: form.steps ? String(form.steps) : undefined,
+    // Приложенные сведения уходят только если человек их оставил. Отказался —
+    // приходит пустое поле, а не тихо всё то же самое.
+    // К жалобе на отметку расхождения прикладываются сами бои: время, состав и
+    // счёт по каждому. Собираем их здесь, а не в окне: окно знает id, а
+    // подробности лежат в базе, и таскать их через IPC ради этого незачем.
+    //
+    // Прикладываются ТОЛЬКО свои и только спорные — список берётся из того же
+    // запроса, что и на экране, а не из присланных номеров. Присланное окном
+    // могло бы содержать что угодно.
+    context: withDisputedBattles(form),
+    install_id: installId(),
+    // Версии проставляем здесь, а не спрашиваем у человека: он их не знает и не
+    // обязан, а без них половина сообщений неразбираема.
+    app_version: app.getVersion(),
+    os_version: `${process.platform} ${require('node:os').release()}`,
+  };
+}
+
+/** Пробует отправить накопленное. Молча: это фон, а не действие человека. */
+async function flushReports() {
+  const queue = loadReports();
+  if (!queue.length) return;
+
+  const осталось = [];
+  for (const body of queue) {
+    try {
+      await account.request('/bugs', { method: 'POST', body, auth: account.isSignedIn });
+    } catch (e) {
+      // Сервер отказал по существу (слишком длинно, лимит в сутки) — повторять
+      // бессмысленно, отказ повторится. Нет связи — оставляем на потом.
+      if (e.offline || (e.status && e.status >= 500)) осталось.push(body);
+    }
+  }
+  saveReports(осталось);
+}
+
+handle('support:send', async (_e, form = {}) => {
+  const body = reportBody(form);
+  try {
+    return await account.request('/bugs', {
+      method: 'POST',
+      body,
+      // Вход необязателен: у кого не работает именно вход, тот иначе не сможет
+      // пожаловаться ровно на это.
+      auth: account.isSignedIn,
+    });
+  } catch (e) {
+    // Отказ по существу человек должен увидеть сразу: длинный текст надо
+    // сократить, а не откладывать до появления сети.
+    if (!e.offline && !(e.status >= 500)) throw e;
+
+    const queue = loadReports();
+    queue.push(body);
+    saveReports(queue.slice(-REPORTS_MAX));
+    // Номера у отложенного нет и быть не может: его присваивает сервер.
+    return { id: null, queued: true };
+  }
+});
 
 handle('support:mine', () => account.request('/bugs/mine', { auth: true }));
 
@@ -1113,6 +1226,9 @@ handle('db:dailyStats', (_e, opts = {}) =>
   db.dailyStats({ from: opts.period ? windowStart(opts.period) : 0 })
 );
 handle('db:streaks', (_e, opts = {}) => db.streaks(opts));
+// Свои спорные бои — для жалобы «ложное обвинение». Только свои и только
+// спорные: приложить чужой бой нельзя в принципе.
+handle('db:disputedBattles', () => db.disputedBattles());
 
 handle('db:setNote', (_e, nick, note) => db.setNote(nick, note));
 handle('db:battleDetails', (_e, id) => db.battleDetails(id));

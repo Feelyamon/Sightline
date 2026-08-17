@@ -504,5 +504,17 @@
   "profile.confirmed": "已被其他玩家确认：{total} 场中的 {n} 场。",
   "profile.confirmedHint": "当一场战斗的记录与其他用户的记录一致时即视为已确认。确认数少并非指责：通常只是当时附近没有第二位用户。",
   "profile.totalBattles": "总战斗数",
-  "profile.open": "打开资料"
+  "profile.open": "打开资料",
+  "notify.title": "通知",
+  "notify.readAll": "标记为已读",
+  "notify.avatarRemoved": "因违规，你的头像已从资料中移除。",
+  "notify.avatarBanned": "因违规，你的头像已从资料中移除。你将无法再设置头像。",
+  "notify.friendRequest": "{login} 想添加你为好友。",
+  "notify.passwordReset": "管理员已作废你的密码，请设置新密码。",
+  "notify.adminNote": "管理员消息：{text}",
+  "report.queued": "无法连接服务器。反馈已保存，将在恢复连接后发送。",
+  "report.tag.falseFlag": "误判——申诉标记",
+  "report.disputed": "你要申诉哪些战斗",
+  "report.disputedHint": "勾选你不认同的战斗。系统会自动附上你的记录：时间、阵容和战绩。只能附上带有分歧标记的、属于你自己的战斗。",
+  "report.disputedNone": "没有争议战斗。当他人的战斗记录与你的不一致时才会出现该标记——你没有。"
 }

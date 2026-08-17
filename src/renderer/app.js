@@ -1175,6 +1175,54 @@ $('reportBtn').addEventListener('click', async () => {
 
 $('reportAttach').addEventListener('change', renderReportContext);
 
+/**
+ * Спорные бои для жалобы «ложное обвинение».
+ *
+ * Тег работает не как остальные: вместо пустого поля человек получает СПИСОК
+ * своих спорных боёв с галочками. Иначе ему пришлось бы описывать словами,
+ * какой именно бой он оспаривает, а по словам разобрать расхождение нельзя.
+ *
+ * Приложить можно только свои бои и только с отметкой расхождения — список и
+ * составляется из них. Поле, куда можно приложить чужой бой, превратилось бы в
+ * способ жаловаться на чужие профили.
+ */
+async function renderDisputed() {
+  const нужен = $('reportTag').value === 'false-flag';
+  $('disputedBox').hidden = !нужен;
+  if (!нужен) return;
+
+  let бои = [];
+  try {
+    бои = await window.wt.db.disputedBattles();
+  } catch {
+    бои = [];
+  }
+
+  $('disputedList').replaceChildren(
+    ...(бои.length
+      ? бои.map((b) => {
+          const row = el('label', 'row consent');
+          const box = el('input');
+          box.type = 'checkbox';
+          box.value = String(b.id);
+          box.className = 'disputed-pick';
+          const kda = `${b.my_kills}/${b.my_deaths}/${b.my_assists}`;
+          row.append(
+            box,
+            el(
+              'span',
+              null,
+              `${dateText(b.started_at)} · ${kda} · ${(b.my_vehicles || []).join(', ') || '—'}`
+            )
+          );
+          return row;
+        })
+      : [el('div', 'empty', t('report.disputedNone'))])
+  );
+}
+
+$('reportTag').addEventListener('change', renderDisputed);
+
 /** Прежние сообщения и что с ними стало. Только для тех, кто вошёл. */
 async function renderMyReports() {
   const box = $('reportMineBox');
@@ -1238,12 +1286,22 @@ $('reportSend').addEventListener('click', async (e) => {
       // Отказался прикладывать — уходит пусто. Тихо приложить всё равно
       // означало бы, что галочка ничего не решает.
       context: $('reportAttach').checked ? reportContext : null,
+      // К жалобе на отметку прикладываются сами бои: время, состав и счёт по
+      // каждому. Без них разбирать нечего — администратор увидел бы только
+      // «я не согласен».
+      battles: [...document.querySelectorAll('.disputed-pick:checked')].map((c) => Number(c.value)),
     });
     $('reportModal').hidden = true;
     // Подтверждение — в строке состояния: отдельная «спасибо»-модалка поверх
     // только что закрытой это ещё одно окно, которое надо закрывать.
     // Номер обязателен: по нему человек потом спросит, что решили.
-    showError(t('report.sentNumber', { n: answer?.id ?? '—' }));
+    // Отложенному номера нет и быть не может: его присваивает сервер. Говорим
+    // как есть — «уйдёт, когда появится связь», а не выдумываем номер.
+    showError(
+      answer?.queued
+        ? t('report.queued')
+        : t('report.sentNumber', { n: answer?.id ?? '—' })
+    );
   } catch (err) {
     $('reportError').textContent = err?.offline ? t('acc.offline') : err?.message || String(err);
     $('reportError').hidden = false;
@@ -2274,6 +2332,7 @@ async function refreshAccount() {
   $('tabAdmin').hidden = !state.isAdmin;
   renderSquad();
   renderMyAvatar();
+  refreshNotices();
   if (state.signedIn) {
     $('accLogin').textContent = state.login;
     $('accRole').textContent = t(state.isAdmin ? 'acc.role.admin' : 'acc.role.user');
@@ -2588,6 +2647,95 @@ async function renderAbout() {
   }
 }
 
+
+
+// --- Уведомления ----------------------------------------------------------
+
+/**
+ * То, что программа обязана сообщить, а человек обязан увидеть: сняли
+ * аватарку, пришла заявка в друзья, администратор сбросил пароль.
+ *
+ * Приглашений в отряд здесь нет намеренно: они живут минуту и приходят своим
+ * путём. Уведомление живёт до прочтения — смешать их значило бы либо потерять
+ * срочность приглашения, либо засорить этот список.
+ */
+let notices = [];
+
+function noticeText(n) {
+  if (n.kind === 'avatar_removed') {
+    return t(n.payload?.banned ? 'notify.avatarBanned' : 'notify.avatarRemoved');
+  }
+  if (n.kind === 'friend_request') {
+    return t('notify.friendRequest', { login: n.payload?.login || '—' });
+  }
+  if (n.kind === 'password_reset') return t('notify.passwordReset');
+  if (n.kind === 'admin_note') return t('notify.adminNote', { text: n.payload?.text || '' });
+  // Вид из будущей версии сервера. Показать его как есть лучше, чем промолчать:
+  // человек хотя бы узнает, что ему что-то сообщили.
+  return n.kind;
+}
+
+function renderBell() {
+  const непрочитано = notices.filter((n) => !n.read).length;
+  const кнопка = $('bellBtn');
+  // Кнопки нет, когда показывать нечего: вечно висящий пустой колокольчик —
+  // предмет, который ничего не сообщает и всё равно занимает место.
+  кнопка.hidden = notices.length === 0;
+  $('bellCount').textContent = непрочитано ? `● ${непрочитано}` : t('notify.title');
+}
+
+function renderNotices() {
+  $('notifyList').replaceChildren(
+    ...notices.map((n) => {
+      const box = el('div', `notice${n.read ? '' : ' unread'}`);
+      box.append(el('div', null, noticeText(n)));
+      box.append(el('div', 'notice-when', dateText(n.created_at)));
+      return box;
+    })
+  );
+}
+
+async function refreshNotices() {
+  if (!(await window.wt.account.state())?.signedIn) {
+    notices = [];
+    renderBell();
+    return;
+  }
+  try {
+    notices = (await window.wt.account.notifications())?.items || [];
+  } catch {
+    // Сервера нет — уведомления просто не обновились. Ошибку показывать не за
+    // что: это не действие человека, а фоновая проверка.
+    return;
+  }
+  renderBell();
+
+  // Требующее действия открывает своё окно само. Такое уведомление возвращается,
+  // пока действие не сделано, — прочтением оно не гасится.
+  const срочное = notices.find((n) => n.blocking && !n.read);
+  if (срочное?.kind === 'password_reset') openForcedPassword(accountLogin || '');
+}
+
+$('bellBtn').addEventListener('click', () => {
+  $('notifyModal').hidden = false;
+  renderNotices();
+});
+$('notifyClose').addEventListener('click', () => {
+  $('notifyModal').hidden = true;
+});
+$('notifyModal').addEventListener('click', (e) => {
+  if (e.target === $('notifyModal')) $('notifyModal').hidden = true;
+});
+
+$('notifyReadAll').addEventListener('click', async () => {
+  try {
+    await window.wt.account.readNotifications(null);
+    await refreshNotices();
+    renderNotices();
+  } catch (err) {
+    showError(err?.message || String(err));
+  }
+});
 
 // --- Профиль игрока -------------------------------------------------------
 

@@ -197,6 +197,7 @@ window.wt = {
       }
       return [...map.values()].sort((a, b) => a.day.localeCompare(b.day));
     },
+    disputedBattles: async () => ALL.filter((b) => b.trust === 'disputed').slice(0, 5),
     streaks: async ({ recent = 50 } = {}) => {
       const asc = [...ALL].sort((a, b) => a.started_at - b.started_at);
       let current = { type: 'none', length: 0 };
@@ -228,6 +229,12 @@ window.wt = {
     // Стенд показывает полосу «есть обновление»: иначе её негде посмотреть,
     // пока выпущенная версия одна.
     checkVersion: async () => ВЕРСИЯ,
+    notifications: async () => ({ items: [
+      { id: 2, kind: 'avatar_removed', payload: { banned: false }, created_at: Date.now() - 3600000, read: false, blocking: false },
+      { id: 1, kind: 'friend_request', payload: { login: 'Bravo' }, created_at: Date.now() - 86400000, read: true, blocking: false },
+    ] }),
+    readNotifications: async () => ({ ok: true }),
+    forcedPassword: async () => ({ recoveryCode: 'AAAA-BBBB-CCCC-DDDD' }),
     openDownload: async () => {},
     // В браузере файл выбрать некуда и загружать некуда: стенд показывает
     // только вёрстку с буквой вместо картинки.

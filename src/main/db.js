@@ -528,6 +528,31 @@ class Db {
     };
   }
 
+  /**
+   * Свои спорные бои — те, по которым чужая запись разошлась с нашей.
+   *
+   * Нужны для жалобы «ложное обвинение»: без списка человеку пришлось бы
+   * описывать словами, какой именно бой он оспаривает, а по словам разобрать
+   * расхождение невозможно.
+   *
+   * Только СВОИ и только спорные. Чужие сюда не попадают в принципе: поле
+   * жалобы, куда можно приложить чужой бой, превратилось бы в способ
+   * жаловаться на чужие профили.
+   */
+  disputedBattles(limit = 50) {
+    return this.db
+      .prepare(
+        `SELECT id, started_at, duration, my_kills, my_deaths, my_assists,
+                my_vehicles, result, server_key
+           FROM battles
+          WHERE trust = 'disputed' AND cancelled = 0
+          ORDER BY started_at DESC
+          LIMIT ?`
+      )
+      .all(Math.max(1, Math.min(Number(limit) || 50, 200)))
+      .map((b) => ({ ...b, my_vehicles: JSON.parse(b.my_vehicles || '[]') }));
+  }
+
   /** Последние бои без фильтров. */
   recentBattles(limit = 50) {
     return this.searchBattles({ limit }).rows;
