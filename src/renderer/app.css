@@ -740,6 +740,9 @@ label.field { flex-direction: column; align-items: stretch; max-width: 420px; }
   align-items: center;
   justify-content: center;
   z-index: 10;
+  /* Поле по краям: без него высокое окно упирается в границы экрана, и его
+     нижняя кнопка оказывается ровно на кромке. */
+  padding: 12px;
 }
 /* display в правиле выше перебивает атрибут hidden, поэтому гасим явно —
    иначе модалка висит поверх интерфейса с момента загрузки. */
@@ -752,9 +755,15 @@ label.field { flex-direction: column; align-items: stretch; max-width: 420px; }
   border-radius: 10px;
   padding: 16px 18px;
   width: min(440px, 90vw);
+  /* Окно не может быть выше экрана. Раньше предел стоял только у широких
+     окон, и форма сообщения о проблеме, разросшаяся полями и приложенными
+     сведениями, не помещалась даже на развёрнутом на весь экран приложении:
+     кнопки «Отправить» просто не было видно, и добраться до неё было нечем. */
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
 }
 .modal h2 { margin: 0 0 8px; font-size: 15px; }
-.modal.wide { width: min(760px, 92vw); max-height: 82vh; overflow: auto; }
+.modal.wide { width: min(760px, 92vw); }
 
 /* Метка досье у ника: сколько раз уже встречались. */
 .dossier {
@@ -1197,3 +1206,7 @@ textarea:focus {
   text-underline-offset: 3px;
   text-decoration-color: var(--accent);
 }
+
+/* Прежние сообщения не должны отжимать форму вниз: их читают изредка, а
+   писать новое нужно сейчас. Список прокручивается внутри себя. */
+#reportMine { max-height: 180px; overflow-y: auto; }
