@@ -336,6 +336,18 @@ window.wt = {
       // Пара нераспознанных строк: без них не видно, как выглядит самое
       // полезное из приложенного.
       unparsed: ['[CLNZ] Кто-то сделал что-то непонятное', 'непонятная строка кил-фида'],
+      system: {
+        os: 'Windows_NT 10.0.26200 (x64)',
+        cpu: 'AMD Ryzen 7 5800X 8-Core Processor',
+        cores: 16,
+        ramTotalGb: 31.9,
+        ramFreeGb: 25.3,
+        gpu: ['AMD Radeon RX 6650 XT · драйвер 32.0.21045.1000'],
+        displays: ['2560×1440 @ 1x'],
+        uiScale: 1,
+        uptimeMin: 12,
+        electron: '43.4.0', chrome: '132.0.0.0', node: '22.0.0',
+      },
       installId: 'harness',
     }),
   },

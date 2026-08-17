@@ -936,6 +936,66 @@ handle('support:context', async () => ({
  * сервер сообщениями и склеить десять нажатий «отправить» в одно.
  */
 /**
+ * Названия видеокарт — человеческие, а не идентификаторы.
+ *
+ * app.getGPUInfo отдаёт vendorId и deviceId числами: «vendor 4098 · device
+ * 29679». Формально это AMD, но прочитать это может только тот, кто помнит
+ * таблицу PCI наизусть, — а сведения собираются как раз чтобы их читал
+ * человек. В сообщении о проблеме «AMD Radeon RX 6650 XT» и «vendor 4098» —
+ * это разница между «понятно, в чём дело» и перепиской на неделю.
+ *
+ * Поэтому на Windows спрашиваем систему напрямую. Запуск процесса здесь
+ * оправдан: это разовое действие в момент открытия формы, а не опрос по
+ * таймеру, от которого в своё время отказались в слежении за игрой.
+ */
+async function gpuNames() {
+  if (process.platform === 'win32') {
+    try {
+      const { execFile } = require('node:child_process');
+      const вывод = await new Promise((resolve, reject) => {
+        const child = execFile(
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            'Get-CimInstance Win32_VideoController | ForEach-Object { "$($_.Name)|$($_.DriverVersion)" }',
+          ],
+          { windowsHide: true, timeout: 4000 },
+          (err, stdout) => (err ? reject(err) : resolve(stdout))
+        );
+        child.on('error', reject);
+      });
+
+      const строки = вывод
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => {
+          const [name, driver] = l.split('|');
+          return driver ? `${name} · драйвер ${driver}` : name;
+        });
+      if (строки.length) return строки;
+    } catch {
+      // Powershell выключен политикой, ответил не вовремя, его нет вовсе —
+      // все три случая означают одно: спросим у Chromium ниже.
+    }
+  }
+
+  // Запасной путь и для не-Windows. Chromium знает, чем рисует, и его строка
+  // обычно содержит название модели.
+  try {
+    const info = await app.getGPUInfo('complete');
+    const рендер = info?.auxAttributes?.glRenderer;
+    if (рендер) return [String(рендер)];
+  } catch {
+    // Видеокарта не опозналась. Это само по себе полезная примета для
+    // разбора, но ронять из-за неё форму нельзя.
+  }
+  return [];
+}
+
+/**
  * Сведения о машине для сообщения о проблеме.
  *
  * Собираются в момент открытия формы, не раньше: держать их наготове значило
@@ -946,22 +1006,7 @@ async function systemInfo() {
   const cpus = os.cpus() || [];
   const гб = (b) => Math.round((b / 1024 ** 3) * 10) / 10;
 
-  let gpu = [];
-  try {
-    // basic, а не complete: complete отдаёт километр внутренних флагов
-    // Chromium, из которых человеку не понятно ничего, а нам полезны две
-    // строки — модель и драйвер.
-    const info = await app.getGPUInfo('basic');
-    gpu = (info?.gpuDevice || [])
-      .map((d) =>
-        [d.vendorId ? `vendor ${d.vendorId}` : '', d.deviceId ? `device ${d.deviceId}` : '',
-         d.driverVersion || ''].filter(Boolean).join(' · ')
-      )
-      .filter(Boolean);
-  } catch {
-    // Видеокарта не опозналась — это само по себе полезная примета, но ронять
-    // из-за неё форму нельзя.
-  }
+  const gpu = await gpuNames();
 
   const экраны = (() => {
     try {
