@@ -809,6 +809,27 @@
     </div>
   </div>
 
+  <!-- Профиль игрока. Та же разметка, что и у своей карточки в «Аккаунте», —
+       она с самого начала писалась так, чтобы подставлялись чужие данные. -->
+  <div class="modal-backdrop" id="profileModal" hidden>
+    <div class="modal wide">
+      <div class="editor-head">
+        <h2 style="flex:1" data-i18n="profile.title"></h2>
+        <button class="editor-close" id="profileClose" aria-label="×">&times;</button>
+      </div>
+
+      <label class="row field">
+        <span class="muted" data-i18n="profile.search"></span>
+        <input type="search" id="profileQuery" data-i18n-placeholder="profile.searchHint"
+               autocomplete="off" />
+      </label>
+      <div id="profileResults"></div>
+
+      <div class="auth-error" id="profileError" hidden></div>
+      <div id="profileBody" hidden></div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="squadInviteModal" hidden>
     <div class="modal">
       <h2 data-i18n="squad.inviteTitle"></h2>

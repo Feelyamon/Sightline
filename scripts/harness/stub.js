@@ -285,6 +285,37 @@ window.wt = {
     };
   })(),
 
+  profile: {
+    search: async (q) => [
+      { login: 'Feelyamon', game_nick: '[CLAN] Ловкач', avatar: null },
+      { login: 'Username', game_nick: null, avatar: null },
+    ].filter((f) => (f.game_nick || f.login).toLowerCase().includes(q.toLowerCase())),
+    get: async (who) => ({
+      login: 'Feelyamon',
+      game_nick: '[CLAN] Ловкач',
+      avatar: null,
+      member_since: Date.now() - 90 * DAY,
+      last_battle_at: Date.now() - 3 * 3600 * 1000,
+      month: { battles: 48, wins: 27, losses: 20, percent: 57, kills: 131, deaths: 26,
+               assists: 14, kda: 5.58, best_win_streak: 9 },
+      totals: { battles: 812, wins: 441, confirmed: 0, disputed: 0 },
+      calendar: (() => {
+        const out = [];
+        for (let i = 0; i < 90; i++) {
+          const d = new Date(Date.now() - i * DAY);
+          const k = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+          if (rnd() < 0.55) out.push({ day: k, battles: 1 + Math.floor(rnd() * 9), wins: Math.floor(rnd() * 5) });
+        }
+        return out.reverse();
+      })(),
+      vehicles: [
+        { name: 'Т-80БВМ', sorties: 214, kills: 388, kills_per_sortie: 1.81, losses: 96 },
+        { name: 'Leopard 2A4', sorties: 88, kills: 121, kills_per_sortie: 1.38, losses: 51 },
+        { name: 'ЗСУ-23-4', sorties: 40, kills: 62, kills_per_sortie: 1.55, losses: 22 },
+      ],
+    }),
+  },
+
   support: {
     send: async () => ({ id: 42 }),
     mine: async () => ({ items: [] }),

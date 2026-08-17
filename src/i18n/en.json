@@ -490,5 +490,19 @@
   "server.ok": "Server connected",
   "server.offline": "Server unreachable",
   "server.guest": "No account",
-  "server.hint": "Connection to the Sightline server"
+  "server.hint": "Connection to the Sightline server",
+  "profile.title": "Player profile",
+  "profile.search": "Find a player",
+  "profile.searchHint": "in-game nickname or login, three characters or more",
+  "profile.nobody": "Nobody found.",
+  "profile.lastBattle": "last battle",
+  "profile.never": "no battles yet",
+  "profile.vehicles": "Favourite vehicles",
+  "profile.sorties": "sorties",
+  "profile.perSortie": "kills per sortie",
+  "profile.calendar": "When they played",
+  "profile.confirmed": "Confirmed by other players: {n} of {total}.",
+  "profile.confirmedHint": "A battle counts as confirmed when its record matches another user’s. Few confirmed battles is not a reproach: most often there simply was no second user around.",
+  "profile.totalBattles": "battles in total",
+  "profile.open": "Open profile"
 }

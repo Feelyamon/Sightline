@@ -490,5 +490,19 @@
   "server.ok": "Сервер на связи",
   "server.offline": "Сервера нет",
   "server.guest": "Без аккаунта",
-  "server.hint": "Связь с сервером Sightline"
+  "server.hint": "Связь с сервером Sightline",
+  "profile.title": "Профиль игрока",
+  "profile.search": "Найти игрока",
+  "profile.searchHint": "игровой ник или логин, от трёх знаков",
+  "profile.nobody": "Никого не нашли.",
+  "profile.lastBattle": "последний бой",
+  "profile.never": "боёв ещё нет",
+  "profile.vehicles": "Любимая техника",
+  "profile.sorties": "вылетов",
+  "profile.perSortie": "фрагов за вылет",
+  "profile.calendar": "Когда играл",
+  "profile.confirmed": "Подтверждено другими игроками: {n} из {total}.",
+  "profile.confirmedHint": "Бой считается подтверждённым, когда его запись совпала с записью другого пользователя программы. Мало подтверждённых — не упрёк: чаще всего рядом просто не было второго.",
+  "profile.totalBattles": "всего боёв",
+  "profile.open": "Открыть профиль"
 }

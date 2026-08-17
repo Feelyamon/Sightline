@@ -972,6 +972,15 @@ handle('account:forcedPassword', (_e, form = {}) =>
 );
 
 handle('account:notifications', () => account.request('/notifications', { auth: true }));
+
+// Публичные профили. Оба метода требуют входа: поиск по чужим никам не стоит
+// открывать всему интернету, и сервер это тоже проверяет.
+handle('profile:search', (_e, q) =>
+  account.request(`/profile/search?q=${encodeURIComponent(String(q || ''))}`, { auth: true })
+);
+handle('profile:get', (_e, who) =>
+  account.request(`/profile?who=${encodeURIComponent(String(who || ''))}`, { auth: true })
+);
 handle('account:readNotifications', (_e, id) =>
   account.request('/notifications/read', { method: 'POST', body: { id: id ?? null }, auth: true })
 );

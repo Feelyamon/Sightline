@@ -67,6 +67,11 @@ contextBridge.exposeInMainWorld('wt', {
     saveRecoveryCode: (code) => invoke('account:saveRecoveryCode', code),
   },
 
+  profile: {
+    search: (q) => invoke('profile:search', q),
+    get: (who) => invoke('profile:get', who),
+  },
+
   support: {
     send: (form) => invoke('support:send', form),
     reportPlayer: (form) => invoke('support:reportPlayer', form),

@@ -231,7 +231,13 @@ function playersTable(players) {
     // команде это не говорит ничего, зато говорит другое — этот бой будет
     // кому подтвердить.
     if (p.isUser && !p.isSelf) nameEl.title = t('player.isUser');
-    nameEl.addEventListener('click', () => openCard(p.nick));
+    nameEl.addEventListener('click', () => {
+      // У пользователя программы есть настоящий профиль — открываем его.
+      // Остальным показываем местное досье: сервер о них ничего не знает, и
+      // подменять досье пустым профилем было бы хуже, чем не открывать ничего.
+      if (p.isUser && !p.isSelf) openProfile(p.nick);
+      else openCard(p.nick);
+    });
     nick.append(nameEl);
     nick.title = p.nick;
 
@@ -2573,6 +2579,198 @@ async function renderAbout() {
     dd.append(link);
     facts.append(el('dt', null, t('about.source')), dd);
   }
+}
+
+
+// --- Профиль игрока -------------------------------------------------------
+
+/**
+ * Окно чужого профиля.
+ *
+ * Числа собраны программой на компьютере игрока, и подделать их он в принципе
+ * может — поэтому рядом стоит, сколько боёв подтверждено чужими записями.
+ * Формулировка при этом не обвиняет: мало подтверждённых почти всегда значит
+ * не «врёт», а «рядом не было второго пользователя».
+ */
+function openProfile(who) {
+  $('profileModal').hidden = false;
+  $('profileError').hidden = true;
+  $('profileResults').replaceChildren();
+  $('profileQuery').value = '';
+  if (who) {
+    loadProfile(who);
+  } else {
+    $('profileBody').hidden = true;
+    $('profileQuery').focus();
+  }
+}
+
+$('profileClose').addEventListener('click', () => {
+  $('profileModal').hidden = true;
+});
+$('profileModal').addEventListener('click', (e) => {
+  if (e.target === $('profileModal')) $('profileModal').hidden = true;
+});
+
+// Задержка перед запросом: искать на каждую букву — это и есть перебор, за
+// который сервер считает частоту обращений.
+let profileSearchTimer = null;
+$('profileQuery').addEventListener('input', (e) => {
+  const q = e.target.value.trim();
+  clearTimeout(profileSearchTimer);
+  $('profileError').hidden = true;
+  if (q.length < 3) {
+    $('profileResults').replaceChildren();
+    return;
+  }
+  profileSearchTimer = setTimeout(() => searchProfiles(q), 250);
+});
+
+async function searchProfiles(q) {
+  try {
+    const found = await window.wt.profile.search(q);
+    $('profileResults').replaceChildren(
+      ...(found.length
+        ? found.map((f) => {
+            const row = el('div', 'friend-row');
+            const face = el('span', 'friend-avatar');
+            face.append(avatarContent(f.login, f.avatar));
+            const name = el('div', 'friend-name');
+            name.append(el('div', null, f.game_nick || f.login));
+            // Логин второй строкой: в бою человек видел ник, и связать одно с
+            // другим он может, только увидев оба сразу.
+            if (f.game_nick) name.append(el('div', 'friend-status', f.login));
+            row.append(face, name);
+            const open = el('button', 'small', t('profile.open'));
+            open.addEventListener('click', () => loadProfile(f.login));
+            row.append(open);
+            return row;
+          })
+        : [el('div', 'empty', t('profile.nobody'))])
+    );
+  } catch (err) {
+    showProfileError(err);
+  }
+}
+
+function showProfileError(err) {
+  $('profileError').textContent = err?.offline ? t('acc.offline') : err?.message || String(err);
+  $('profileError').hidden = false;
+  $('profileBody').hidden = true;
+}
+
+async function loadProfile(who) {
+  $('profileError').hidden = true;
+  try {
+    renderProfile(await window.wt.profile.get(who));
+  } catch (err) {
+    showProfileError(err);
+  }
+}
+
+function renderProfile(p) {
+  const box = $('profileBody');
+  const card = el('div', 'profile-card');
+
+  const avatar = el('div', 'avatar-big profile-avatar');
+  avatar.append(avatarContent(p.login, p.avatar));
+  card.append(avatar);
+  card.append(el('h2', 'profile-name', p.game_nick || p.login));
+  card.append(el('p', 'profile-role', p.game_nick ? p.login : ''));
+
+  const hero = el('div', 'profile-hero');
+  hero.append(
+    el('div', 'profile-hero-value', fmtInt(p.month.battles)),
+    el(
+      'div',
+      'profile-hero-label',
+      t('acc.stat.battlesPeriod', { word: window.i18n.plural(p.month.battles, 'plural.battles') })
+    )
+  );
+  card.append(hero);
+
+  const tiles = [
+    {
+      value: p.month.percent === null ? t('acc.stat.none') : `${p.month.percent}%`,
+      label: t('acc.stat.winrate'),
+      tone: p.month.percent === null ? '' : p.month.percent >= 50 ? 'good' : 'bad',
+    },
+    {
+      value: p.month.battles ? p.month.kda.toFixed(2) : t('acc.stat.none'),
+      label: t('acc.stat.kda'),
+    },
+    {
+      value: p.month.best_win_streak ? fmtInt(p.month.best_win_streak) : t('acc.stat.none'),
+      label: t('acc.stat.bestWin'),
+      tone: p.month.best_win_streak ? 'good' : '',
+    },
+  ];
+  const stats = el('div', 'profile-stats');
+  for (const tile of tiles) {
+    const cell = el('div', 'profile-stat');
+    cell.append(
+      el('div', `profile-stat-value${tile.tone ? ' ' + tile.tone : ''}`, tile.value),
+      el('div', 'profile-stat-label', tile.label)
+    );
+    stats.append(cell);
+  }
+  card.append(stats);
+
+  // Всего боёв и когда играл в последний раз — одной строкой: по ней сразу
+  // видно, живой аккаунт или заброшенный.
+  const tail = [
+    `${fmtInt(p.totals.battles)} ${t('profile.totalBattles')}`,
+    p.last_battle_at
+      ? `${t('profile.lastBattle')}: ${dateText(p.last_battle_at)}`
+      : t('profile.never'),
+  ];
+  card.append(el('p', 'muted small profile-note', tail.join(' · ')));
+
+  // Подтверждённость показывается всегда — решение владельца. Рядом
+  // объяснение, потому что «0 из 340» без него читается как обвинение, хотя
+  // означает только то, что рядом не было второго пользователя.
+  const trust = el('p', 'muted small profile-note');
+  trust.append(
+    el('b', null, t('profile.confirmed', { n: p.totals.confirmed, total: p.totals.battles })),
+    document.createTextNode(' ' + t('profile.confirmedHint'))
+  );
+  card.append(trust);
+
+  box.replaceChildren(card);
+
+  // Календарь активности — тот же компонент, что и в «Статистике». Он для того
+  // и вынесен отдельной функцией ещё в этапе 2.
+  if (p.calendar && p.calendar.length) {
+    box.append(el('div', 'section-title', t('profile.calendar')));
+    // grassChart отдаёт готовый узел, а не строку: через innerHTML он
+    // превращался в «[object SVGSVGElement]» и календарь просто не появлялся.
+    box.append(
+      window.charts.grassChart(p.calendar, {
+        weeks: 13,
+        width: Math.max(320, box.clientWidth || 640),
+      })
+    );
+  }
+
+  if (p.vehicles && p.vehicles.length) {
+    box.append(el('div', 'section-title', t('profile.vehicles')));
+    const list = el('div', 'profile-vehicles');
+    for (const v of p.vehicles) {
+      const row = el('div', 'profile-vehicle');
+      row.append(el('div', 'profile-vehicle-name', v.name));
+      row.append(
+        el(
+          'div',
+          'muted small',
+          `${fmtInt(v.sorties)} ${t('profile.sorties')} · ${v.kills_per_sortie} ${t('profile.perSortie')}`
+        )
+      );
+      list.append(row);
+    }
+    box.append(list);
+  }
+
+  box.hidden = false;
 }
 
 // --- Карточка игрока ----------------------------------------------------

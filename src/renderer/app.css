@@ -865,6 +865,18 @@ label.row.consent input { margin-top: 3px; }
    читается хуже, чем в шестьдесят, даже если место есть. */
 .profile-note { margin: 0 auto 14px; max-width: 62ch; }
 
+/* Любимая техника. Без картинок: они из вики Gaijin, и прежде чем складывать
+   их у себя, надо разобраться с лицензией. Название текстом ничего не
+   нарушает и работает уже сейчас. */
+.profile-vehicles { display: grid; gap: 8px; }
+.profile-vehicle {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 10px 12px;
+}
+.profile-vehicle-name { font-weight: 600; }
+
 /* --- Редактор профиля ---------------------------------------------------- */
 
 /* Два класса, потому что .modal.wide объявлен двумя и при одном перебивал бы

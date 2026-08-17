@@ -490,5 +490,19 @@
   "server.ok": "服务器已连接",
   "server.offline": "无法连接服务器",
   "server.guest": "未登录",
-  "server.hint": "与 Sightline 服务器的连接"
+  "server.hint": "与 Sightline 服务器的连接",
+  "profile.title": "玩家资料",
+  "profile.search": "查找玩家",
+  "profile.searchHint": "游戏昵称或登录名，至少三个字符",
+  "profile.nobody": "未找到。",
+  "profile.lastBattle": "最后一场战斗",
+  "profile.never": "尚无战斗",
+  "profile.vehicles": "常用载具",
+  "profile.sorties": "出击次数",
+  "profile.perSortie": "每次出击击杀",
+  "profile.calendar": "游戏时间分布",
+  "profile.confirmed": "已被其他玩家确认：{total} 场中的 {n} 场。",
+  "profile.confirmedHint": "当一场战斗的记录与其他用户的记录一致时即视为已确认。确认数少并非指责：通常只是当时附近没有第二位用户。",
+  "profile.totalBattles": "总战斗数",
+  "profile.open": "打开资料"
 }
