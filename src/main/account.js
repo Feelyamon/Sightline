@@ -59,6 +59,14 @@ class Account {
     // { ok, appVersion, minClient, latestClient, downloadUrl, updateAvailable,
     //   latestNotes }
     this.version = null;
+    /**
+     * Позвать, когда стало известно что-то о связи с сервером.
+     *
+     * Здесь единственное место, где это вообще известно: все обращения идут
+     * через request(). Собирать состояние снаружи значило бы гадать по
+     * ошибкам, которые до окна доходят не все.
+     */
+    this.onServerState = () => {};
     this.load();
   }
 
@@ -160,8 +168,13 @@ class Account {
       const reason = e.name === 'TimeoutError' ? 'сервер не отвечает' : 'нет связи с сервером';
       const err = new Error(reason);
       err.offline = true;
+      this.onServerState({ ok: false, message: reason });
       throw err;
     }
+
+    // Ответ получен — сервер на связи, каким бы ни был код. Отказ по существу
+    // (неверный пароль, нет прав) к связи отношения не имеет.
+    this.onServerState({ ok: true });
 
     const text = await response.text();
     let data = null;
@@ -200,6 +213,11 @@ class Account {
       const err = new Error(data?.message || `ошибка сервера (${response.status})`);
       err.code = data?.error;
       err.status = response.status;
+      // Ошибки сервера (5xx) — это про связь: отвечает, но не работает.
+      // Ошибки запроса (4xx) — про то, что мы попросили, и в строку состояния
+      // им не место: там они висели бы как «сервер сломан» после каждой
+      // опечатки в пароле.
+      if (response.status >= 500) this.onServerState({ ok: false, message: err.message });
       // Через сколько секунд можно повторить — отдельным полем, а не разбором
       // текста: формулировку однажды поправят, и разбор молча перестанет
       // работать. Окно показывает по нему обратный отсчёт вместо глухого

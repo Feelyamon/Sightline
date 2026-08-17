@@ -142,6 +142,11 @@ contextBridge.exposeInMainWorld('wt', {
   },
   // Настройки приехали из учётной записи и уже применены в main. Окну надо
   // перерисовать то, что построено из них: переключатели, масштаб, язык.
+  onServerStatus: (cb) => {
+    const handler = (_e, info) => cb(info);
+    ipcRenderer.on('server:status', handler);
+    return () => ipcRenderer.off('server:status', handler);
+  },
   onSettingsChanged: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on('settings:changed', handler);

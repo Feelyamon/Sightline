@@ -2240,6 +2240,9 @@ function renderWhoAmI(state) {
   const вошли = !!state?.signedIn;
   кнопка.textContent = вошли ? t('who.signedIn', { login: state.login }) : t('who.guest');
   кнопка.classList.toggle('guest', !вошли);
+  // Без входа программа с сервером не разговаривает вовсе, и «сервер на связи»
+  // было бы неправдой: мы этого не знаем и знать не должны.
+  if (!вошли) renderServerStatus({ signedIn: false });
 }
 
 // Нажатие ведёт в «Аккаунт»: там и вход, и выход. Тем же способом, что и
@@ -2776,6 +2779,41 @@ function showError(message) {
   showError.timer = setTimeout(() => box.classList.remove('error'), 30000);
 }
 
+// --- Связь с сервером -----------------------------------------------------
+
+/**
+ * Отдельный индикатор рядом с состоянием игры.
+ *
+ * Это разные вещи: игра может идти при лежащем сервере, и наоборот. Раньше
+ * сообщения о сервере попадали в строку игры и затирали «В бою» — то есть
+ * во время боя человек терял из виду ровно то, ради чего программа открыта.
+ *
+ * «Без аккаунта» — не ошибка и красным не показывается: программа без сервера
+ * полноценна, и пугать человека там, где ничего не сломалось, нельзя.
+ */
+function renderServerStatus({ ok, message, signedIn } = {}) {
+  const box = $('serverStatus');
+  const text = $('serverText');
+  text.className = 'server-text';
+
+  if (signedIn === false) {
+    box.className = 'server-status idle';
+    text.textContent = t('server.guest');
+    return;
+  }
+  if (ok === false) {
+    box.className = 'server-status bad';
+    // Показываем то, что сказал сервер: «нет связи», «сервер не отвечает» или
+    // текст его собственной ошибки. Общее «что-то пошло не так» не помогает
+    // никому, и в сообщение о проблеме его не перепишешь.
+    text.textContent = message || t('server.offline');
+    return;
+  }
+  box.className = 'server-status ok';
+  text.textContent = t('server.ok');
+}
+
+window.wt.onServerStatus(renderServerStatus);
 window.wt.onError(showError);
 
 // Настройки приехали из учётной записи: значения уже применены в main, окну

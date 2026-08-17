@@ -486,5 +486,9 @@
   "admin.resetPassword": "重置密码",
   "admin.resetPasswordDone": "密码已作废。玩家将使用自己的恢复码设置新密码，不会向你显示。会话已关闭。",
   "admin.bans": "封禁次数：{n}",
-  "admin.avatarBanned": "禁止使用头像"
+  "admin.avatarBanned": "禁止使用头像",
+  "server.ok": "服务器已连接",
+  "server.offline": "无法连接服务器",
+  "server.guest": "未登录",
+  "server.hint": "与 Sightline 服务器的连接"
 }

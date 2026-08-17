@@ -463,6 +463,10 @@ app.whenReady().then(() => {
   db = new Db(app.getPath('userData'));
   account = new Account(app.getPath('userData'));
   friends = new Friends(account, settings);
+  // Состояние связи с сервером идёт в шапку отдельным индикатором. Раньше
+  // такие сообщения попадали в строку игры и затирали «В бою» — во время боя
+  // человек терял из виду ровно то, ради чего программа открыта.
+  account.onServerState = (info) => send('server:status', info);
   avatars = new Avatars(app.getPath('userData'));
   avatars.install();
   sync = new Sync(app.getPath('userData'), account, db);

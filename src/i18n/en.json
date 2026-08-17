@@ -486,5 +486,9 @@
   "admin.resetPassword": "Reset password",
   "admin.resetPasswordDone": "The password is now invalid. The player sets a new one themselves using their recovery code — it is not shown to you. Sessions closed.",
   "admin.bans": "bans: {n}",
-  "admin.avatarBanned": "avatars blocked"
+  "admin.avatarBanned": "avatars blocked",
+  "server.ok": "Server connected",
+  "server.offline": "Server unreachable",
+  "server.guest": "No account",
+  "server.hint": "Connection to the Sightline server"
 }

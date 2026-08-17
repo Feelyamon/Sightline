@@ -80,6 +80,14 @@
       <span class="dot" id="dot"></span>
       <span id="statusText">…</span>
       <span class="muted" id="counter"></span>
+      <!-- Связь с нашим сервером — отдельным индикатором, а не в той же строке.
+           Раньше ошибка сервера затирала «В бою», и во время боя человек терял
+           из виду то, ради чего программа открыта. Это разные вещи: игра может
+           идти при лежащем сервере, и наоборот. -->
+      <span class="server-status" id="serverStatus" data-i18n-title="server.hint">
+        <span class="dot" id="serverDot"></span>
+        <span id="serverText"></span>
+      </span>
     </div>
   </header>
 

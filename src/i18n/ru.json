@@ -486,5 +486,9 @@
   "admin.resetPassword": "Сбросить пароль",
   "admin.resetPasswordDone": "Пароль объявлен негодным. Игрок задаст новый сам по своему коду восстановления — вам он не показывается. Сессии закрыты.",
   "admin.bans": "блокировок: {n}",
-  "admin.avatarBanned": "аватарки запрещены"
+  "admin.avatarBanned": "аватарки запрещены",
+  "server.ok": "Сервер на связи",
+  "server.offline": "Сервера нет",
+  "server.guest": "Без аккаунта",
+  "server.hint": "Связь с сервером Sightline"
 }

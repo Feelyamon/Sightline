@@ -119,6 +119,8 @@ window.wt = {
   // окно можно было посмотреть, не поднимая двух аккаунтов и сервер.
   onSquadInvites: (cb) => { window.__invites = cb; return () => {}; },
   onSettingsChanged: () => () => {},
+  // Стенд умеет показать оба состояния: window.__server({ok:false, message:'…'}).
+  onServerStatus: (cb) => { window.__server = cb; setTimeout(() => cb({ ok: true }), 300); return () => {}; },
   // В приложении это уходит в shell.openExternal. В стенде открывать браузер
   // незачем — достаточно не падать: без заглушки клик по ссылке на репозиторий
   // ронял бы обработчик и молча ломал вкладку.

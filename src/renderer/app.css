@@ -253,6 +253,31 @@ body {
    обычных сообщений вроде «В ангаре». */
 #statusText.error { color: var(--enemy); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+
+/* Связь с сервером. Отделена чертой: рядом стоят два состояния разной природы,
+   и без границы они читаются как одна фраза. */
+.server-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  margin-left: 2px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 260px;
+}
+.server-status .server-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Ошибка сервера видна, но не кричит: программа без сервера работает, и
+   красная строка на весь экран пугала бы там, где ничего страшного нет. */
+.server-status.bad { color: #e0a0a0; }
+.server-status.bad .dot { background: var(--enemy); }
+.server-status.ok .dot { background: var(--ally); }
+.server-status.idle .dot { background: var(--muted); }
 .dot.battle { background: var(--ally); }
 .dot.idle { background: #e0b354; }
 .dot.offline { background: var(--enemy); }
