@@ -463,6 +463,51 @@
         </div>
       </form>
 
+      <!-- Второй шаг входа: код из приложения или резервный код -->
+      <form class="auth" id="authTotp" hidden>
+        <h2 data-i18n="totp.title"></h2>
+        <p class="muted" id="totpLead" data-i18n="totp.lead"></p>
+        <label class="row field">
+          <span class="muted" id="totpLabel" data-i18n="totp.code"></span>
+          <input type="text" id="totpCode" autocomplete="one-time-code" inputmode="numeric" maxlength="32" spellcheck="false" />
+        </label>
+        <button type="button" class="link" id="totpUseBackup" data-i18n="totp.useBackup"></button>
+        <div class="auth-error" id="totpError" hidden></div>
+        <div class="buttons">
+          <button type="submit" id="totpSubmit" data-i18n="totp.submit"></button>
+          <button type="button" class="totp-back" data-i18n="acc.back"></button>
+        </div>
+      </form>
+
+      <!-- Обязательная настройка второго фактора -->
+      <form class="auth" id="authTotpSetup" hidden>
+        <h2 data-i18n="totpSetup.title"></h2>
+        <p class="muted" data-i18n="totpSetup.lead"></p>
+        <ol class="muted totp-steps">
+          <li data-i18n="totpSetup.step1"></li>
+          <li data-i18n="totpSetup.step2"></li>
+          <li data-i18n="totpSetup.step3"></li>
+        </ol>
+        <div class="totp-qr">
+          <canvas id="totpQr" width="200" height="200"></canvas>
+        </div>
+        <div class="section-title" data-i18n="totpSetup.secret"></div>
+        <div class="totp-secret-row">
+          <code class="totp-secret" id="totpSecret"></code>
+          <button type="button" class="small" id="totpSecretCopy" data-i18n="code.copy"></button>
+        </div>
+        <p class="muted small" id="totpSecretStatus"></p>
+        <label class="row field">
+          <span class="muted" data-i18n="totp.code"></span>
+          <input type="text" id="totpSetupCode" autocomplete="one-time-code" inputmode="numeric" maxlength="16" spellcheck="false" />
+        </label>
+        <div class="auth-error" id="totpSetupError" hidden></div>
+        <div class="buttons">
+          <button type="submit" id="totpSetupSubmit" data-i18n="totpSetup.submit"></button>
+          <button type="button" class="totp-back" data-i18n="acc.back"></button>
+        </div>
+      </form>
+
       <form class="auth" id="authRegister" hidden>
         <h2 data-i18n="acc.register"></h2>
         <label class="row field">
@@ -966,6 +1011,27 @@
       </label>
       <div class="buttons">
         <button id="codeClose" disabled data-i18n="code.close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Резервные коды второго фактора: показываются один раз -->
+  <div class="modal-backdrop blocking" id="backupModal" hidden>
+    <div class="modal">
+      <h2 data-i18n="backup.title"></h2>
+      <p class="muted" data-i18n="backup.lead"></p>
+      <ol class="backup-codes" id="backupList"></ol>
+      <div class="buttons">
+        <button id="backupCopy" data-i18n="code.copy"></button>
+        <button id="backupSave" data-i18n="code.save"></button>
+      </div>
+      <p class="muted small" id="backupStatus"></p>
+      <label class="row consent">
+        <input type="checkbox" id="backupConfirm" />
+        <span data-i18n="backup.confirm"></span>
+      </label>
+      <div class="buttons">
+        <button id="backupClose" disabled data-i18n="backup.close"></button>
       </div>
     </div>
   </div>

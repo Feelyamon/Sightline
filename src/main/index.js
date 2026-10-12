@@ -1203,8 +1203,45 @@ handle('account:register', async (event, form) => {
 });
 handle('account:signIn', async (_e, form) => {
   const state = await account.signIn(form || {});
+  // Пароль принят, но нужен второй фактор — входа ещё нет, и делать то, что
+  // делается после входа, рано.
+  if (state.signedIn) await afterSignIn();
+  return state;
+});
+
+// Второй фактор при входе. Токен шага держит главный процесс; окно присылает
+// только то, что ввёл человек.
+handle('account:totpSignIn', async (_e, form = {}) => {
+  const state = await account.signInTotp({ code: String(form.code || '') });
   await afterSignIn();
   return state;
+});
+handle('account:totpSetupForced', () => account.totpSetupForced());
+handle('account:totpConfirmForced', async (_e, form = {}) => {
+  const result = await account.totpConfirmForced({ code: String(form.code || '') });
+  await afterSignIn();
+  return result;
+});
+handle('account:totpCancel', () => account.cancelPending());
+handle('account:saveBackupCodes', async (_e, codes) => {
+  // Как и код восстановления — диалогом: человек должен знать, где лежат
+  // его запасные ключи.
+  const list = (Array.isArray(codes) ? codes : []).map(String).filter(Boolean);
+  if (!list.length) return null;
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: 'sightline-backup-codes.txt',
+    filters: [{ name: 'Text', extensions: ['txt'] }],
+  });
+  if (canceled || !filePath) return null;
+  const dict = locale.dictionary(settings.get('uiLang'));
+  const title = dict['backup.title'] || 'backup codes';
+  const lead = dict['backup.lead'] || '';
+  require('node:fs').writeFileSync(
+    filePath,
+    `Sightline — ${title}\n\n${list.join('\n')}\n\n${lead}\n`,
+    'utf8'
+  );
+  return filePath;
 });
 
 /**

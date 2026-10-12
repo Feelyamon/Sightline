@@ -45,6 +45,51 @@ function compareVersions(a, b) {
   return 0;
 }
 
+/**
+ * Отказы 401, которые говорят о введённом в форму, а не о токене сессии.
+ * На них человека из аккаунта не выкидываем.
+ */
+const INPUT_ERRORS = new Set(['bad_credentials', 'totp_required', 'bad_totp']);
+
+/**
+ * Код из приложения или резервный код — как его отправить.
+ *
+ * Шесть цифр приложение показывает группами («123 456»), и люди так и вводят.
+ * Пробелы из цифр убираем; резервный код уходит как набран (без краевых
+ * пробелов) — какой у него вид, решает сервис учёток.
+ */
+function normalizeTotpCode(raw) {
+  const s = String(raw || '').trim();
+  if (/^[\d\s]+$/.test(s)) return s.replace(/\s/g, '');
+  return s;
+}
+
+/**
+ * Модули QR-кода для адреса otpauth:// — строки из «0» и «1».
+ *
+ * Рисуется в окне холстом, а считается здесь: библиотека — обычный модуль
+ * Node (qrcode-generator, версия закреплена точно), окну же разрешены только
+ * свои скрипты. Секрет при этом никуда не уходит — ни в сеть, ни в чужой
+ * сервис картинок.
+ */
+function qrMatrix(text) {
+  const qrcode = require('qrcode-generator');
+  // Байтовый режим по умолчанию режет символы до одного байта — логин
+  // кириллицей в подписи превратился бы в мусор. Нужен UTF-8.
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+  const qr = qrcode(0, 'M');
+  qr.addData(String(text), 'Byte');
+  qr.make();
+  const n = qr.getModuleCount();
+  const rows = [];
+  for (let r = 0; r < n; r++) {
+    let row = '';
+    for (let c = 0; c < n; c++) row += qr.isDark(r, c) ? '1' : '0';
+    rows.push(row);
+  }
+  return rows;
+}
+
 class Account {
   /**
    * @param {string} userDataDir
@@ -55,6 +100,11 @@ class Account {
     this.file = path.join(userDataDir, TOKEN_FILE);
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.session = null; // { token, login, role, lang, expiresAt }
+    // Незаконченный вход: пароль принят, ждём второй фактор.
+    // { kind: 'totp' | 'setup', token, login, recoveryCode? }. Токен шага
+    // живёт только здесь, в памяти главного процесса: окну он не нужен, а
+    // всё, что уходит в окно, видно любому его скрипту.
+    this.pending = null;
     // Что сервер думает о нашей версии. null — ещё не спрашивали.
     // { ok, appVersion, minClient, latestClient, downloadUrl, updateAvailable,
     //   latestNotes }
@@ -209,10 +259,16 @@ class Account {
       // действием в админке. Там с сессией всё в порядке, и выкидывать человека
       // из аккаунта за опечатку в поле нельзя. Разводим по коду ошибки:
       // «unauthorized» — про токен, «bad_credentials» — про то, что он ввёл.
-      if (response.status === 401 && data?.error !== 'bad_credentials') this.signOutLocally();
+      //
+      // То же со вторым фактором: `totp_required` — это «пароль верный, нужен
+      // код», `bad_totp` — опечатка в коде. Ни то ни другое не про токен.
+      if (response.status === 401 && !INPUT_ERRORS.has(data?.error)) this.signOutLocally();
       const err = new Error(data?.message || `ошибка сервера (${response.status})`);
       err.code = data?.error;
       err.status = response.status;
+      // Тело отказа целиком — для тех, кто ждёт в нём не только текст:
+      // `totp_token` и `setup_token` приходят именно отказом входа.
+      err.body = data;
       // Ошибки сервера (5xx) — это про связь: отвечает, но не работает.
       // Ошибки запроса (4xx) — про то, что мы попросили, и в строку состояния
       // им не место: там они висели бы как «сервер сломан» после каждой
@@ -346,11 +402,103 @@ class Account {
   }
 
   async signIn({ login, password }) {
-    const data = await this.request('/auth/login', {
-      method: 'POST',
-      body: { login, password },
-    });
+    this.pending = null;
+    let data;
+    try {
+      data = await this.request('/auth/login', {
+        method: 'POST',
+        body: { login, password },
+      });
+    } catch (e) {
+      const step = this.takeStep(e, login);
+      if (step) return step;
+      throw e;
+    }
     this.applySession(data);
+    return this.state();
+  }
+
+  // --- Второй фактор -------------------------------------------------------
+  //
+  // Пароль верный, но сессии ещё нет. Сервер отвечает отказом с токеном шага:
+  //   401 totp_required {totp_token}        — нужен код из приложения;
+  //   403 totp_setup_required {setup_token} — роли второй фактор обязателен,
+  //                                           а он не настроен.
+  // Для человека это не ошибка, а следующий экран, поэтому наружу уходит не
+  // исключением, а ответом { step }.
+
+  /** Отказ входа → шаг второго фактора, если это он. Иначе null. */
+  takeStep(e, login) {
+    const body = e?.body || {};
+    const recoveryCode = body.recovery_code || undefined;
+    if (e?.code === 'totp_required' && body.totp_token) {
+      this.pending = { kind: 'totp', token: body.totp_token, login, recoveryCode };
+      return { ...this.state(), step: 'totp' };
+    }
+    if (e?.code === 'totp_setup_required' && body.setup_token) {
+      this.pending = { kind: 'setup', token: body.setup_token, login, recoveryCode };
+      return { ...this.state(), step: 'totp_setup' };
+    }
+    return null;
+  }
+
+  pendingOf(kind) {
+    if (this.pending?.kind !== kind) {
+      const err = new Error('вход начат заново — введите логин и пароль');
+      err.code = 'no_pending_step';
+      throw err;
+    }
+    return this.pending;
+  }
+
+  /** Второй шаг входа: шесть цифр или резервный код. */
+  async signInTotp({ code }) {
+    const pending = this.pendingOf('totp');
+    const data = await this.request('/auth/login/totp', {
+      method: 'POST',
+      body: { totp_token: pending.token, code: normalizeTotpCode(code) },
+    });
+    this.pending = null;
+    this.applySession(data, pending.login);
+    return { ...this.state(), recoveryCode: pending.recoveryCode };
+  }
+
+  /** Обязательная настройка: секрет и адрес для приложения, плюс QR. */
+  async totpSetupForced() {
+    const pending = this.pendingOf('setup');
+    const data = await this.request('/auth/totp/setup-forced', {
+      method: 'POST',
+      body: { setup_token: pending.token },
+    });
+    return {
+      secret: data?.secret || '',
+      otpauthUri: data?.otpauth_uri || '',
+      qr: data?.otpauth_uri ? qrMatrix(data.otpauth_uri) : null,
+    };
+  }
+
+  /**
+   * Подтвердить настройку кодом. Сервер включает второй фактор, отдаёт
+   * резервные коды — ОДИН раз — и сессию, как при входе.
+   */
+  async totpConfirmForced({ code }) {
+    const pending = this.pendingOf('setup');
+    const data = await this.request('/auth/totp/confirm-forced', {
+      method: 'POST',
+      body: { setup_token: pending.token, code: normalizeTotpCode(code) },
+    });
+    this.pending = null;
+    this.applySession(data, pending.login);
+    return {
+      ...this.state(),
+      backupCodes: Array.isArray(data?.backup_codes) ? data.backup_codes.map(String) : [],
+      recoveryCode: pending.recoveryCode,
+    };
+  }
+
+  /** Человек вернулся к форме входа — шаг больше не нужен. */
+  cancelPending() {
+    this.pending = null;
     return this.state();
   }
 
@@ -430,10 +578,22 @@ class Account {
    * значило бы спросить пароль, который он ввёл секунду назад.
    */
   async forcedPassword({ login, recoveryCode, newPassword }) {
-    const data = await this.request('/auth/forced-password', {
-      method: 'POST',
-      body: { login, recovery_code: recoveryCode, new_password: newPassword },
-    });
+    this.pending = null;
+    let data;
+    try {
+      data = await this.request('/auth/forced-password', {
+        method: 'POST',
+        body: { login, recovery_code: recoveryCode, new_password: newPassword },
+      });
+    } catch (e) {
+      // Восстановление второй фактор не снимает: после него тот же шаг кода,
+      // что и при входе (docs/totp-spec.md на сайте). Новый код
+      // восстановления, если сервис приложил его к отказу, донесём до окна
+      // после второго шага.
+      const step = this.takeStep(e, login);
+      if (step) return { recoveryCode: null, step: step.step, state: step };
+      throw e;
+    }
     this.session = {
       token: data.token,
       login,
@@ -451,10 +611,10 @@ class Account {
     return { ...this.state(), closed: data?.closed ?? null };
   }
 
-  applySession(data) {
+  applySession(data, login) {
     this.session = {
       token: data.token,
-      login: data.login,
+      login: data.login || login || null,
       role: data.role,
       lang: data.lang,
       expiresAt: data.expires_at,
@@ -463,4 +623,11 @@ class Account {
   }
 }
 
-module.exports = { Account, parseVersion, compareVersions, APP_VERSION };
+module.exports = {
+  Account,
+  parseVersion,
+  compareVersions,
+  normalizeTotpCode,
+  qrMatrix,
+  APP_VERSION,
+};

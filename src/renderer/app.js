@@ -1097,11 +1097,18 @@ $('minePeriod').addEventListener('change', refreshMine);
 
 // --- Аккаунт ------------------------------------------------------------
 
-const AUTH_SCREENS = ['authGuest', 'authSignIn', 'authRegister', 'authSignedIn'];
+const AUTH_SCREENS = [
+  'authGuest',
+  'authSignIn',
+  'authTotp',
+  'authTotpSetup',
+  'authRegister',
+  'authSignedIn',
+];
 
 function showAuthScreen(id) {
   for (const screen of AUTH_SCREENS) $(screen).hidden = screen !== id;
-  for (const box of ['siError', 'regError']) $(box).hidden = true;
+  for (const box of ['siError', 'regError', 'totpError', 'totpSetupError']) $(box).hidden = true;
 }
 
 // --- Жалоба на игрока ----------------------------------------------------
@@ -2396,12 +2403,20 @@ $('fpSubmit').addEventListener('click', async (e) => {
 
   setBusy(button, true);
   try {
-    const { recoveryCode } = await window.wt.account.forcedPassword({
+    const { recoveryCode, step } = await window.wt.account.forcedPassword({
       login: $('fpLogin').value.trim(),
       recoveryCode: $('fpCode').value,
       newPassword: пароль,
     });
     $('forcedPasswordModal').hidden = true;
+    // Пароль задан, но второй фактор восстановление не снимает — дальше тот
+    // же шаг, что и при обычном входе.
+    if (step) {
+      for (const id of ['fpCode', 'fpNew', 'fpNew2']) $(id).value = '';
+      document.querySelector('.tab[data-tab="account"]')?.click();
+      await startTotpStep(step);
+      return;
+    }
     // Новый код показывается тем же окном, что и при регистрации: он такой же
     // единственный ключ, и закрыть окно, не подтвердив сохранение, нельзя.
     showRecoveryCode(recoveryCode);
@@ -2507,11 +2522,15 @@ $('authSignIn').addEventListener('submit', async (e) => {
   const button = $('siSubmit');
   setBusy(button, true);
   try {
-    await window.wt.account.signIn({
+    const result = await window.wt.account.signIn({
       login: $('siLogin').value.trim(),
       password: $('siPassword').value,
     });
     $('siPassword').value = '';
+    if (result?.step) {
+      await startTotpStep(result.step);
+      return;
+    }
     await refreshAccount();
   } catch (err) {
     // Пароль сброшен администратором. Это единственный момент, когда человеку
@@ -2525,6 +2544,206 @@ $('authSignIn').addEventListener('submit', async (e) => {
   } finally {
     setBusy(button, false);
   }
+});
+
+// --- Второй фактор при входе ---------------------------------------------
+//
+// Пароль принят, сессии ещё нет. Сервер просит либо код из приложения
+// (step 'totp'), либо — роли, которой второй фактор обязателен, — настроить
+// его прямо сейчас (step 'totp_setup'). Токен шага держит главный процесс;
+// окно знает только, какой экран показать.
+
+/** Режим поля кода: шесть цифр из приложения или резервный код. */
+let totpBackupMode = false;
+
+function setTotpMode(backup) {
+  totpBackupMode = backup;
+  const pairs = [
+    ['totpLead', backup ? 'totp.leadBackup' : 'totp.lead'],
+    ['totpLabel', backup ? 'totp.backupCode' : 'totp.code'],
+    ['totpUseBackup', backup ? 'totp.useApp' : 'totp.useBackup'],
+  ];
+  // Ключ меняем в самом атрибуте: при смене языка подпись переведётся из
+  // него, а не вернётся к прежней.
+  for (const [id, key] of pairs) {
+    $(id).dataset.i18n = key;
+    $(id).textContent = t(key);
+  }
+  const input = $('totpCode');
+  input.inputMode = backup ? 'text' : 'numeric';
+  input.value = '';
+  input.focus();
+}
+
+async function startTotpStep(step) {
+  if (step === 'totp') {
+    showAuthScreen('authTotp');
+    setTotpMode(false);
+    return;
+  }
+  if (step === 'totp_setup') {
+    showAuthScreen('authTotpSetup');
+    $('totpSetupCode').value = '';
+    $('totpSecret').textContent = '';
+    $('totpSecretStatus').textContent = '';
+    drawQr($('totpQr'), null);
+    try {
+      const setup = await window.wt.account.totpSetupForced();
+      $('totpSecret').textContent = groupSecret(setup.secret);
+      drawQr($('totpQr'), setup.qr);
+      $('totpSetupCode').focus();
+    } catch (err) {
+      showTotpError('totpSetupError', err);
+    }
+  }
+}
+
+/** Секрет группами по четыре — его переписывают руками, если нет камеры. */
+function groupSecret(secret) {
+  return String(secret || '').replace(/\s+/g, '').replace(/(.{4})(?=.)/g, '$1 ');
+}
+
+/**
+ * QR рисуется здесь же, холстом: модули посчитал главный процесс, по сети
+ * ничего не ходит. Светлая подложка и поле в четыре модуля — без них
+ * камера телефона на тёмной теме код не находит.
+ */
+function drawQr(canvas, rows) {
+  const ctx = canvas.getContext('2d');
+  const size = canvas.width;
+  ctx.clearRect(0, 0, size, size);
+  if (!Array.isArray(rows) || !rows.length) {
+    canvas.hidden = true;
+    return;
+  }
+  canvas.hidden = false;
+  const n = rows.length;
+  const quiet = 4;
+  const cell = Math.floor(size / (n + quiet * 2));
+  const offset = Math.floor((size - cell * n) / 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#000000';
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (rows[r][c] === '1') ctx.fillRect(offset + c * cell, offset + r * cell, cell, cell);
+    }
+  }
+}
+
+/** Неверный код — своей строкой на языке окна, остальное как обычно. */
+function showTotpError(boxId, err) {
+  if (err?.code === 'bad_totp') return showAuthError(boxId, { message: t('totp.bad') });
+  if (err?.code === 'no_pending_step') return showAuthError(boxId, { message: t('totp.expired') });
+  // Токен шага истёк или израсходован — вход надо начать заново.
+  if (err?.status === 401 || err?.status === 403) {
+    return showAuthError(boxId, { message: err?.message || t('totp.expired') });
+  }
+  showAuthError(boxId, err);
+}
+
+$('totpUseBackup').addEventListener('click', () => setTotpMode(!totpBackupMode));
+
+for (const back of document.querySelectorAll('.totp-back')) {
+  back.addEventListener('click', async () => {
+    await window.wt.account.totpCancel();
+    $('totpSecret').textContent = '';
+    drawQr($('totpQr'), null);
+    showAuthScreen('authSignIn');
+  });
+}
+
+$('authTotp').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = $('totpCode').value.trim();
+  if (!code) return;
+  const button = $('totpSubmit');
+  setBusy(button, true);
+  $('totpError').hidden = true;
+  try {
+    const result = await window.wt.account.totpSignIn({ code });
+    $('totpCode').value = '';
+    await refreshAccount();
+    if (result?.recoveryCode) showRecoveryCode(result.recoveryCode);
+  } catch (err) {
+    showTotpError('totpError', err);
+  } finally {
+    setBusy(button, false);
+  }
+});
+
+$('totpSecretCopy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText($('totpSecret').textContent.replace(/\s+/g, ''));
+  $('totpSecretStatus').textContent = t('code.copied');
+});
+
+$('authTotpSetup').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = $('totpSetupCode').value.trim();
+  if (!code) return;
+  const button = $('totpSetupSubmit');
+  setBusy(button, true);
+  $('totpSetupError').hidden = true;
+  try {
+    const result = await window.wt.account.totpConfirmForced({ code });
+    $('totpSetupCode').value = '';
+    $('totpSecret').textContent = '';
+    drawQr($('totpQr'), null);
+    await refreshAccount();
+    // Сначала резервные коды, потом — если был — новый код восстановления:
+    // оба показываются один раз, и оба окна не закрыть без «Я сохранил».
+    showBackupCodes(result?.backupCodes || [], result?.recoveryCode);
+  } catch (err) {
+    showTotpError('totpSetupError', err);
+  } finally {
+    setBusy(button, false);
+  }
+});
+
+// --- Резервные коды -------------------------------------------------------
+
+/** Что показать после закрытия окна с резервными кодами. */
+let afterBackup = null;
+
+function showBackupCodes(codes, recoveryCode) {
+  const list = $('backupList');
+  list.replaceChildren(
+    ...codes.map((code) => {
+      const li = document.createElement('li');
+      li.textContent = code;
+      return li;
+    })
+  );
+  afterBackup = recoveryCode || null;
+  $('backupStatus').textContent = '';
+  $('backupConfirm').checked = false;
+  $('backupClose').disabled = true;
+  $('backupModal').hidden = false;
+}
+
+const backupCodesShown = () =>
+  [...$('backupList').querySelectorAll('li')].map((li) => li.textContent);
+
+$('backupConfirm').addEventListener('change', (e) => {
+  $('backupClose').disabled = !e.target.checked;
+});
+
+$('backupCopy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(backupCodesShown().join('\n'));
+  $('backupStatus').textContent = t('code.copied');
+});
+
+$('backupSave').addEventListener('click', async () => {
+  const file = await window.wt.account.saveBackupCodes(backupCodesShown());
+  if (file) $('backupStatus').textContent = t('code.saved', { file });
+});
+
+$('backupClose').addEventListener('click', () => {
+  $('backupModal').hidden = true;
+  // Коды нигде больше не хранятся — и в разметке им висеть незачем.
+  $('backupList').replaceChildren();
+  if (afterBackup) showRecoveryCode(afterBackup);
+  afterBackup = null;
 });
 
 // Кнопка регистрации оживает только вместе с галочкой согласия: без согласия

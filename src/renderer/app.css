@@ -1068,6 +1068,58 @@ label.row.consent input { margin-top: 3px; }
   user-select: all;
 }
 
+/* --- Второй фактор ---------------------------------------------------- */
+
+/* Переключатель «резервный код / код из приложения»: действие второго
+   порядка, поэтому ссылкой, а не ещё одной кнопкой рядом с «Войти». */
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+button.link:hover:not(:disabled) { text-decoration: underline; border: 0; }
+.auth .totp-steps { padding-left: 20px; margin: 6px 0 14px; }
+.auth .totp-steps li { margin-bottom: 4px; }
+/* QR на белой подложке при любой теме: камера телефона ищет тёмное на
+   светлом. Размер холста задан атрибутами — CSS его не растягивает, чтобы
+   модули оставались резкими. */
+.totp-qr { margin: 6px 0 14px; }
+.totp-qr canvas { display: block; border-radius: 6px; }
+.totp-secret-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.totp-secret {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 15px;
+  letter-spacing: .06em;
+  user-select: all;
+  word-break: break-all;
+}
+.auth .totp-secret-row + .small { margin: 6px 0 12px; min-height: 1em; }
+/* Резервные коды — так же крупно и моноширинно, как код восстановления,
+   двумя колонками: восемь строк столбиком не помещаются в окно. */
+.backup-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 24px;
+  margin: 16px 0;
+  padding: 14px 16px 14px 36px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 17px;
+  letter-spacing: .08em;
+  user-select: all;
+}
+
 /* Друг не в отряде: тот же зелёный, но пустой кружок. Заполненный означает
    «точно со мной», пустой — «свой человек, но сторона неизвестна». */
 .squad-mark.friend { opacity: 0.75; }

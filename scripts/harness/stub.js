@@ -245,7 +245,31 @@ window.wt = {
     },
     removeAvatar: async () => ({ avatar: null }),
     register: async () => ({ recoveryCode: 'ABCD-EFGH-JKMN-PQRS' }),
-    signIn: async () => ({ signedIn: true, login: 'Username' }),
+    // Второй фактор в стенде: логин «totp» ведёт на шаг кода, «setup» — на
+    // обязательную настройку. Остальные входят сразу.
+    signIn: async ({ login } = {}) =>
+      login === 'totp'
+        ? { signedIn: false, step: 'totp' }
+        : login === 'setup'
+          ? { signedIn: false, step: 'totp_setup' }
+          : { signedIn: true, login: 'Username' },
+    totpSignIn: async () => ({ signedIn: true, login: 'Username' }),
+    // Настоящий QR считает главный процесс; здесь — узор того же размера,
+    // чтобы было видно вёрстку.
+    totpSetupForced: async () => ({
+      secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP',
+      otpauthUri: 'otpauth://totp/Feelyamon:Username?secret=JBSWY3DPEHPK3PXP',
+      qr: Array.from({ length: 29 }, (_, r) =>
+        Array.from({ length: 29 }, (_, c) => ((r * 7 + c * 3 + r * c) % 5 < 2 ? '1' : '0')).join('')
+      ),
+    }),
+    totpConfirmForced: async () => ({
+      signedIn: true,
+      login: 'Username',
+      backupCodes: ['k3m9-p2x7', 'a8d4-q6w1', 'z5n2-h7c3', 'r1t8-b4v6', 'e9y3-u5i2', 'o7l1-j6g4', 's2f8-m3k9', 'x4c6-n1p5'],
+    }),
+    totpCancel: async () => ({ signedIn: false }),
+    saveBackupCodes: async () => null,
     signOut: async () => ({ signedIn: false }),
     // Смена пароля в стенде всегда «удаётся»: смотреть тут нечего, кроме окна
     // с новым кодом восстановления, — а оно и есть самая заметная часть.
