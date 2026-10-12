@@ -136,7 +136,7 @@ window.wt = {
   about: async () => ({
     version: '0.3.0',
     license: 'GPL-3.0-or-later',
-    repo: 'https://github.com/Solevaral/Sightline',
+    repo: 'https://github.com/Feelyamon/Sightline',
     electron: '43.4.0',
     node: '22.0.0',
     // Обратные слэши экранированы. Раньше не были, и строка молча теряла

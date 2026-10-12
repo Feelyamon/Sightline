@@ -15,10 +15,10 @@
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Solevaral/Sightline.git"
+    "url": "git+https://github.com/Feelyamon/Sightline.git"
   },
   "bugs": {
-    "url": "https://github.com/Solevaral/Sightline/issues"
+    "url": "https://github.com/Feelyamon/Sightline/issues"
   },
   "homepage": "https://sightline.feelyamon.ru/",
   "devDependencies": {
