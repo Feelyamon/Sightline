@@ -16,6 +16,8 @@ const { Account } = require('./account');
 const { Friends } = require('./friends');
 const { Avatars } = require('./avatars');
 const { Sync, battlePayload } = require('./sync');
+const { HistoryPull } = require('./history-pull');
+const { Restore } = require('./restore');
 const { GuestNotice, COUNTDOWN_SEC } = require('./guest-notice');
 const links = require('./links');
 const { loadWindowIcon } = require('./icon-paths');
@@ -36,6 +38,10 @@ let account;
 let friends;
 let avatars;
 let sync;
+/** @type {HistoryPull} история аккаунта с сервера */
+let historyPull;
+/** @type {Restore|null} открытый список резервных копий */
+let restore = null;
 /** @type {GuestNotice} */
 let guestNotice;
 let db;
@@ -610,14 +616,21 @@ app.whenReady().then(() => {
   // Отметка доверия поменялась — список боёв надо перерисовать, иначе галочка
   // появится только после переключения вкладки.
   sync.onTrustChanged = () => send('db:changed');
+  // История аккаунта с сервера (с 1.0.4): после входа, по кнопке во вкладке
+  // «Бои» и при запуске, если вход сохранён. См. history-pull.js.
+  historyPull = new HistoryPull(account, db);
+  historyPull.onChanged = () => send('db:changed');
   // Любой выход из аккаунта обнуляет очередь отправки и снова взводит
-  // предупреждение о гостевом режиме (guest-notice.js).
+  // предупреждение о гостевом режиме (guest-notice.js). Подтягивание истории
+  // обрывается; уже пришедшие бои остаются — это история на этой машине.
   account.onSignedOut = () => {
     sync.endSession();
+    historyPull.signedOut();
     guestNotice.signedOut();
     send('account:signedOut');
   };
   sync.start();
+  pullHistory();
   // Настройка поменялась в окне — уедет в учётную запись. Применение при этом
   // мгновенное и не ждёт сети: программа обязана слушаться сразу.
   settings.onChanged = () => scheduleSettingsSync();
@@ -645,6 +658,9 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   quitting = true;
   persistBattle();
+  // Временные папки с подготовленными копиями — мусор, если окно их не
+  // закрыло само.
+  if (restore) restore.close();
   if (client) client.stop();
   if (db) db.close();
   if (tray) tray.destroy();
@@ -1249,6 +1265,20 @@ async function afterSignIn() {
   sync.beginSession();
   guestNotice.signedIn();
   sync.start();
+  // История аккаунта: сначала показываем то, что уже есть на этой машине от
+  // этого аккаунта (или прячем чужое), потом подтягиваем недостающее.
+  historyPull.signedIn();
+  pullHistory();
+}
+
+/**
+ * Подтянуть историю аккаунта в фоне. Ошибка не показывается: сети может не
+ * быть, а локальная история от этого не страдает. Кнопка «Обновить с сервера»
+ * зовёт history:pull и ошибку видит.
+ */
+function pullHistory() {
+  if (!account.isSignedIn) return;
+  historyPull.pull().catch((e) => console.error('история с сервера не подтянулась:', e.message));
 }
 handle('account:saveRecoveryCode', async (_e, code) => {
   // Диалог сохранения, а не тихая запись в заранее выбранную папку: человек
@@ -1412,5 +1442,30 @@ handle('db:deleteBattle', (_e, id) => {
 });
 
 handle('db:clearHistory', (_e, opts = {}) => db.clearHistory(opts));
+
+// История аккаунта с сервера — по кнопке во вкладке «Бои». Без входа не
+// спрашивает сервер вовсе.
+handle('history:pull', async () => {
+  if (!account.isSignedIn) return { skipped: 'signed-out' };
+  return historyPull.pull();
+});
+
+// Восстановление из резервных копий (Настройки → База данных). Список готовит
+// временные копии файлов; оригиналы не открываются — см. restore.js.
+handle('restore:list', () => {
+  if (restore) restore.close();
+  restore = new Restore(db);
+  return restore.list();
+});
+handle('restore:import', (_e, files) => {
+  if (!restore) throw new Error('список копий не открыт');
+  const out = restore.import(files);
+  send('db:changed');
+  return out;
+});
+handle('restore:close', () => {
+  if (restore) restore.close();
+  restore = null;
+});
 handle('db:clearPlayers', () => db.clearPlayers());
 handle('db:reveal', () => shell.showItemInFolder(db.stats().file));

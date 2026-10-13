@@ -1195,6 +1195,31 @@ button.link:hover:not(:disabled) { text-decoration: underline; border: 0; }
   display: inline-block;
 }
 
+/* «С сервера» — бой пришёл из истории аккаунта, а не записан здесь. Тоже
+   пояснение, а не оценка: тот же вид, что у «без входа», рамка пунктиром. */
+.trust.server {
+  color: var(--muted);
+  font-weight: 600;
+  border: 1px dashed currentColor;
+  border-radius: 4px;
+  padding: 0 4px;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* Список резервных копий в окне восстановления. */
+.restore-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.2);
+}
+.restore-item:last-child { border-bottom: none; }
+.restore-item .restore-text { display: flex; flex-direction: column; gap: 2px; }
+.restore-item .restore-warn { color: #e0b354; }
+#restoreList { max-height: 50vh; overflow-y: auto; }
+
 /* --- Кнопка «Сообщить о проблеме» в навигации --- */
 /* Отделена чертой от разделов: это действие, а не место, куда переходят. */
 .tab-report {

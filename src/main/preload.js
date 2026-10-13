@@ -125,6 +125,16 @@ contextBridge.exposeInMainWorld('wt', {
     reveal: () => invoke('db:reveal'),
   },
 
+  // История аккаунта с сервера и восстановление из резервных копий (1.0.4).
+  history: {
+    pull: () => invoke('history:pull'),
+  },
+  restore: {
+    list: () => invoke('restore:list'),
+    import: (files) => invoke('restore:import', files),
+    close: () => invoke('restore:close'),
+  },
+
   onUpdate: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on('battle:update', handler);

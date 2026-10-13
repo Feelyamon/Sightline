@@ -131,6 +131,7 @@ const SALVAGE_TABLES = [
   'awards',
   'player_notes',
   'counters',
+  'app_meta',
 ];
 
 class Db {
@@ -176,8 +177,12 @@ class Db {
       }
       const corruptFile = this.setAside();
       this.init();
-      const salvaged = this.salvage(corruptFile);
-      this.recovery = { corruptFile, salvaged, error: e.message };
+      const unreadable = [];
+      const salvaged = this.salvage(corruptFile, unreadable);
+      // unreadable — таблицы, чтение которых оборвалось на испорченной
+      // странице (прочитанное до неё перенесено). Нужен восстановлению из
+      // копий: человек должен знать, что взято не всё.
+      this.recovery = { corruptFile, salvaged, unreadable, error: e.message };
       console.error(`база боёв испорчена (${e.message}), отложена в ${corruptFile}`);
     }
   }
@@ -265,14 +270,17 @@ class Db {
    * страница обрывает чтение таблицы, но прочитанное до неё остаётся.
    * Колонки берутся общие для старой и новой схемы — отложенная база могла
    * быть от старой версии программы.
+   * @param {string[]} [unreadable] - сюда дописываются таблицы, чтение
+   *   которых оборвалось
    * @returns {Object<string, number>} сколько строк перенесено, по таблицам
    */
-  salvage(corruptFile) {
+  salvage(corruptFile, unreadable = []) {
     const result = {};
     let old;
     try {
       old = new DatabaseSync(corruptFile, { readOnly: true });
     } catch {
+      unreadable.push('*');
       return result;
     }
     // Ссылки здесь не проверяем: строка участника может прочитаться, а игрок,
@@ -299,6 +307,7 @@ class Db {
           }
         } catch {
           // Таблица оборвалась на испорченной странице — берём, что успели.
+          unreadable.push(table);
         } finally {
           result[table] = moved;
         }
@@ -496,12 +505,18 @@ class Db {
     return this.saveBattle(snapshot, opts);
   }
 
-  /** Четыре счётчика: сколько боёв попало в окно с момента последнего сброса. */
+  /** Счётчики: сколько боёв попало в окно с момента последнего сброса. */
   counters() {
     const rows = this.db.prepare('SELECT name, reset_at, reset_id FROM counters').all();
     const resets = Object.fromEntries(rows.map((r) => [r.name, r]));
+    // Водяной знак по номеру годится только для боёв, записанных здесь: их
+    // номера растут вместе со временем. Бой, пришедший с сервера или из
+    // копии, получает свежий номер, хотя сыгран давно, — по номеру он попал бы
+    // в «с запуска» и пережил бы любой сброс. Для них граница — время сброса.
     const count = this.db.prepare(
-      'SELECT COUNT(*) n FROM battles WHERE id > ? AND started_at >= ? AND cancelled = 0'
+      `SELECT COUNT(*) n FROM battles
+        WHERE started_at >= ? AND cancelled = 0 AND hidden = 0
+          AND CASE WHEN origin = 'recorded' THEN id > ? ELSE started_at >= ? END`
     );
 
     const out = {};
@@ -510,7 +525,15 @@ class Db {
       // Две независимые границы: номер боя на момент ручного сброса и начало
       // календарного окна (для today/week/month).
       const from = Math.max(r.reset_at || 0, windowStart(name));
-      out[name] = { battles: count.get(r.reset_id || 0, windowStart(name)).n, from };
+      // «С запуска» — всегда от времени запуска. Остальные — от времени
+      // ручного сброса, если он был (reset_id > 0): reset_at у них проставлен
+      // и при заведении строки, и считать от него значило бы потерять
+      // пришедшие бои, сыгранные до первого запуска на этой машине.
+      const foreignFrom = name === 'session' || r.reset_id > 0 ? r.reset_at || 0 : 0;
+      out[name] = {
+        battles: count.get(windowStart(name), r.reset_id || 0, foreignFrom).n,
+        from,
+      };
     }
     return out;
   }
@@ -529,7 +552,9 @@ class Db {
    * @returns {{sql: string, params: Array}}
    */
   battleFilter({ query = '', from = 0, to = 0, result = '', myVehicle = '', selfNick = '' } = {}) {
-    const where = [];
+    // Бои другого аккаунта, пришедшие с сервера, на время чужого входа
+    // спрятаны (см. setViewer) — ни в списке, ни в итогах их нет.
+    const where = ['b.hidden = 0'];
     const params = [];
 
     if (from) {
@@ -608,7 +633,7 @@ class Db {
       }
     }
 
-    return { sql: where.length ? where.join(' AND ') : '1 = 1', params };
+    return { sql: where.join(' AND '), params };
   }
 
   /**
@@ -625,7 +650,7 @@ class Db {
     const rows = this.db
       .prepare(
         `SELECT id, started_at, duration, my_kills, my_deaths, my_assists, my_vehicles,
-                players_seen, result, cancelled, cancel_reason, trust
+                players_seen, result, cancelled, cancel_reason, trust, origin
          FROM battles b
          WHERE ${sql}
          ORDER BY started_at DESC, id DESC
@@ -693,7 +718,7 @@ class Db {
         `SELECT id, started_at, duration, my_kills, my_deaths, my_assists,
                 my_vehicles, result, server_key
            FROM battles
-          WHERE trust = 'disputed' AND cancelled = 0
+          WHERE trust = 'disputed' AND cancelled = 0 AND hidden = 0
           ORDER BY started_at DESC
           LIMIT ?`
       )
@@ -756,7 +781,7 @@ class Db {
       // Гостевой бой ключа не получает никогда, даже если его как-то прислали:
       // отметка «записан без входа» не должна смениться на «ждёт сверки».
       .prepare(
-        "UPDATE battles SET server_key = ?, trust = CASE WHEN trust = 'local' THEN 'pending' ELSE trust END WHERE id = ? AND trust <> 'guest'"
+        "UPDATE battles SET server_key = ?, trust = CASE WHEN trust = 'local' THEN 'pending' ELSE trust END WHERE id = ? AND trust <> 'guest' AND origin = 'recorded'"
       )
       .run(key, id);
   }
@@ -770,6 +795,7 @@ class Db {
         // прислать свою запись через час после боя.
         `SELECT server_key FROM battles
           WHERE server_key IS NOT NULL AND trust IN ('pending', 'alone', 'disputed')
+            AND hidden = 0
           ORDER BY started_at DESC LIMIT ?`
       )
       .all(limit)
@@ -778,13 +804,244 @@ class Db {
 
   /** @param {Array<{battle_key: string, trust: string}>} rows */
   applyTrust(rows) {
-    const update = this.db.prepare('UPDATE battles SET trust = ? WHERE server_key = ?');
+    // Ключ боя одинаков у всех его участников: если на этой машине лежит и
+    // бой другого аккаунта с тем же ключом (спрятанный), его отметку ответ
+    // про наш бой трогать не должен. Гостевая отметка не меняется никогда.
+    const update = this.db.prepare(
+      "UPDATE battles SET trust = ? WHERE server_key = ? AND hidden = 0 AND trust <> 'guest'"
+    );
     let changed = 0;
     for (const r of rows) {
       if (!r?.battle_key || !r?.trust) continue;
       changed += update.run(r.trust, r.battle_key).changes;
     }
     return changed;
+  }
+
+  // --- Чья история на экране -----------------------------------------------
+  //
+  // Бои, пришедшие с сервера, помечены номером аккаунта (owner_id). Если на
+  // этой машине входили под разными аккаунтами, в базе лежат истории обоих —
+  // и показывать их вперемешку нельзя: чужие бои попали бы в свой винрейт.
+  //
+  // Правило: на экране история ОДНОГО аккаунта — того, кто вошёл, а после
+  // выхода — того, кто входил последним (выход ничего не прячет: это всё ещё
+  // его история на его компьютере). Бои другого аккаунта не удаляются, а
+  // прячутся (hidden = 1) и возвращаются, когда войдёт он сам. Бои без
+  // хозяина — записанные здесь, гостевые, восстановленные из копий — видны
+  // всегда: это история этого компьютера, как и до 1.0.4.
+
+  meta(key) {
+    return this.db.prepare('SELECT value FROM app_meta WHERE key = ?').get(key)?.value ?? null;
+  }
+
+  setMeta(key, value) {
+    if (value === null || value === undefined) {
+      this.db.prepare('DELETE FROM app_meta WHERE key = ?').run(key);
+      return;
+    }
+    this.db
+      .prepare(
+        'INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+      )
+      .run(key, String(value));
+  }
+
+  /** Чья история сейчас на экране: номер аккаунта или null — «ничья». */
+  viewer() {
+    const raw = this.meta('viewer');
+    return raw === null || raw === '' ? null : Number(raw);
+  }
+
+  /**
+   * Показывать историю этого аккаунта. null — вошёл человек, чей номер ещё
+   * неизвестен (первый вход на этой машине): тогда прячутся бои ВСЕХ
+   * аккаунтов, пока ответ сервера не назовёт номер.
+   * @returns {number} сколько записей сменили видимость
+   */
+  setViewer(ownerId) {
+    const id = Number.isInteger(ownerId) ? ownerId : null;
+    this.setMeta('viewer', id === null ? '' : id);
+    return this.db
+      .prepare(
+        `UPDATE battles
+            SET hidden = CASE WHEN owner_id IS NOT NULL AND (?1 IS NULL OR owner_id <> ?1) THEN 1 ELSE 0 END
+          WHERE hidden <> CASE WHEN owner_id IS NOT NULL AND (?1 IS NULL OR owner_id <> ?1) THEN 1 ELSE 0 END`
+      )
+      .run(id).changes;
+  }
+
+  /** Запомнить номер аккаунта по логину — чтобы при следующем входе сразу. */
+  rememberLogin(login, ownerId) {
+    const key = String(login || '').trim().toLowerCase();
+    if (!key || !Number.isInteger(ownerId)) return;
+    this.setMeta(`login:${key}`, ownerId);
+  }
+
+  /** Номер аккаунта по логину, если он уже приходил с сервера. */
+  ownerForLogin(login) {
+    const key = String(login || '').trim().toLowerCase();
+    if (!key) return null;
+    const raw = this.meta(`login:${key}`);
+    return raw === null ? null : Number(raw);
+  }
+
+  /**
+   * Можно ли отправить этот бой на сервер. Только записанный здесь и не
+   * гостевой: пришедший с сервера там уже лежит, а восстановленный из копии
+   * записан неизвестно под каким входом. Проверка — в базе, по самой записи,
+   * а не по тому, откуда позвали: обойти её другим путём нельзя.
+   */
+  uploadAllowed(id) {
+    const row = this.db.prepare('SELECT origin, trust FROM battles WHERE id = ?').get(id);
+    return !!row && row.origin === 'recorded' && row.trust !== 'guest';
+  }
+
+  // --- История с сервера ----------------------------------------------------
+
+  /**
+   * Есть ли уже этот бой здесь — для этого аккаунта или без хозяина.
+   * Совпадение по ключу сервера ИЛИ по времени начала: время начала сервер
+   * получил от программы как есть, до миллисекунды, и по нему находится бой,
+   * который ушёл на сервер, но ключ которого не успел вернуться (ответ
+   * потерялся). Два разных боя одного человека в одну миллисекунду не
+   * начинаются.
+   * @returns {{id: number, server_key: string|null, trust: string}|null}
+   */
+  findServerBattle(key, startedAt, ownerId) {
+    return (
+      this.db
+        .prepare(
+          `SELECT id, server_key, trust FROM battles
+            WHERE (owner_id IS NULL OR owner_id = ?)
+              AND ((? IS NOT NULL AND server_key = ?) OR started_at = ?)
+            ORDER BY (server_key = ?) DESC
+            LIMIT 1`
+        )
+        .get(ownerId ?? null, key ?? null, key ?? null, startedAt, key ?? null) || null
+    );
+  }
+
+  /**
+   * Вписывает страницу боёв с сервера (GET /v1/battles/mine). Уже известные
+   * пропускаются; новые пишутся с origin='server', хозяином ownerId и
+   * отметкой доверия сервера. На сервер такие бои не уходят никогда — см.
+   * uploadAllowed и sync.js.
+   *
+   * @param {Array<object>} battles - как отдаёт сервер
+   * @param {number} ownerId - номер аккаунта из того же ответа
+   * @returns {{inserted: number, known: number, invalid: number}}
+   */
+  mergeServerBattles(battles, ownerId) {
+    const out = { inserted: 0, known: 0, invalid: 0 };
+    if (!Array.isArray(battles) || !battles.length) return out;
+    if (!Number.isInteger(ownerId)) throw new Error('у истории с сервера нет номера аккаунта');
+    const viewer = this.viewer();
+    const hidden = viewer === ownerId ? 0 : 1;
+
+    const insBattle = this.db.prepare(
+      `INSERT INTO battles (started_at, ended_at, duration, my_kills, my_deaths, my_assists,
+                            my_vehicles, players_seen, result, tz_offset, cancelled, cancel_reason,
+                            trust, server_key, origin, owner_id, hidden)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'server', ?, ?)`
+    );
+    // Порядок боёв с сервера произвольный, поэтому «впервые видели» и
+    // «последний раз» — по минимуму и максимуму, а не «последний записанный».
+    const upsertPlayer = this.db.prepare(
+      `INSERT INTO players (nick, first_seen, last_seen) VALUES (?, ?, ?)
+       ON CONFLICT(nick) DO UPDATE SET first_seen = MIN(first_seen, excluded.first_seen),
+                                       last_seen  = MAX(last_seen, excluded.last_seen)`
+    );
+    const findPlayer = this.db.prepare('SELECT id FROM players WHERE nick = ?');
+    const insBp = this.db.prepare(
+      `INSERT OR IGNORE INTO battle_players (battle_id, player_id, team, kills, deaths, assists, vehicles, left_battle)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const insSortie = this.db.prepare(
+      `INSERT OR IGNORE INTO sorties (battle_id, player_id, seq, vehicle, kills, destroyed)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    const heal = this.db.prepare(
+      `UPDATE battles SET server_key = ?, trust = ?
+        WHERE id = ? AND server_key IS NULL AND origin = 'recorded' AND trust = 'local'`
+    );
+
+    const int = (v) => (Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : 0);
+    const RESULTS = new Set(['win', 'loss']);
+    const TRUSTS = new Set(['pending', 'alone', 'confirmed', 'disputed']);
+    const TEAMS = new Set(['ally', 'enemy']);
+
+    this.db.exec('BEGIN');
+    try {
+      for (const b of battles) {
+        const key = typeof b?.battle_key === 'string' && b.battle_key ? b.battle_key : null;
+        const start = Date.parse(b?.started_at);
+        const end = Date.parse(b?.ended_at);
+        if (!key || !Number.isFinite(start) || !Number.isFinite(end)) {
+          out.invalid += 1;
+          continue;
+        }
+        const trust = TRUSTS.has(b.trust) ? b.trust : 'pending';
+
+        const existing = this.findServerBattle(key, start, ownerId);
+        if (existing) {
+          // Бой ушёл на сервер, а ключ не вернулся (ответ потерялся по
+          // дороге): теперь ключ известен — приклеиваем, и сверка заработает.
+          if (!existing.server_key) heal.run(key, trust, existing.id);
+          out.known += 1;
+          continue;
+        }
+
+        const players = Array.isArray(b.players) ? b.players : [];
+        const battleId = insBattle.run(
+          start,
+          end,
+          int(b.duration_sec ?? Math.round((end - start) / 1000)),
+          int(b.my_kills),
+          int(b.my_deaths),
+          int(b.my_assists),
+          JSON.stringify(Array.isArray(b.my_vehicles) ? b.my_vehicles.map(String) : []),
+          int(b.players_seen ?? players.length),
+          RESULTS.has(b.result) ? b.result : 'unknown',
+          Number.isFinite(b.tz_offset) ? Math.trunc(b.tz_offset) : null,
+          b.cancelled ? 1 : 0,
+          b.cancelled ? (b.cancel_reason ?? null) : null,
+          trust,
+          key,
+          ownerId,
+          hidden
+        ).lastInsertRowid;
+
+        for (const p of players) {
+          const nick = typeof p?.nick === 'string' ? p.nick.trim() : '';
+          if (!nick) continue;
+          upsertPlayer.run(nick, start, end);
+          const { id } = findPlayer.get(nick);
+          const sorties = (Array.isArray(p.sorties) ? p.sorties : []).filter(
+            (s) => typeof s?.vehicle === 'string' && s.vehicle
+          );
+          insBp.run(
+            battleId,
+            id,
+            TEAMS.has(p.team) ? p.team : 'unknown',
+            int(p.kills),
+            int(p.deaths),
+            int(p.assists),
+            JSON.stringify([...new Set(sorties.map((s) => s.vehicle))]),
+            p.left_battle ? 1 : 0
+          );
+          sorties.forEach((s, i) => {
+            insSortie.run(battleId, id, Number.isInteger(s.seq) ? s.seq : i, s.vehicle, int(s.kills), s.destroyed ? 1 : 0);
+          });
+        }
+        out.inserted += 1;
+      }
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
+    return out;
   }
 
   /**
@@ -808,7 +1065,7 @@ class Db {
          FROM battle_players bp
          JOIN players p ON p.id = bp.player_id
          JOIN battles b ON b.id = bp.battle_id
-         WHERE bp.team = ? AND b.started_at >= ? AND b.cancelled = 0
+         WHERE bp.team = ? AND b.started_at >= ? AND b.cancelled = 0 AND b.hidden = 0
            AND (? = '' OR (p.nick <> ? AND p.nick NOT LIKE ? ESCAPE '\\'))
          GROUP BY p.id
          HAVING battles >= ?
@@ -826,7 +1083,8 @@ class Db {
       .prepare(
         `SELECT b.id, b.started_at, bp.team, bp.kills, bp.deaths, bp.assists, bp.vehicles
          FROM battle_players bp JOIN battles b ON b.id = bp.battle_id
-         WHERE bp.player_id = ? AND b.cancelled = 0 ORDER BY b.started_at DESC LIMIT 200`
+         WHERE bp.player_id = ? AND b.cancelled = 0 AND b.hidden = 0
+         ORDER BY b.started_at DESC LIMIT 200`
       )
       .all(player.id)
       .map((r) => ({ ...r, vehicles: JSON.parse(r.vehicles || '[]') }));
@@ -849,7 +1107,7 @@ class Db {
          FROM battle_players bp
          JOIN players p ON p.id = bp.player_id
          JOIN battles b ON b.id = bp.battle_id
-         WHERE p.nick IN (${holes}) AND b.cancelled = 0
+         WHERE p.nick IN (${holes}) AND b.cancelled = 0 AND b.hidden = 0
          GROUP BY p.id`
       )
       .all(...list);
@@ -862,9 +1120,10 @@ class Db {
     // Любимая техника — та, на которой игрока видели в наибольшем числе вылетов.
     const favourites = this.db
       .prepare(
-        `SELECT player_id, vehicle, COUNT(*) AS n, SUM(kills) AS kills
-         FROM sorties WHERE player_id IN (${idHoles})
-         GROUP BY player_id, vehicle ORDER BY n DESC`
+        `SELECT s.player_id, s.vehicle, COUNT(*) AS n, SUM(s.kills) AS kills
+         FROM sorties s JOIN battles b ON b.id = s.battle_id
+         WHERE s.player_id IN (${idHoles}) AND b.hidden = 0
+         GROUP BY s.player_id, s.vehicle ORDER BY n DESC`
       )
       .all(...idList);
 
@@ -874,10 +1133,12 @@ class Db {
     if (me !== null) {
       duelRows = this.db
         .prepare(
-          `SELECT killer_id, victim_id, SUM(count) AS n FROM duels
-           WHERE (killer_id = ? AND victim_id IN (${idHoles}))
-              OR (victim_id = ? AND killer_id IN (${idHoles}))
-           GROUP BY killer_id, victim_id`
+          `SELECT d.killer_id, d.victim_id, SUM(d.count) AS n
+             FROM duels d JOIN battles b ON b.id = d.battle_id
+            WHERE b.hidden = 0
+              AND ((d.killer_id = ? AND d.victim_id IN (${idHoles}))
+                OR (d.victim_id = ? AND d.killer_id IN (${idHoles})))
+            GROUP BY d.killer_id, d.victim_id`
         )
         .all(me, ...idList, me, ...idList);
     }
@@ -923,7 +1184,7 @@ class Db {
                 SUM(CASE WHEN b.result = 'loss' THEN 1 ELSE 0 END) AS losses_battles,
                 MAX(b.started_at)    AS last_used
          FROM sorties s JOIN battles b ON b.id = s.battle_id
-         WHERE s.player_id = ? AND b.started_at >= ? AND b.cancelled = 0
+         WHERE s.player_id = ? AND b.started_at >= ? AND b.cancelled = 0 AND b.hidden = 0
          GROUP BY s.vehicle
          ORDER BY sorties DESC`
       )
@@ -940,7 +1201,7 @@ class Db {
          JOIN battle_players bp
            ON bp.battle_id = s.battle_id AND bp.player_id = s.player_id
          JOIN battles b ON b.id = s.battle_id
-         WHERE bp.team = 'enemy' AND b.started_at >= ? AND b.cancelled = 0
+         WHERE bp.team = 'enemy' AND b.started_at >= ? AND b.cancelled = 0 AND b.hidden = 0
          GROUP BY s.vehicle
          ORDER BY sorties DESC
          LIMIT ?`
@@ -965,7 +1226,7 @@ class Db {
                 COALESCE(SUM(my_deaths), 0)  AS deaths,
                 COALESCE(SUM(my_assists), 0) AS assists
          FROM battles
-         WHERE started_at >= ? AND (? = 0 OR started_at <= ?) AND cancelled = 0
+         WHERE started_at >= ? AND (? = 0 OR started_at <= ?) AND cancelled = 0 AND hidden = 0
          GROUP BY hour`
       )
       .all(from, to, to);
@@ -993,7 +1254,7 @@ class Db {
                 COALESCE(SUM(my_deaths), 0)  AS deaths,
                 COALESCE(SUM(my_assists), 0) AS assists
          FROM battles
-         WHERE started_at >= ? AND (? = 0 OR started_at <= ?) AND cancelled = 0
+         WHERE started_at >= ? AND (? = 0 OR started_at <= ?) AND cancelled = 0 AND hidden = 0
          GROUP BY day
          ORDER BY day`
       )
@@ -1019,7 +1280,7 @@ class Db {
     const all = this.db
       .prepare(
         `SELECT id, started_at, result FROM battles
-          WHERE cancelled = 0 AND started_at >= ?
+          WHERE cancelled = 0 AND hidden = 0 AND started_at >= ?
           ORDER BY started_at, id`
       )
       .all(from || 0);
@@ -1053,7 +1314,7 @@ class Db {
         `SELECT COUNT(*) AS total,
                 SUM(CASE WHEN result = 'win'  THEN 1 ELSE 0 END) AS wins,
                 SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) AS losses
-         FROM battles WHERE started_at >= ? AND cancelled = 0`
+         FROM battles WHERE started_at >= ? AND cancelled = 0 AND hidden = 0`
       )
       .get(since);
     const decided = (r.wins || 0) + (r.losses || 0);
@@ -1085,7 +1346,10 @@ class Db {
 
   stats() {
     const one = (sql) => this.db.prepare(sql).get();
-    const battles = one('SELECT COUNT(*) n FROM battles').n;
+    // battles — видимые сейчас; hidden — бои другого аккаунта, спрятанные до
+    // его возвращения (в файле они есть, на экране — нет).
+    const battles = one('SELECT COUNT(*) n FROM battles WHERE hidden = 0').n;
+    const hidden = one('SELECT COUNT(*) n FROM battles WHERE hidden <> 0').n;
     const players = one('SELECT COUNT(*) n FROM players').n;
     let size = 0;
     try {
@@ -1093,7 +1357,7 @@ class Db {
     } catch {
       // База может быть ещё не сброшена на диск — не страшно.
     }
-    return { battles, players, sizeBytes: size, file: this.file };
+    return { battles, hidden, players, sizeBytes: size, file: this.file };
   }
 
   /**

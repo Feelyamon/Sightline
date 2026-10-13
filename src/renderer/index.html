@@ -283,6 +283,11 @@
         <span id="battlesSummary"></span>
         <span class="muted" data-i18n="battles.clickHint"></span>
         <span class="muted" id="battlesTotal"></span>
+        <!-- История аккаунта с сервера: только после входа. Подтягивается и
+             сама после входа; кнопка — для тех, кто только что играл на
+             другом компьютере. -->
+        <button id="battlesPull" class="small" data-i18n="battles.pull" hidden></button>
+        <span class="muted small" id="battlesPullState"></span>
       </div>
       <div id="battlesBody"></div>
       <div class="buttons more">
@@ -402,6 +407,7 @@
       <div class="buttons">
         <button id="reveal" data-i18n="settings.reveal"></button>
         <button id="resetBattleBtn" data-i18n="settings.resetBattle"></button>
+        <button id="restoreOpen" data-i18n="restore.open"></button>
       </div>
 
       <div class="section-title" data-i18n="settings.danger"></div>
@@ -695,6 +701,21 @@
       <div class="buttons">
         <button id="delBattleGo" class="danger" data-i18n="delBattle.go"></button>
         <button id="delBattleCancel" data-i18n="delBattle.cancel"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Восстановление истории из резервных копий базы (1.0.4). Копии ищутся
+       рядом с базой; оригиналы не меняются — читаются их временные копии. -->
+  <div class="modal-backdrop" id="restoreModal" hidden>
+    <div class="modal wide">
+      <h2 data-i18n="restore.title"></h2>
+      <p class="muted" data-i18n="restore.lead"></p>
+      <div id="restoreList"></div>
+      <p class="muted small" id="restoreResult" hidden></p>
+      <div class="buttons">
+        <button id="restoreGo" data-i18n="restore.go" disabled></button>
+        <button id="restoreCancel" data-i18n="restore.close"></button>
       </div>
     </div>
   </div>

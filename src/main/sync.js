@@ -28,6 +28,12 @@ const path = require('node:path');
 //     приходит только накрутка, и сервер не должен видеть от честной
 //     программы того же, что от поддельной.
 //
+// С 1.0.4 бои бывают ещё и пришедшими с сервера (история аккаунта, см.
+// history-pull.js) и восстановленными из резервной копии (restore.js). Ни те,
+// ни другие сюда не попадают: очередь пополняет только запись боя на этой
+// машине, а enqueue вдобавок спрашивает у базы, можно ли отправлять именно эту
+// запись (Db.uploadAllowed).
+//
 // До 1.0.2 очередь была массивом [id, бой] без отметки сессии и после входа
 // отправлялась пачками по 50. Такая очередь при запуске выбрасывается: чья
 // это сессия, по ней уже не узнать.
@@ -181,6 +187,11 @@ class Sync {
   enqueue(localId, payload, recording) {
     if (typeof localId !== 'number' || !payload) return false;
     if (!canUpload(recording, { session: this.session, signedIn: this.account.isSignedIn })) {
+      return false;
+    }
+    // Вторая проверка — по самой записи в базе: бой, пришедший с сервера или
+    // восстановленный из копии, не уходит никогда, кто бы его ни подал сюда.
+    if (typeof this.db.uploadAllowed === 'function' && !this.db.uploadAllowed(localId)) {
       return false;
     }
     for (const [id, item] of this.queue) {

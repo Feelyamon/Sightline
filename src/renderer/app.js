@@ -690,7 +690,14 @@ function battleRow(b) {
   // читался бы как ещё одна степень подтверждения.
   if (b.trust === 'guest') {
     const badge = el('span', 'trust guest', t('battles.guestBadge'));
-    badge.title = t('trust.guest');
+    badge.title = t(b.origin === 'backup' ? 'trust.backup' : 'trust.guest');
+    when.append(badge);
+  }
+  // Бой из истории аккаунта на сервере, а не записанный на этом компьютере.
+  // Наград и личных счётов у такого боя нет: сервер их не хранит.
+  if (b.origin === 'server') {
+    const badge = el('span', 'trust server', t('battles.serverBadge'));
+    badge.title = t('trust.server');
     when.append(badge);
   }
 
@@ -2053,6 +2060,9 @@ $('whoAmI').addEventListener('click', () => {
 async function refreshAccount() {
   const state = await window.wt.account.state();
   renderWhoAmI(state);
+  // Подтянуть историю с сервера можно только под входом.
+  $('battlesPull').hidden = !state.signedIn;
+  if (!state.signedIn) $('battlesPullState').textContent = '';
   applyVersion(state.version);
   accountLogin = state.login;
   renderSquad();
@@ -3126,6 +3136,94 @@ $('uiScale').addEventListener('change', async (e) => {
   if ($('panel-counters').classList.contains('active')) refreshCharts();
 });
 $('reveal').addEventListener('click', () => window.wt.db.reveal());
+
+// --- История с сервера ----------------------------------------------------
+
+$('battlesPull').addEventListener('click', async () => {
+  const button = $('battlesPull');
+  const state = $('battlesPullState');
+  button.disabled = true;
+  state.textContent = t('battles.pulling');
+  try {
+    const r = await window.wt.history.pull();
+    if (r?.skipped) state.textContent = '';
+    else if (r.inserted) state.textContent = t('battles.pulled', { n: r.inserted });
+    else state.textContent = t('battles.pulledNothing');
+  } catch (e) {
+    state.textContent = e?.offline ? t('acc.offline') : e?.message || String(e);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+// --- Восстановление из резервных копий ------------------------------------
+
+/** Одна копия в списке: галочка, дата, сколько боёв и что не прочиталось. */
+function restoreItem(item) {
+  const row = el('label', 'restore-item');
+  const box = el('input');
+  box.type = 'checkbox';
+  box.value = item.file;
+  // Брать нечего — и выбирать нечего: галочка у такой копии не ставится.
+  box.disabled = !item.newBattles;
+  box.addEventListener('change', updateRestoreButton);
+
+  const text = el('span', 'restore-text');
+  const kind = t(item.kind === 'corrupt' ? 'restore.kindCorrupt' : 'restore.kindBackup');
+  text.append(el('b', null, dateText(item.madeAt) + ' · ' + kind));
+  let counts = t('restore.counts', { battles: item.battles, fresh: item.newBattles });
+  if (item.firstAt) {
+    counts += ' · ' + t('restore.range', { from: dateText(item.firstAt), to: dateText(item.lastAt) });
+  }
+  text.append(el('span', 'muted', counts));
+  if (item.unreadable && item.unreadable.length) {
+    text.append(el('span', 'restore-warn', t('restore.unreadable', { tables: item.unreadable.join(', ') })));
+  } else if (item.error) {
+    text.append(el('span', 'restore-warn', t('restore.damaged')));
+  }
+  text.append(el('span', 'muted small', item.name));
+  row.append(box, text);
+  return row;
+}
+
+function updateRestoreButton() {
+  $('restoreGo').disabled = !$('restoreList').querySelector('input:checked');
+}
+
+$('restoreOpen').addEventListener('click', async () => {
+  const list = $('restoreList');
+  list.replaceChildren(el('div', 'muted', t('restore.searching')));
+  $('restoreResult').hidden = true;
+  $('restoreGo').disabled = true;
+  $('restoreModal').hidden = false;
+  const items = await window.wt.restore.list();
+  list.replaceChildren(
+    ...(items.length ? items.map(restoreItem) : [el('div', 'empty', t('restore.none'))])
+  );
+});
+
+$('restoreGo').addEventListener('click', async () => {
+  const files = [...$('restoreList').querySelectorAll('input:checked')].map((i) => i.value);
+  if (!files.length) return;
+  $('restoreGo').disabled = true;
+  const { results } = await window.wt.restore.import(files);
+  const imported = results.reduce((n, r) => n + (r.imported || 0), 0);
+  const failed = results.filter((r) => r.error);
+  let text = t('restore.done', { n: imported });
+  if (failed.length) text += ' ' + t('restore.failed', { files: failed.map((r) => r.name).join(', ') });
+  const box = $('restoreResult');
+  box.textContent = text;
+  box.hidden = false;
+  // Перенесённое больше не новое — пересобираем список, чтобы это было видно.
+  const items = await window.wt.restore.list();
+  $('restoreList').replaceChildren(...items.map(restoreItem));
+  refreshDbStats();
+});
+
+$('restoreCancel').addEventListener('click', () => {
+  $('restoreModal').hidden = true;
+  window.wt.restore.close();
+});
 $('resetBattleBtn').addEventListener('click', () => window.wt.resetBattle());
 
 // --- Подтверждение опасных действий -------------------------------------

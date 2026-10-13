@@ -286,3 +286,37 @@ test('награды со степенями доезжают до базы и �
   assert.deepEqual(me.awards, [{ name: 'Тактик', count: 1, tier: 2 }]);
   db.close();
 });
+
+test('миграция 6: старые бои — записанные здесь, без хозяина и видимые', () => {
+  const dir = tmpDir();
+  const file = path.join(dir, 'battles.db');
+  const db = new Db(dir);
+  db.db.prepare(
+    "INSERT INTO battles (started_at, ended_at, duration, trust) VALUES (1, 2, 1, 'pending')"
+  ).run();
+  // Откатываем до схемы 1.0.3: колонок 1.0.4 нет, номер схемы — 5.
+  db.db.exec('DROP INDEX IF EXISTS idx_battles_server_key');
+  db.db.exec('ALTER TABLE battles DROP COLUMN origin');
+  db.db.exec('ALTER TABLE battles DROP COLUMN owner_id');
+  db.db.exec('ALTER TABLE battles DROP COLUMN hidden');
+  db.db.exec('DROP TABLE app_meta');
+  db.db.exec('PRAGMA user_version = 5');
+  db.close();
+
+  const again = new Db(dir);
+  assert.equal(again.migration.from, 5);
+  assert.equal(again.migration.to, LATEST);
+  const row = again.db.prepare('SELECT origin, owner_id, hidden FROM battles').get();
+  assert.deepEqual({ ...row }, { origin: 'recorded', owner_id: null, hidden: 0 });
+  assert.equal(again.stats().battles, 1);
+  assert.equal(again.viewer(), null);
+  again.close();
+  assert.ok(fs.existsSync(file));
+
+  // Повторный прогон шага на уже доведённой базе ничего не ломает.
+  const raw = new DatabaseSync(file);
+  raw.exec('PRAGMA user_version = 5');
+  const result = migrate(raw);
+  assert.equal(result.to, LATEST);
+  raw.close();
+});
