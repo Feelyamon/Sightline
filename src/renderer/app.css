@@ -1233,53 +1233,6 @@ textarea:focus {
   box-shadow: 0 0 0 2px rgba(110, 168, 254, .2);
 }
 
-/* --- Админка --- */
-.admin-user {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-  background: var(--panel);
-}
-/* Закрытое сообщение приглушено, но остаётся читаемым: его перечитывают,
-   когда та же проблема приходит второй раз. */
-.admin-user.resolved { opacity: .6; }
-.admin-user-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.admin-login { font-weight: 600; }
-.admin-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-
-/* Результат действия — строка, которую можно выделить мышью: код
-   восстановления показывается один раз, и «скопировать из всплывашки» тут
-   не годится. */
-.admin-result {
-  margin-top: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  font-size: 12px;
-  -webkit-user-select: text;
-  user-select: text;
-}
-
-.admin-ask { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.admin-ask input { flex: 1; min-width: 160px; }
-
-/* Текст сообщения как есть, с переносами: люди присылают шаги списком, и
-   склеивать их в абзац — терять смысл. */
-.admin-report-text {
-  margin: 8px 0 0;
-  padding: 8px;
-  border-radius: 6px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  white-space: pre-wrap;
-  word-break: break-word;
-  font: inherit;
-  -webkit-user-select: text;
-  user-select: text;
-}
-
 /* Ник пользователя программы подчёркнут. Пунктиром и приглушённо: в таблице
    боя и так есть отметка отряда, метка досье и рамка «Око за око» — четвёртое
    яркое украшение превратило бы строку в ёлку. */

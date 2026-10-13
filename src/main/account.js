@@ -90,6 +90,26 @@ function qrMatrix(text) {
   return rows;
 }
 
+/**
+ * Ведёт ли маршрут в административные методы сервера (/v1/admin, /v1/admin/…).
+ *
+ * По адресу, который получится на деле, а не по началу строки: «/x/../admin»
+ * URL сам превратит в «/admin», и проверка по строке его бы пропустила.
+ */
+function isAdminRoute(baseUrl, route) {
+  let base;
+  let target;
+  try {
+    base = new URL(baseUrl).pathname.replace(/\/+$/, '');
+    target = new URL(`${baseUrl}${route}`).pathname;
+  } catch {
+    return false;
+  }
+  const admin = `${base}/admin`.toLowerCase();
+  const where = target.toLowerCase();
+  return where === admin || where.startsWith(`${admin}/`);
+}
+
 class Account {
   /**
    * @param {string} userDataDir
@@ -200,6 +220,16 @@ class Account {
    * @param {boolean} [opts.auth] - приложить токен
    */
   async request(route, { method = 'GET', body, raw, contentType, auth = false } = {}) {
+    // Администрирование — только в панели администрации (с 1.0.3): в
+    // программе его нет, а сервис учёток токен программы к /admin/* больше не
+    // пускает (admin_only_in_panel). Отказываем здесь же, до сети: запрос,
+    // который заведомо получит 403, не должен даже уходить, а случайно
+    // вернувшийся вызов должен падать громко, а не тихо.
+    if (isAdminRoute(this.baseUrl, route)) {
+      const err = new Error('администрирование — только в панели администрации');
+      err.code = 'admin_only_in_panel';
+      throw err;
+    }
     const headers = {
       'Content-Type': raw ? contentType || 'application/octet-stream' : 'application/json',
       [VERSION_HEADER]: APP_VERSION,
@@ -638,5 +668,6 @@ module.exports = {
   compareVersions,
   normalizeTotpCode,
   qrMatrix,
+  isAdminRoute,
   APP_VERSION,
 };

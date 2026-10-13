@@ -1,7 +1,7 @@
 {
   "name": "sightline",
   "productName": "Sightline",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Companion-приложение для War Thunder: разбор кил-фида, статистика боёв и игроков. Использует официальный локальный API игры (127.0.0.1:8111). Не аффилировано с Gaijin Entertainment.",
   "main": "src/main/index.js",
   "scripts": {

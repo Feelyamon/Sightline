@@ -49,11 +49,6 @@
     <symbol id="i-about" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.4v.2" />
     </symbol>
-    <!-- Щит: раздел администратора. -->
-    <symbol id="i-admin" viewBox="0 0 24 24">
-      <path d="M12 3l7 3v5.5c0 4.2-2.8 7.6-7 9.5-4.2-1.9-7-5.3-7-9.5V6z" />
-      <path d="M9 12l2.2 2.2L15.5 10" />
-    </symbol>
     <!-- Жучок: сообщить о проблеме. -->
     <symbol id="i-report" viewBox="0 0 24 24">
       <rect x="7.5" y="8" width="9" height="11" rx="4.5" />
@@ -158,12 +153,6 @@
       <button class="tab" data-tab="about" data-i18n-title="tab.about">
         <svg class="tab-icon"><use href="#i-about" /></svg>
         <span class="tab-label" data-i18n="tab.about"></span>
-      </button>
-      <!-- Виден только администратору. Прятать кнопку — не защита (она на
-           сервере, по типу аргумента), но показывать её всем незачем. -->
-      <button class="tab" data-tab="admin" id="tabAdmin" hidden data-i18n-title="tab.admin">
-        <svg class="tab-icon"><use href="#i-admin" /></svg>
-        <span class="tab-label" data-i18n="tab.admin"></span>
       </button>
       <button class="tab-report" id="reportBtn" data-i18n-title="report.open">
         <svg class="tab-icon"><use href="#i-report" /></svg>
@@ -587,63 +576,6 @@
         </div>
 
       </div>
-    </section>
-
-    <!-- Администрирование. Доступ проверяет сервер; здесь только интерфейс. -->
-    <section class="panel" id="panel-admin">
-      <div class="controls">
-        <label class="row grow">
-          <span class="muted" data-i18n="admin.find"></span>
-          <input type="search" id="adminQuery" data-i18n-placeholder="admin.findPlaceholder"
-                 autocomplete="off" />
-        </label>
-        <button id="adminSearch" data-i18n="admin.search"></button>
-      </div>
-      <div class="auth-error" id="adminError" hidden></div>
-      <div id="adminUsers"></div>
-
-      <div class="section-title" data-i18n="admin.reports"></div>
-      <div class="controls">
-        <label class="row">
-          <span class="muted" data-i18n="admin.reportsScope"></span>
-          <span class="sel"><select id="adminReportTag">
-            <option value="" data-i18n="admin.anyTag"></option>
-            <option value="killfeed" data-i18n="report.tag.killfeed"></option>
-            <option value="teams" data-i18n="report.tag.teams"></option>
-            <option value="kda" data-i18n="report.tag.kda"></option>
-            <option value="crash" data-i18n="report.tag.crash"></option>
-            <option value="no-game" data-i18n="report.tag.noGame"></option>
-            <option value="stats" data-i18n="report.tag.stats"></option>
-            <option value="ui" data-i18n="report.tag.ui"></option>
-            <option value="account" data-i18n="report.tag.account"></option>
-            <option value="sync" data-i18n="report.tag.sync"></option>
-            <option value="idea" data-i18n="report.tag.idea"></option>
-            <option value="false-flag" data-i18n="report.tag.falseFlag"></option>
-            <option value="player" data-i18n="admin.tag.player"></option>
-            <option value="other" data-i18n="report.tag.other"></option>
-          </select></span>
-          <span class="sel"><select id="adminReportScope">
-            <option value="open" data-i18n="admin.reportsOpen"></option>
-            <option value="all" data-i18n="admin.reportsAll"></option>
-          </select></span>
-        </label>
-        <button id="adminReportsRefresh" data-i18n="admin.refresh"></button>
-      </div>
-      <div id="adminReports"></div>
-
-      <div class="section-title" data-i18n="admin.vehicles"></div>
-      <p class="muted small" data-i18n="admin.vehiclesHint"></p>
-      <div class="controls">
-        <button id="adminVehiclesRefresh" data-i18n="admin.refresh"></button>
-      </div>
-      <div id="adminVehicles"></div>
-
-      <div class="section-title" data-i18n="admin.log"></div>
-      <p class="muted small" data-i18n="admin.logHint"></p>
-      <div class="controls">
-        <button id="adminLogRefresh" data-i18n="admin.refresh"></button>
-      </div>
-      <div id="adminLog"></div>
     </section>
 
     <!-- Инструкция: длинный текст, поэтому разделы генерируются из словаря -->

@@ -382,45 +382,6 @@ window.wt = {
     }),
   },
 
-  admin: {
-    findUsers: async () => [
-      { id: 1, login: 'Username', role: 'admin', blocked: false, created_at: new Date().toISOString() },
-      { id: 7, login: 'Narushitel', role: 'user', blocked: true, created_at: new Date().toISOString() },
-    ],
-    newRecoveryCode: async () => ({ recovery_code: 'ABCD-EFGH-JKMN-PQRS' }),
-    setPassword: async () => ({ recovery_code: 'WXYZ-2345-6789-ABCD' }),
-    block: async () => ({ ok: true }),
-    setRole: async () => ({ ok: true }),
-    clearAvatar: async () => ({ ok: true }),
-    vehicles: async () => [
-      { folded: 't80bvm', spellings: ['Т-80БВМ', 'T-80BVM'], sorties: 214, canonical: null },
-      { folded: 'pantera', spellings: ['Пантера'], sorties: 38, canonical: null },
-      { folded: 'panther', spellings: ['Panther'], sorties: 31, canonical: null },
-    ],
-    setVehicleAlias: async () => ({ ok: true }),
-    log: async () => [
-      { id: 2, admin_login: 'Username', action: 'block', target_login: 'Narushitel', details: { reason: 'оскорбления в чате' }, at: new Date().toISOString() },
-      { id: 1, admin_login: 'Username', action: 'set_password', target_login: 'Zabyvchivyi', details: {}, at: new Date(Date.now() - 36e5).toISOString() },
-    ],
-    reports: async () => [
-      {
-        id: 3,
-        login: 'Username',
-        kind: 'bug',
-        // С переносами намеренно: люди присылают шаги списком, и стенд должен
-        // показывать, как такое сообщение выглядит в разборе.
-        message: 'Таблица боя пустеет после респавна.\n1. Выехал\n2. Сгорел\n3. Выбрал технику заново',
-        app_version: '0.3.0',
-        os_version: 'win32 10.0.26200',
-        created_at: new Date().toISOString(),
-        resolved: false,
-        admin_note: null,
-      },
-      { id: 2, login: null, kind: 'idea', message: 'Хочу видеть свой средний КДА за последние двадцать боёв прямо в шапке.', app_version: '0.2.0', os_version: 'win32 10.0.22631', created_at: new Date(Date.now() - 864e5).toISOString(), resolved: true, admin_note: 'Сделано в 0.3.0' },
-    ],
-    resolveReport: async () => ({ ok: true }),
-  },
-
   onUpdate: () => () => {},
   onDbChanged: () => () => {},
   onError: () => () => {},

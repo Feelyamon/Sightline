@@ -87,21 +87,6 @@ contextBridge.exposeInMainWorld('wt', {
     mine: () => invoke('support:mine'),
   },
 
-  admin: {
-    findUsers: (query) => invoke('admin:findUsers', query),
-    newRecoveryCode: (id, confirm) => invoke('admin:newRecoveryCode', id, confirm),
-    setPassword: (id, password, confirm) => invoke('admin:setPassword', id, password, confirm),
-    block: (id, blocked, reason, confirm) => invoke('admin:block', id, blocked, reason, confirm),
-    setRole: (id, role, confirm) => invoke('admin:setRole', id, role, confirm),
-    log: () => invoke('admin:log'),
-    vehicles: () => invoke('admin:vehicles'),
-    setVehicleAlias: (alias, canonical) => invoke('admin:setVehicleAlias', alias, canonical),
-    clearAvatar: (id) => invoke('admin:clearAvatar', id),
-    unbanAvatar: (id) => invoke('admin:unbanAvatar', id),
-    reports: (scope, tag) => invoke('admin:reports', scope, tag),
-    resolveReport: (id, resolved, note) => invoke('admin:resolveReport', id, resolved, note),
-  },
-
   friends: {
     state: () => invoke('friends:state'),
     refresh: () => invoke('friends:refresh'),
