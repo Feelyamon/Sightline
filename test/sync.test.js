@@ -427,3 +427,68 @@ test('в отправку идут только факты боя, без агр
   assert.equal(p.players[1].left_battle, true);
   for (const k of ['winrate', 'total_battles', 'kda']) assert.ok(!(k in p));
 });
+
+// --- Окончательный отказ сервера не должен запирать очередь ----------------
+
+const { isPermanentRejection } = require('../src/main/sync');
+
+test('isPermanentRejection: 4xx — окончательно, кроме 401/408/426/429', () => {
+  for (const s of [400, 403, 404, 409, 413, 415, 422]) assert.equal(isPermanentRejection(s), true, String(s));
+  for (const s of [401, 408, 426, 429, 500, 502, 503, undefined, null, 0, 200]) {
+    assert.equal(isPermanentRejection(s), false, String(s));
+  }
+});
+
+for (const status of [400, 403, 413, 422]) {
+  test(`окончательный отказ ${status} убирает отправленный бой, следующий уходит`, async () => {
+    const env = setup({ signedIn: true });
+    env.sync.beginSession();
+    env.account.fail = Object.assign(new Error('плохой бой'), { status });
+    env.sync.enqueue(1, payload(), env.sync.recording());
+    await settle();
+    assert.equal(env.sync.queue.size, 0, 'отвергнутый бой не остаётся первым навсегда');
+    env.account.fail = null;
+    env.sync.enqueue(2, payload(), env.sync.recording());
+    await settle();
+    assert.equal(env.account.posts.length, 1, 'следующий бой ушёл');
+    assert.equal(env.sync.queue.size, 0);
+  });
+}
+
+for (const status of [401, 408, 429, 500, 502, 503]) {
+  test(`временный отказ ${status} бой не теряет`, async () => {
+    const env = setup({ signedIn: true });
+    env.sync.beginSession();
+    env.account.fail = Object.assign(new Error('позже'), { status });
+    env.sync.enqueue(1, payload(), env.sync.recording());
+    await settle();
+    assert.equal(env.sync.queue.size, 1, 'бой ждёт следующей попытки');
+  });
+}
+
+test('отказ без статуса (нет сети) бой не теряет', async () => {
+  const env = setup({ signedIn: true });
+  env.sync.beginSession();
+  env.account.fail = Object.assign(new Error('нет сети'), { offline: true });
+  env.sync.enqueue(1, payload(), env.sync.recording());
+  await settle();
+  assert.equal(env.sync.queue.size, 1);
+});
+
+test('бой, вставший в очередь во время отвергнутого запроса, не удаляется', async () => {
+  const env = setup({ signedIn: true });
+  env.sync.beginSession();
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  env.account.request = async (route) => {
+    if (route !== '/battles') return [];
+    await gate;
+    throw Object.assign(new Error('плохой бой'), { status: 400 });
+  };
+  env.sync.enqueue(1, payload(), env.sync.recording()); // уходит и «висит»
+  await new Promise((r) => setImmediate(r));
+  env.sync.enqueue(2, payload(), env.sync.recording()); // встал, пока первый в пути
+  release();
+  await settle();
+  assert.deepEqual([...env.sync.queue.keys()], [2], 'остался только новый, ещё не отправленный бой');
+});

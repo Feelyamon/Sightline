@@ -62,6 +62,12 @@ function canUpload(recording, now) {
   return !!(recording?.session && now?.signedIn && now.session === recording.session);
 }
 
+/** Отказ, который повтором не исправить: 4xx, кроме 401/408/426/429. */
+function isPermanentRejection(status) {
+  return Number.isInteger(status) && status >= 400 && status < 500
+    && ![401, 408, 426, 429].includes(status);
+}
+
 class Sync {
   /**
    * @param {string} userDataDir
@@ -204,12 +210,17 @@ class Sync {
       return this.state();
     }
     this.sending = true;
+    // Что именно ушло этим запросом — для окончательного отказа ниже. Не
+    // пересчитываем в catch: за время запроса в очередь мог встать новый бой,
+    // который ещё никуда не отправлялся.
+    let sentIds = [];
     try {
       const session = this.session;
       const chunk = [...this.queue]
         .filter(([, item]) => item.session === session)
         .slice(0, PER_REQUEST);
       if (!chunk.length) return this.state();
+      sentIds = chunk.map(([id]) => id);
       const answer = await this.account.request('/battles', {
         method: 'POST',
         body: chunk.map(([, item]) => item.payload),
@@ -238,10 +249,18 @@ class Sync {
       await this.refreshTrust();
     } catch (e) {
       this.lastError = e.message;
-      // Сеть пропала или сервер отказал — очередь остаётся, попробуем позже.
-      // Кроме одного случая: если сборка устарела, повторять бессмысленно —
-      // сервер будет отказывать, пока человек не обновится.
+      // Сеть пропала или сервер временно отказал — очередь остаётся, попробуем
+      // позже. Если сборка устарела, повторять бессмысленно — сервер будет
+      // отказывать, пока человек не обновится.
       if (e.status === 426) this.stop();
+      // Окончательный отказ (4xx, кроме «войдите заново», «не дождались»,
+      // «обновитесь» и «слишком часто») — этот бой сервер не примет никогда.
+      // Оставь его в очереди — и он навсегда встанет первым и не пропустит
+      // за собой ни одного следующего. Убираем отправленные, остальные пойдут.
+      else if (isPermanentRejection(e.status)) {
+        for (const id of sentIds) this.queue.delete(id);
+        this.save();
+      }
     } finally {
       this.sending = false;
     }
@@ -333,4 +352,5 @@ function battlePayload(snapshot, opts) {
   };
 }
 
-module.exports = { Sync, battlePayload, canUpload, PER_REQUEST, FLUSH_MS, MAX_QUEUE };
+module.exports = {
+  isPermanentRejection, Sync, battlePayload, canUpload, PER_REQUEST, FLUSH_MS, MAX_QUEUE };
