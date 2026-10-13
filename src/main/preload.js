@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('wt', {
     notifications: () => invoke('account:notifications'),
     readNotifications: (id) => invoke('account:readNotifications', id),
     saveRecoveryCode: (code) => invoke('account:saveRecoveryCode', code),
+    guestNotice: () => invoke('account:guestNotice'),
   },
 
   profile: {
@@ -180,6 +181,13 @@ contextBridge.exposeInMainWorld('wt', {
     const handler = (_e, tried) => cb(tried);
     ipcRenderer.on('account:proofProgress', handler);
     return () => ipcRenderer.off('account:proofProgress', handler);
+  },
+  // Вход закончился не по кнопке в окне (сервер закрыл сессию): окну надо
+  // перерисовать аккаунт и, возможно, показать предупреждение о гостевом режиме.
+  onSignedOut: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on('account:signedOut', handler);
+    return () => ipcRenderer.off('account:signedOut', handler);
   },
   onError: (cb) => {
     const handler = (_e, message) => cb(message);

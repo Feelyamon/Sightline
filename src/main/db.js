@@ -110,10 +110,80 @@ function windowStart(name, now = Date.now()) {
   }
 }
 
+// Коды SQLite, означающие «файл испорчен», а не «занят» или «нет места».
+// SQLITE_CORRUPT = 11, SQLITE_NOTADB = 26.
+const CORRUPT_CODES = new Set([11, 26]);
+
+/** Испорчена ли база — по ошибке, которую бросил node:sqlite. */
+function isCorruption(e) {
+  if (CORRUPT_CODES.has(e?.errcode)) return true;
+  return /malformed|not a database|file is encrypted/i.test(String(e?.message || ''));
+}
+
+// Таблицы в порядке, при котором ссылки не повисают: сначала то, на что
+// ссылаются.
+const SALVAGE_TABLES = [
+  'players',
+  'battles',
+  'battle_players',
+  'sorties',
+  'duels',
+  'awards',
+  'player_notes',
+  'counters',
+];
+
 class Db {
   constructor(userDataDir, { file = 'battles.db' } = {}) {
     this.file = path.join(userDataDir, file);
     fs.mkdirSync(userDataDir, { recursive: true });
+    /**
+     * Что случилось при открытии, если база оказалась испорчена:
+     * { corruptFile, salvaged: {таблица: строк}, error }. null — всё в порядке.
+     * Окно показывает это человеку: молча начать с пустой историей значило бы
+     * получить жалобу «пропала вся статистика» без единой зацепки.
+     */
+    this.recovery = null;
+    this.open();
+  }
+
+  /**
+   * Открывает базу. Испорченную — НЕ удаляет и не перезаписывает: файл (вместе
+   * с -wal и -shm) откладывается рядом под именем .corrupt-<время>, а в новую
+   * базу переносится всё, что из старой ещё читается.
+   *
+   * Раньше испорченная база роняла программу на запуске, и единственным
+   * «лечением», которое оставалось человеку, было удалить файл — вместе с тем,
+   * что ещё можно было спасти.
+   */
+  open() {
+    try {
+      this.init();
+      // Быстрая проверка целостности. Стоит миллисекунды на базе в несколько
+      // мегабайт, а находит порчу до того, как её найдёт запрос посреди боя.
+      const check = this.db.prepare('PRAGMA quick_check').get();
+      const verdict = check && Object.values(check)[0];
+      if (verdict !== 'ok') {
+        throw Object.assign(new Error(`quick_check: ${verdict}`), { errcode: 11 });
+      }
+    } catch (e) {
+      if (!isCorruption(e)) throw e;
+      try {
+        this.db?.close();
+      } catch {
+        // Закрыть испорченную базу удаётся не всегда — неважно, файл всё равно
+        // откладывается ниже.
+      }
+      const corruptFile = this.setAside();
+      this.init();
+      const salvaged = this.salvage(corruptFile);
+      this.recovery = { corruptFile, salvaged, error: e.message };
+      console.error(`база боёв испорчена (${e.message}), отложена в ${corruptFile}`);
+    }
+  }
+
+  /** Открыть файл, создать схему, довести миграциями. */
+  init() {
     this.db = new DatabaseSync(this.file);
     this.db.exec(SCHEMA);
 
@@ -174,6 +244,76 @@ class Db {
     for (const name of COUNTERS) ins.run(name, now);
   }
 
+  /**
+   * Откладывает испорченную базу в сторону, ничего не удаляя.
+   * @returns {string} путь, под которым она теперь лежит
+   */
+  setAside() {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const target = `${this.file}.corrupt-${stamp}`;
+    // -wal и -shm переезжают вместе с файлом и под тем же именем: без журнала
+    // главный файл — это база на момент последней контрольной точки, а всё
+    // свежее лежит как раз в журнале.
+    for (const suffix of ['', '-wal', '-shm']) {
+      if (fs.existsSync(this.file + suffix)) fs.renameSync(this.file + suffix, target + suffix);
+    }
+    return target;
+  }
+
+  /**
+   * Переносит из отложенной базы всё, что читается. По строке: испорченная
+   * страница обрывает чтение таблицы, но прочитанное до неё остаётся.
+   * Колонки берутся общие для старой и новой схемы — отложенная база могла
+   * быть от старой версии программы.
+   * @returns {Object<string, number>} сколько строк перенесено, по таблицам
+   */
+  salvage(corruptFile) {
+    const result = {};
+    let old;
+    try {
+      old = new DatabaseSync(corruptFile, { readOnly: true });
+    } catch {
+      return result;
+    }
+    // Ссылки здесь не проверяем: строка участника может прочитаться, а игрок,
+    // на которого она ссылается, — оказаться на испорченной странице. Лучше
+    // сохранить такую строку, чем потерять её из-за соседней.
+    this.db.exec('PRAGMA foreign_keys = OFF');
+    try {
+      for (const table of SALVAGE_TABLES) {
+        let moved = 0;
+        try {
+          const mine = this.db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+          const theirs = new Set(
+            old.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name)
+          );
+          const cols = mine.filter((c) => theirs.has(c));
+          if (!cols.length) continue;
+          const list = cols.join(', ');
+          const insert = this.db.prepare(
+            `INSERT OR REPLACE INTO ${table} (${list}) VALUES (${cols.map(() => '?').join(', ')})`
+          );
+          for (const row of old.prepare(`SELECT ${list} FROM ${table}`).iterate()) {
+            insert.run(...cols.map((c) => row[c]));
+            moved += 1;
+          }
+        } catch {
+          // Таблица оборвалась на испорченной странице — берём, что успели.
+        } finally {
+          result[table] = moved;
+        }
+      }
+    } finally {
+      this.db.exec('PRAGMA foreign_keys = ON');
+      try {
+        old.close();
+      } catch {
+        // Отложенный файл остаётся на диске как есть.
+      }
+    }
+    return result;
+  }
+
   lastBattleId() {
     return this.db.prepare('SELECT COALESCE(MAX(id), 0) id FROM battles').get().id;
   }
@@ -214,7 +354,10 @@ class Db {
    * Пишет завершённый бой. Возвращает id или null, если писать нечего.
    * @param {object} snapshot - снапшот BattleState
    */
-  saveBattle(snapshot, { startedAt, endedAt, result = 'unknown', cancelReason = null } = {}) {
+  saveBattle(
+    snapshot,
+    { startedAt, endedAt, result = 'unknown', cancelReason = null, guest = false } = {}
+  ) {
     const players = snapshot.players || [];
     if (!players.length) return null;
 
@@ -226,8 +369,8 @@ class Db {
     const tx = () => {
       const battleId = this.db
         .prepare(
-          `INSERT INTO battles (started_at, ended_at, duration, my_kills, my_deaths, my_assists, my_vehicles, players_seen, result, tz_offset, cancelled, cancel_reason)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO battles (started_at, ended_at, duration, my_kills, my_deaths, my_assists, my_vehicles, players_seen, result, tz_offset, cancelled, cancel_reason, trust)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           start,
@@ -244,7 +387,12 @@ class Db {
           // а человек ожидает +180, поэтому переворачиваем здесь, один раз.
           -new Date(start).getTimezoneOffset(),
           cancelReason ? 1 : 0,
-          cancelReason
+          cancelReason,
+          // 'guest' — бой записан без входа и навсегда остаётся только здесь:
+          // на сервер он не отправляется (см. sync.js), и ключ сервера к нему
+          // не приклеится (см. setBattleKey). 'local' — обычный бой, ещё не
+          // отправленный.
+          guest ? 'guest' : 'local'
         ).lastInsertRowid;
 
       const upsertPlayer = this.db.prepare(
@@ -605,7 +753,11 @@ class Db {
    */
   setBattleKey(id, key) {
     this.db
-      .prepare("UPDATE battles SET server_key = ?, trust = CASE WHEN trust = 'local' THEN 'pending' ELSE trust END WHERE id = ?")
+      // Гостевой бой ключа не получает никогда, даже если его как-то прислали:
+      // отметка «записан без входа» не должна смениться на «ждёт сверки».
+      .prepare(
+        "UPDATE battles SET server_key = ?, trust = CASE WHEN trust = 'local' THEN 'pending' ELSE trust END WHERE id = ? AND trust <> 'guest'"
+      )
       .run(key, id);
   }
 
@@ -944,12 +1096,22 @@ class Db {
     return { battles, players, sizeBytes: size, file: this.file };
   }
 
-  /** Копия файла рядом с базой — делается перед любым разрушительным сбросом. */
+  /**
+   * Копия базы рядом с ней — делается перед любым разрушительным сбросом и
+   * перед миграциями.
+   *
+   * Через VACUUM INTO, а не копированием файла. База работает в режиме WAL:
+   * свежие записи лежат в журнале (-wal), а главный файл догоняет его только
+   * на контрольной точке. Раньше здесь была контрольная точка и копия файла;
+   * если точка не проходила целиком (базу в этот момент читал кто-то ещё),
+   * в копию попадал главный файл без журнала — база многодневной давности, а
+   * то и пустая. Такой «бэкап» хуже никакого: глядя на него, решают, что
+   * данных и не было. VACUUM INTO пишет согласованный снимок с учётом журнала.
+   */
   backup() {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const target = `${this.file}.${stamp}.bak`;
-    this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
-    fs.copyFileSync(this.file, target);
+    this.db.prepare('VACUUM INTO ?').run(target);
     return target;
   }
 
@@ -976,4 +1138,4 @@ class Db {
   }
 }
 
-module.exports = { Db, COUNTERS, windowStart };
+module.exports = { Db, COUNTERS, windowStart, isCorruption };

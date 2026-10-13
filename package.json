@@ -1,7 +1,7 @@
 {
   "name": "sightline",
   "productName": "Sightline",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Companion-приложение для War Thunder: разбор кил-фида, статистика боёв и игроков. Использует официальный локальный API игры (127.0.0.1:8111). Не аффилировано с Gaijin Entertainment.",
   "main": "src/main/index.js",
   "scripts": {
@@ -9,7 +9,8 @@
     "mock": "electron . --mock",
     "test": "node --test \"test/*.test.js\"",
     "harness": "node scripts/harness/build.js",
-    "dist": "electron-builder --win --publish never"
+    "dist": "electron-builder --win --publish never",
+    "icons": "node scripts/make-ico.js"
   },
   "author": "",
   "license": "GPL-3.0-or-later",
@@ -35,7 +36,8 @@
       "assets/**/*"
     ],
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "win": {
       "target": [
@@ -46,13 +48,16 @@
           ]
         }
       ],
-      "icon": "assets/icon.png"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
     }
   },
   "dependencies": {

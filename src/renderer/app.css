@@ -1182,6 +1182,18 @@ button.link:hover:not(:disabled) { text-decoration: underline; border: 0; }
 }
 .trust.confirmed { color: var(--ally); }
 .trust.disputed { color: #e0b354; }
+/* «Без входа» — словом и приглушённо: это не тревога, а пояснение, почему
+   бой не уйдёт на сервер. */
+.trust.guest {
+  color: var(--muted);
+  font-weight: 600;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 0 4px;
+  /* Два слова переносились по одному в строку и разрывали рамку. */
+  white-space: nowrap;
+  display: inline-block;
+}
 
 /* --- Кнопка «Сообщить о проблеме» в навигации --- */
 /* Отделена чертой от разделов: это действие, а не место, куда переходят. */

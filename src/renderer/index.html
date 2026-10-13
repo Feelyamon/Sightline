@@ -456,6 +456,9 @@
           <span class="muted" data-i18n="acc.password"></span>
           <input type="password" id="siPassword" autocomplete="current-password" />
         </label>
+        <!-- Восстановление пароля живёт на сайте: учётка общая на все проекты,
+             и второй экземпляр этой формы в программе разошёлся бы с первым. -->
+        <button type="button" class="link" id="siForgot" data-i18n="acc.forgot"></button>
         <div class="auth-error" id="siError" hidden></div>
         <div class="buttons">
           <button type="submit" id="siSubmit" data-i18n="acc.signIn"></button>
@@ -576,6 +579,10 @@
                не сопровождает никогда. -->
           <div class="buttons profile-actions" id="accOwnerActions">
             <button id="profileEdit" data-i18n="acc.edit"></button>
+            <!-- Смена пароля — на сайте, где учётная запись и живёт. Кнопка
+                 на виду, а не внутри редактора: искать её там не догадывались. -->
+            <button id="accChangePassword" data-i18n="acc.changePasswordSite"
+                    data-i18n-title="acc.changePasswordSiteHint"></button>
           </div>
         </div>
 
@@ -979,6 +986,24 @@
       <div class="auth-error" id="fpError" hidden></div>
       <div class="buttons">
         <button id="fpSubmit" data-i18n="forced.submit"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Предупреждение о гостевом режиме. Показывается при запуске без входа и
+       после выхода — не чаще раза на «отрезок без входа» (guest-notice.js).
+       «Да, я понимаю» оживает через пять секунд: окно, которое закрывается
+       не глядя, не предупреждает ни о чём. Escape отсчёт не обходит — по той
+       же причине. «Вход / регистрация» доступен сразу. -->
+  <div class="modal-backdrop blocking" id="guestModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true"
+         aria-labelledby="guestTitle" aria-describedby="guestText">
+      <h2 id="guestTitle" data-i18n="guest.title"></h2>
+      <p id="guestText" data-i18n="guest.text"></p>
+      <p class="muted small" data-i18n="guest.local"></p>
+      <div class="buttons">
+        <button id="guestSignIn" data-i18n="guest.signIn"></button>
+        <button id="guestOk" class="ghost" disabled></button>
       </div>
     </div>
   </div>

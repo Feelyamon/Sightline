@@ -11,6 +11,14 @@ const POLL_MS = 1000;
 const TIMEOUT_MS = 1500;
 // Сколько неудачных тиков подряд терпим, прежде чем сказать «игра не запущена».
 const OFFLINE_AFTER = 3;
+// И сколько времени они должны длиться. Одних трёх тиков мало: на загрузке
+// карты (ангар → бой, бой → ангар) игра занята и её веб-сервер молчит по
+// десять-двадцать секунд. Три тика — это три секунды, и программа решала, что
+// игру закрыли: со «Спрятать программу, когда игра закрыта» окно исчезало
+// ровно в момент начала боя. Закрытую игру отличает от загрузки только
+// длительность молчания, поэтому порог — по времени, с запасом на долгую
+// загрузку на медленном диске.
+const OFFLINE_GRACE_MS = 20_000;
 // Насколько долгим должен быть перерыв «не в бою», чтобы считать его выходом в
 // ангар, а не экраном респавна. Даже если перерыв окажется короче, новый бой
 // всё равно опознается по падению времени в кил-фиде.
@@ -68,8 +76,24 @@ function getJson(pathname, { host = BASE_HOST, port = BASE_PORT } = {}) {
  *   'error'   (Error)        — только неожиданные ошибки, не «игра выключена»
  */
 class WtClient extends EventEmitter {
-  constructor({ mock = false, mockFile = null, host = BASE_HOST, port = BASE_PORT } = {}) {
+  constructor({
+    mock = false,
+    mockFile = null,
+    host = BASE_HOST,
+    port = BASE_PORT,
+    offlineGraceMs = OFFLINE_GRACE_MS,
+    now = Date.now,
+  } = {}) {
     super();
+    // Часы и порог подставляются тестами: ждать двадцать настоящих секунд
+    // ради проверки загрузочного экрана незачем.
+    this.offlineGraceMs = offlineGraceMs;
+    this.now = now;
+    // Когда началась текущая полоса неудач. null — последняя попытка удалась.
+    this.failingSince = null;
+    // Тик ещё идёт. Запрос с таймаутом длиннее интервала опроса иначе
+    // накладывался на следующий, и неудачи считались вдвое быстрее.
+    this.ticking = false;
     this.mock = mock;
     // Адрес настраивается только ради тестов с подставным сервером.
     this.host = host;
@@ -93,8 +117,17 @@ class WtClient extends EventEmitter {
 
   start() {
     if (this.timer) return;
-    this.tick();
-    this.timer = setInterval(() => this.tick(), POLL_MS);
+    const run = async () => {
+      if (this.ticking) return;
+      this.ticking = true;
+      try {
+        await this.tick();
+      } finally {
+        this.ticking = false;
+      }
+    };
+    run();
+    this.timer = setInterval(run, POLL_MS);
   }
 
   stop() {
@@ -121,18 +154,28 @@ class WtClient extends EventEmitter {
 
   /**
    * Одиночная сетевая ошибка — норма: сервер игры иногда рвёт соединение.
-   * Статус «игра не запущена» ставим только после нескольких неудач подряд,
-   * иначе он мигает на ровном месте.
+   * Статус «игра не запущена» ставим только после нескольких неудач подряд
+   * И после того, как молчание длится дольше загрузки карты (см.
+   * OFFLINE_GRACE_MS), иначе он мигает на ровном месте и прячет окно в
+   * начале каждого боя.
    */
   noteFailure(reason) {
     this.failures++;
-    if (this.failures >= OFFLINE_AFTER) {
+    if (this.failingSince === null) this.failingSince = this.now();
+    const long = this.now() - this.failingSince >= this.offlineGraceMs;
+    if (this.failures >= OFFLINE_AFTER && long) {
       this.inBattle = false;
       // Причина уходит в лог, а не в интерфейс: «Игра не запущена» — уже
       // полный ответ, а «Таймаут /hudmsg» рядом с ним ничего не добавляет.
       if (reason) this.emit('debug', reason);
       this.setStatus('offline', '');
     }
+  }
+
+  /** Игра ответила — полоса неудач кончилась. */
+  noteSuccess() {
+    this.failures = 0;
+    this.failingSince = null;
   }
 
   async tick() {
@@ -154,7 +197,7 @@ class WtClient extends EventEmitter {
         info?.map_max ?? null,
         info?.grid_steps ?? null,
       ]);
-      this.failures = 0;
+      this.noteSuccess();
     } catch (e) {
       this.noteFailure('War Thunder не запущен или локальный API недоступен');
       return;
@@ -208,7 +251,7 @@ class WtClient extends EventEmitter {
     let hud;
     try {
       hud = await getJson('/hudmsg?lastEvt=0&lastDmg=0', { host: this.host, port: this.port });
-      this.failures = 0;
+      this.noteSuccess();
     } catch (e) {
       this.noteFailure(e.message);
       return;
@@ -308,4 +351,4 @@ class WtClient extends EventEmitter {
   }
 }
 
-module.exports = { WtClient, getJson };
+module.exports = { WtClient, getJson, OFFLINE_GRACE_MS, OFFLINE_AFTER };

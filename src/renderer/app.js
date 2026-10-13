@@ -691,6 +691,14 @@ function battleRow(b) {
     badge.title = t(`trust.${b.trust}`);
     when.append(badge);
   }
+  // Бой, записанный без входа, помечается словом, а не значком: «на сервер
+  // не уйдёт никогда» — не оттенок доверия, а свойство записи, и значок
+  // читался бы как ещё одна степень подтверждения.
+  if (b.trust === 'guest') {
+    const badge = el('span', 'trust guest', t('battles.guestBadge'));
+    badge.title = t('trust.guest');
+    when.append(badge);
+  }
 
   tr.append(
     when,
@@ -2795,6 +2803,105 @@ $('authRegister').addEventListener('submit', async (e) => {
 $('authSignOut').addEventListener('click', async () => {
   await window.wt.account.signOut();
   await refreshAccount();
+  checkGuestNotice();
+});
+
+// --- Предупреждение о гостевом режиме -------------------------------------
+
+let guestTimer = null;
+
+/**
+ * Спрашивает main, пора ли предупредить, и показывает окно.
+ *
+ * Решает main (guest-notice.js), окно только рисует: перезагрузка окна иначе
+ * сбрасывала бы «уже показывали», и предупреждение всплывало бы снова.
+ */
+async function checkGuestNotice() {
+  let answer;
+  try {
+    answer = await window.wt.account.guestNotice();
+  } catch {
+    return; // не показать предупреждение не страшно, уронить окно — да
+  }
+  if (answer?.show) openGuestNotice(Math.max(0, Number(answer.seconds) || 0));
+}
+
+function openGuestNotice(seconds) {
+  const ok = $('guestOk');
+  let left = seconds;
+  const paint = () => {
+    ok.disabled = left > 0;
+    ok.textContent = left > 0 ? t('guest.okWait', { n: left }) : t('guest.ok');
+  };
+  clearInterval(guestTimer);
+  paint();
+  // Отсчёт по секундам. Таймер на всё сразу не показал бы, сколько ждать, а
+  // неактивная кнопка без объяснения выглядит сломанной.
+  guestTimer = setInterval(() => {
+    left -= 1;
+    paint();
+    if (left <= 0) {
+      clearInterval(guestTimer);
+      guestTimer = null;
+    }
+  }, 1000);
+  $('guestModal').hidden = false;
+  // Фокус сразу на действие, доступное с первой секунды: с клавиатуры окно
+  // должно быть так же понятно, как мышью.
+  $('guestSignIn').focus();
+}
+
+function closeGuestNotice() {
+  clearInterval(guestTimer);
+  guestTimer = null;
+  $('guestModal').hidden = true;
+}
+
+$('guestOk').addEventListener('click', () => {
+  if ($('guestOk').disabled) return;
+  closeGuestNotice();
+});
+
+$('guestSignIn').addEventListener('click', async () => {
+  closeGuestNotice();
+  document.querySelector('.tab[data-tab="account"]')?.click();
+  // Вкладка сама перерисовывает аккаунт, и асинхронно: ждём этого, иначе
+  // перерисовка затёрла бы экран входа уже после того, как мы его показали.
+  const state = await refreshAccount();
+  if (state?.signedIn) return;
+  showAuthScreen('authGuest');
+  $('authShowSignIn').focus();
+});
+
+// Клавиатура внутри окна: Tab ходит по двум кнопкам и не уходит в интерфейс
+// под окном; Escape не закрывает его — иначе отсчёт обходился бы одной
+// клавишей, и смысл задержки пропадал. Слушаем в фазе перехвата, чтобы до
+// общих обработчиков Escape событие не дошло.
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if ($('guestModal').hidden) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const focusable = [$('guestSignIn'), $('guestOk')].filter((b) => !b.disabled);
+    const at = focusable.indexOf(document.activeElement);
+    e.preventDefault();
+    const step = e.shiftKey ? -1 : 1;
+    const next = at === -1 ? 0 : (at + step + focusable.length) % focusable.length;
+    focusable[next].focus();
+  },
+  true
+);
+
+// Сервер закрыл сессию сам (вход на другой машине со сменой пароля, отзыв
+// токена) — это тот же выход, только без нажатия кнопки.
+window.wt.onSignedOut(async () => {
+  await refreshAccount();
+  checkGuestNotice();
 });
 
 // Смена пароля. Новый код восстановления показывается тем же окном, что и при
@@ -2847,6 +2954,7 @@ $('logoutAllGo').addEventListener('click', async () => {
     await window.wt.account.logoutAll();
     $('logoutAllModal').hidden = true;
     await refreshAccount();
+    checkGuestNotice();
   } catch (err) {
     // Сервер не ответил — сессии на других машинах остались живыми, и молча
     // выйти здесь значило бы соврать, что просьба выполнена.
@@ -2888,7 +2996,15 @@ $('codeClose').addEventListener('click', () => {
   $('codeValue').textContent = '';
 });
 
-for (const [id, page] of [['linkTerms', 'terms'], ['linkPrivacy', 'privacy']]) {
+// Пароль меняется и восстанавливается на сайте учётной записи. Адрес собирает
+// main по имени страницы и сам проверяет его (links.js): окно передаёт только
+// имя.
+for (const [id, page] of [
+  ['linkTerms', 'terms'],
+  ['linkPrivacy', 'privacy'],
+  ['siForgot', 'recover'],
+  ['accChangePassword', 'account'],
+]) {
   $(id).addEventListener('click', (e) => {
     e.preventDefault();
     window.wt.openExternal(page);
@@ -3638,5 +3754,10 @@ window.wt.getState().then((state) => {
   checkVersion();
   // Отряд рисуем сразу: он в шапке и виден с первого экрана, а не только
   // после захода во вкладку аккаунта.
-  refreshAccount().then(() => window.wt.friends.state().then(renderFriends));
+  refreshAccount().then(() => {
+    // Предупреждение о гостевом режиме — после того, как стало известно,
+    // вошёл ли человек: вошедшему его не показывают никогда.
+    checkGuestNotice();
+    return window.wt.friends.state().then(renderFriends);
+  });
 });

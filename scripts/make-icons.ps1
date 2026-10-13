@@ -26,8 +26,9 @@ try {
     throw "исходник не квадратный ($($src.Width)x$($src.Height)) — обрежьте его до квадрата"
   }
 
-  # Куда и в каком размере. 512 для иконки приложения: electron-builder сам
-  # соберёт из неё .ico, но требует не меньше 256.
+  # Куда и в каком размере. 512 для иконки приложения: из неё npm run icons
+  # собирает build/icon.ico со всеми размерами (scripts/make-ico.js) — после
+  # смены лого его нужно прогнать, тест сверяет .ico с исходником.
   $targets = @(
     @{ Path = (Join-Path $root 'assets\logo.png');    Size = 1024 },
     @{ Path = (Join-Path $root 'assets\icon.png');    Size = 512  },

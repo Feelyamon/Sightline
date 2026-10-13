@@ -117,6 +117,13 @@ class Account {
      * ошибкам, которые до окна доходят не все.
      */
     this.onServerState = () => {};
+    /**
+     * Позвать, когда вход закончился — неважно как: кнопкой «Выйти», выходом
+     * со всех устройств или отказом сервера по токену. Все три пути сходятся
+     * в signOutLocally, поэтому и сообщаем оттуда: подписываться на каждый
+     * по отдельности значило бы однажды забыть четвёртый.
+     */
+    this.onSignedOut = () => {};
     this.load();
   }
 
@@ -517,8 +524,10 @@ class Account {
   }
 
   signOutLocally() {
+    const was = this.isSignedIn;
     this.session = null;
     this.save();
+    if (was) this.onSignedOut();
   }
 
   /**

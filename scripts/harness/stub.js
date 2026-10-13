@@ -38,7 +38,8 @@ for (let i = 0; i < 220; i++) {
     // Состояние доверия. В живой программе оно приходит с сервера и пока
     // всегда 'alone' — синхронизации боёв ещё нет. В стенде подмешиваем
     // подтверждённые и спорные, иначе их отметки негде увидеть.
-    trust: r < 0.25 ? 'confirmed' : r < 0.32 ? 'disputed' : 'alone',
+    // 'guest' — записан без входа: такие бои остаются только локальными.
+    trust: r < 0.25 ? 'confirmed' : r < 0.32 ? 'disputed' : r > 0.93 ? 'guest' : 'alone',
     nicks: [pick(NICKS), pick(NICKS)],
   });
 }
@@ -280,6 +281,9 @@ window.wt = {
     }),
     logoutAll: async () => ({ signedIn: false, closed: 3 }),
     saveRecoveryCode: async () => null,
+    // Предупреждение о гостевом режиме: в стенде открывается по #guest в
+    // адресе — стенд «вошёл», и иначе окно было бы не увидеть.
+    guestNotice: async () => ({ show: location.hash === '#guest', seconds: 5 }),
   },
 
   friends: (() => {
@@ -420,6 +424,7 @@ window.wt = {
   onUpdate: () => () => {},
   onDbChanged: () => () => {},
   onError: () => () => {},
+  onSignedOut: () => () => {},
   onFriendsUpdate: () => () => {},
   onProofProgress: () => () => {},
 };

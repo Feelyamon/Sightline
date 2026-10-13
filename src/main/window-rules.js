@@ -49,4 +49,65 @@ const onWindowClose = (settings = {}) => (settings.closeToTray ? 'hide' : 'quit'
 const shouldWarnAboutTray = (settings = {}) =>
   !!settings.closeToTray && !settings.trayNoticeShown;
 
-module.exports = { onGameStatus, onWindowClose, shouldWarnAboutTray, isRunning };
+/**
+ * Откладывает «спрятать окно» и отменяет его, если игра вернулась.
+ *
+ * Статус «игра закрыта» уже выставляется с запасом (wt-client.js ждёт, пока
+ * игра промолчит дольше загрузки карты), но окно прячется не по одному
+ * сигналу, а по подтверждённому: если за время ожидания игра снова
+ * ответила, значит, это была пауза, а не выход. Окно, исчезающее посреди
+ * загрузки боя, — ровно та жалоба, из-за которой это появилось; лишние
+ * несколько секунд до скрытия после настоящего выхода никому не мешают.
+ */
+class HideDelay {
+  /**
+   * @param {object} opts
+   * @param {number} [opts.delayMs]
+   * @param {() => void} opts.hide - что сделать, когда ожидание вышло
+   * @param {Function} [opts.setTimer] - подменяется в тестах
+   * @param {Function} [opts.clearTimer]
+   */
+  constructor({ delayMs = HIDE_DELAY_MS, hide, setTimer = setTimeout, clearTimer = clearTimeout }) {
+    this.delayMs = delayMs;
+    this.hide = hide;
+    this.setTimer = setTimer;
+    this.clearTimer = clearTimer;
+    this.timer = null;
+  }
+
+  get pending() {
+    return this.timer !== null;
+  }
+
+  /** Решение onGameStatus пришло — что с ним делать. */
+  apply(action, status) {
+    if (action === 'hide') {
+      if (this.timer === null) {
+        this.timer = this.setTimer(() => {
+          this.timer = null;
+          this.hide();
+        }, this.delayMs);
+      }
+      return;
+    }
+    // Игра снова отвечает (ангар или бой) — отложенное скрытие отменяется.
+    if (isRunning(status)) this.cancel();
+  }
+
+  cancel() {
+    if (this.timer !== null) this.clearTimer(this.timer);
+    this.timer = null;
+  }
+}
+
+// Сколько ждать после «игра закрыта», прежде чем прятать окно.
+const HIDE_DELAY_MS = 10_000;
+
+module.exports = {
+  onGameStatus,
+  onWindowClose,
+  shouldWarnAboutTray,
+  isRunning,
+  HideDelay,
+  HIDE_DELAY_MS,
+};

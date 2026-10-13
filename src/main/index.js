@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell, Notification, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, dialog, nativeImage } = require('electron');
 
 const { WtClient } = require('./wt-client');
 const { BattleState } = require('./battle-state');
@@ -16,6 +16,9 @@ const { Account } = require('./account');
 const { Friends } = require('./friends');
 const { Avatars } = require('./avatars');
 const { Sync, battlePayload } = require('./sync');
+const { GuestNotice, COUNTDOWN_SEC } = require('./guest-notice');
+const links = require('./links');
+const { loadWindowIcon } = require('./icon-paths');
 const config = require('./config');
 
 // Схему адресов аватарок объявляем до готовности приложения — позже окно её
@@ -33,6 +36,8 @@ let account;
 let friends;
 let avatars;
 let sync;
+/** @type {GuestNotice} */
+let guestNotice;
 let db;
 let mainWindow = null;
 let tray = null;
@@ -60,6 +65,18 @@ let battleResult = 'unknown';
 // Причина, по которой данные текущего боя считаются неполными. Пока она есть,
 // бой пишется отменённым и в статистику не идёт. Сбрасывается вместе с боем.
 let battleCancelReason = null;
+
+// В какой сессии входа началась запись текущего боя (sync.recording()).
+// Снимается на НАЧАЛЕ боя, а не на конце: бой, начатый без входа, остаётся
+// гостевым, даже если человек вошёл в аккаунт до его окончания, — иначе
+// «войти на последней минуте» стало бы способом отправить бой, записанный
+// неизвестно кем и как. null — бой ещё не начался.
+let battleRecording = null;
+
+/** Запомнить сессию на начале боя, если ещё не запомнили. */
+function noteBattleStart() {
+  if (!battleRecording && sync) battleRecording = sync.recording();
+}
 
 /**
  * Помечает текущий бой неполным. Причин две, и обе дают одно состояние:
@@ -104,6 +121,7 @@ function persistBattle({ final = false } = {}) {
     endedAt: Date.now(),
     result: battleResult,
     cancelReason: battleCancelReason,
+    guest: sync.isGuest(battleRecording),
   };
   try {
     battleRowId =
@@ -116,7 +134,9 @@ function persistBattle({ final = false } = {}) {
     // ещё меняются, и отправлять промежуточные версии значит слать одно и то
     // же по десять раз. Ключ очереди — локальный id, поэтому повторный вызов
     // заменяет запись, а не добавляет вторую.
-    if (final) sync.enqueue(battleRowId, battlePayload(snapshot, opts));
+    // Гостевой бой sync не примет сам — проверка там, а не здесь, чтобы её
+    // нельзя было обойти другим вызывающим.
+    if (final) sync.enqueue(battleRowId, battlePayload(snapshot, opts), battleRecording);
   } catch (e) {
     // Единственная строка, которую собирает main: словарь берём тот же, что
     // и рендерер, иначе ошибка приходила бы на чужом языке.
@@ -140,6 +160,13 @@ function currentLocale() {
  * @param {object} [opts]
  * @param {boolean} [opts.hidden] - создать окно, но не показывать
  */
+let windowIconCache = null;
+/** Значок окна и уведомлений. Читается один раз. */
+function windowIcon() {
+  if (!windowIconCache) windowIconCache = loadWindowIcon(nativeImage, app.getAppPath());
+  return windowIconCache;
+}
+
 function createWindow({ hidden = false } = {}) {
   const bounds = settings.get('mainBounds') || {};
   mainWindow = new BrowserWindow({
@@ -148,7 +175,9 @@ function createWindow({ hidden = false } = {}) {
     minHeight: 560,
     title: 'Sightline',
     // Без этого в заголовке окна и на панели задач висит логотип Electron.
-    icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
+    // Путь — от корня приложения, а не от этого файла, и с запасным знаком
+    // на случай, если файл не прочитался: см. icon-paths.js.
+    icon: windowIcon(),
     backgroundColor: '#12151a',
     // Окно создаётся скрытым и показывается по ready-to-show. Иначе при тихом
     // старте с системой оно успевало моргнуть на экране, а при обычном —
@@ -168,6 +197,20 @@ function createWindow({ hidden = false } = {}) {
   // раз заново: Electron сбрасывает его на 1 при новой загрузке документа.
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents.setZoomFactor(uiScale());
+    // База оказалась испорчена и была отложена (db.js, open). Говорим об этом
+    // человеку словами и с путём к файлу: пустая история без объяснения
+    // выглядит как «программа всё потеряла», а файл с данными лежит рядом.
+    if (db?.recovery) {
+      const dict = locale.dictionary(settings.get('uiLang'));
+      const template =
+        dict['db.recovered'] || 'The battle database was damaged and has been set aside: {file}';
+      send(
+        'app:error',
+        template
+          .replace('{file}', db.recovery.corruptFile)
+          .replace('{battles}', String(db.recovery.salvaged?.battles ?? 0))
+      );
+    }
   });
 
   const saveBounds = () => {
@@ -201,6 +244,10 @@ function warnAboutTrayOnce() {
   const dict = locale.dictionary(settings.get('uiLang'));
   new Notification({
     title: 'Sightline',
+    // Явно, а не «возьмёт сама»: без значка Windows берёт его у ярлыка с тем
+    // же AppUserModelId, а при запуске не из установленной копии такого
+    // ярлыка нет — и в уведомлении оказывается стандартное окошко.
+    icon: windowIcon(),
     body: dict['tray.stillRunning'] || 'The app is still running in the tray.',
   }).show();
 }
@@ -242,6 +289,14 @@ function applyLaunchWithSystem() {
   });
 }
 
+const hideOnExit = new rules.HideDelay({
+  hide: () => {
+    // За время ожидания человек мог выключить настройку — тогда не прячем.
+    if (!settings.get('hideOnGameExit')) return;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+  },
+});
+
 function startClient() {
   battle = new BattleState(settings.get('selfNick'));
   client = new WtClient({ mock: MOCK });
@@ -252,6 +307,7 @@ function startClient() {
 
     // Живой обмен идёт только в бою: в ангаре делиться нечем, а держать
     // запись о себе означало бы показывать соседям бой, которого уже нет.
+    if (s.status === 'battle') noteBattleStart();
     if (s.status === 'battle') startLive();
     else stopLive();
 
@@ -260,7 +316,9 @@ function startClient() {
     // вопрос «запущена ли игра». Подробности — в window-rules.js.
     const action = rules.onGameStatus(status.status, s.status, settings.data);
     if (action === 'show') showWindow();
-    if (action === 'hide' && mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+    // Прячем не сразу, а через HideDelay: вернулась игра за время ожидания —
+    // значит, это была загрузка карты, а не выход из игры.
+    hideOnExit.apply(action, s.status);
 
     status = s;
     if (tray) {
@@ -290,6 +348,8 @@ function startClient() {
     liveActive = false;
     battleStartedAt = Date.now();
     battleRowId = null; // следующий бой — новая запись
+    battleRecording = null;
+    noteBattleStart();
     battleResult = 'unknown';
     battleCancelReason = null;
     schedulePush();
@@ -299,6 +359,7 @@ function startClient() {
   client.on('dataGap', () => cancelBattle('feedGap'));
 
   client.on('damage', (entry) => {
+    noteBattleStart();
     battle.ingest(entry);
     schedulePush();
     schedulePeers();
@@ -537,6 +598,7 @@ app.whenReady().then(() => {
   settings = new Settings(app.getPath('userData'));
   db = new Db(app.getPath('userData'));
   account = new Account(app.getPath('userData'));
+  guestNotice = new GuestNotice(account.isSignedIn);
   friends = new Friends(account, settings);
   // Состояние связи с сервером идёт в шапку отдельным индикатором. Раньше
   // такие сообщения попадали в строку игры и затирали «В бою» — во время боя
@@ -548,6 +610,13 @@ app.whenReady().then(() => {
   // Отметка доверия поменялась — список боёв надо перерисовать, иначе галочка
   // появится только после переключения вкладки.
   sync.onTrustChanged = () => send('db:changed');
+  // Любой выход из аккаунта обнуляет очередь отправки и снова взводит
+  // предупреждение о гостевом режиме (guest-notice.js).
+  account.onSignedOut = () => {
+    sync.endSession();
+    guestNotice.signedOut();
+    send('account:signedOut');
+  };
   sync.start();
   // Настройка поменялась в окне — уедет в учётную запись. Применение при этом
   // мгновенное и не ждёт сети: программа обязана слушаться сразу.
@@ -1180,6 +1249,7 @@ handle('app:resetBattle', () => {
   battle.reset();
   battleStartedAt = Date.now();
   battleRowId = null;
+  battleRecording = null;
   battleCancelReason = null;
   schedulePush();
 });
@@ -1266,7 +1336,12 @@ async function afterSignIn() {
   // статистика, подделывать в них нечего, и запрет на загрузку накопленной до
   // регистрации истории сюда не относится.
   await syncSettings();
-  // Бои, накопившиеся в очереди до входа, ждали именно этого момента.
+  // Новая сессия отправки. Очередь при этом ОБНУЛЯЕТСЯ, а не разбирается:
+  // бои, записанные до входа, на сервер не едут никогда — ни гостевые, ни
+  // остатки прошлой сессии. Отправляться будут только бои, начатые с этой
+  // минуты, и по одному. Подробности — в шапке sync.js.
+  sync.beginSession();
+  guestNotice.signedIn();
   sync.start();
 }
 handle('account:saveRecoveryCode', async (_e, code) => {
@@ -1287,9 +1362,8 @@ handle('account:saveRecoveryCode', async (_e, code) => {
 handle('app:openExternal', (_e, page) => {
   // Только свои страницы и только из белого списка: передавать в браузер
   // произвольный адрес из окна — способ открыть что угодно чужими руками.
-  const pages = { terms: '/terms', privacy: '/privacy', rights: '/rights' };
-  const route = pages[page];
-  if (route) return shell.openExternal(config.site + route);
+  // Список страниц и проверка адресов — в links.js.
+  if (page !== 'repo') return shell.openExternal(links.externalUrl(page));
 
   // Репозиторий живёт на чужом хосте, поэтому идёт отдельной веткой, а не
   // подклеивается к адресу сайта. Проверяем то же, что и у адреса обновления:
@@ -1321,13 +1395,25 @@ handle('account:openDownload', () => {
 // Задать пароль после админского сброса. Без входа: войти человек как раз и
 // не может — подходящего пароля не существует, а сессии закрыты. Единственный
 // ключ здесь — код восстановления, который у него есть с регистрации.
-handle('account:forcedPassword', (_e, form = {}) =>
-  account.forcedPassword({
+handle('account:forcedPassword', async (_e, form = {}) => {
+  const result = await account.forcedPassword({
     login: String(form.login || ''),
     recoveryCode: String(form.recoveryCode || ''),
     newPassword: String(form.newPassword || ''),
-  })
-);
+  });
+  // Сервис сразу выдал сессию — это такой же вход, как по паролю, и после
+  // него нужно всё то же: новая сессия отправки боёв, ник, друзья.
+  if (account.isSignedIn) await afterSignIn();
+  return result;
+});
+
+// Показать ли предупреждение о гостевом режиме. Решение и счёт показов — в
+// guest-notice.js; окну отдаётся ещё и длительность отсчёта, чтобы она жила
+// в одном месте.
+handle('account:guestNotice', () => ({
+  show: guestNotice.take(account.isSignedIn),
+  seconds: COUNTDOWN_SEC,
+}));
 
 // Приватность профиля. Пока доступна только администратору — это проверяет
 // сервер типом аргумента, а не окно: спрятанная кнопка защитой не является.
